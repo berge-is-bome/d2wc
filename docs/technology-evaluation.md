@@ -32,6 +32,7 @@ The chosen stack should be judged against these criteria.
 7. Can call out to helper tools or libraries for window identity and geometry.
 8. Can safely read, validate, preview, back up, and write text files.
 9. Can be developed quickly enough to get a working Phase 1 configurator.
+10. Fits Qubes OS with XFCE well as the first target environment.
 
 ### Strongly preferred
 
@@ -58,13 +59,46 @@ The first implementation should target Linux/X11-style desktop behavior because 
 
 Wayland support should not drive the first implementation. If a future desktop environment prevents the same level of window inspection or movement, that should be documented as a compatibility limitation rather than allowed to block the first useful version.
 
+## Candidate: Python + GTK/PyGObject
+
+### Summary
+
+Python with GTK/PyGObject is the preferred first UI candidate for the Phase 1 configurator.
+
+This became the stronger choice after the tray icon was moved from required primary entry point to optional setup/troubleshooting behavior. The stable entry point is now a command that can be assigned to a keyboard shortcut, which removes the biggest reason to prefer Qt first.
+
+For Qubes OS with XFCE, a GTK application is likely to fit the desktop better than a Qt application, and the UI requirements are modest enough that GTK should be able to handle the Phase 1 configurator cleanly.
+
+### Strengths
+
+1. GTK is natural on many Linux desktops and should fit Qubes/XFCE well.
+2. PyGObject is a common Python path for GTK applications.
+3. Python remains excellent for parser/writer logic.
+4. The UI can be small and native-looking.
+5. Distribution packaging is generally practical.
+6. The command/keyboard-shortcut entry point does not depend on tray support.
+7. The optional-tray decision avoids building the architecture around deprecated or desktop-specific tray behavior.
+
+### Weaknesses
+
+1. GTK's old tray/status-icon path is not a good foundation for a permanently visible tray icon.
+2. A modern tray/status-notifier implementation may require extra libraries or desktop-specific handling if optional tray mode is added later.
+3. GTK 3 versus GTK 4 needs a deliberate choice.
+4. Pointer-anchored menu behavior still needs testing.
+
+### Assessment
+
+Recommended as the first Phase 1 UI candidate.
+
+The first proof should start with Python + GTK/PyGObject unless a practical test on the target Qubes/XFCE environment exposes a blocker.
+
 ## Candidate: Python + Qt for Python/PySide6
 
 ### Summary
 
-Python with PySide6 is a strong first candidate for the configurator UI and possibly the helper process.
+Python with PySide6 remains a strong fallback candidate for the configurator UI and possibly the helper process.
 
-The earlier assumption that the tray icon was a required primary entry point made PySide6 look like the obvious default. With the tray now optional and the command/keyboard-shortcut path promoted to the stable entry point, PySide6 remains attractive but should be tested against GTK rather than treated as settled.
+The earlier assumption that the tray icon was a required primary entry point made PySide6 look like the obvious default. With the tray now optional and the command/keyboard-shortcut path promoted to the stable entry point, PySide6 is no longer the first default.
 
 ### Strengths
 
@@ -78,43 +112,15 @@ The earlier assumption that the tray icon was a required primary entry point mad
 ### Weaknesses
 
 1. Qt is heavier than a minimal GTK utility.
-2. Desktop integration may feel less native on GNOME-style desktops than a GTK application.
+2. Desktop integration may feel less native in the first target environment.
 3. Packaging must ensure the correct PySide6 dependency is available on target distributions.
 4. Optional tray behavior still depends on the user's desktop environment exposing a tray or StatusNotifier-compatible area.
 
 ### Assessment
 
-Recommended as one of the two serious Phase 1 candidates.
+Recommended as the fallback Phase 1 UI candidate if GTK/PyGObject fails a practical proof task.
 
-PySide6 is especially attractive if optional tray mode and pointer-anchored popup behavior are kept important.
-
-## Candidate: Python + GTK/PyGObject
-
-### Summary
-
-Python with GTK/PyGObject is now just as serious as PySide6 for the Phase 1 configurator because the tray icon is no longer a required always-visible entry point.
-
-### Strengths
-
-1. GTK is natural on many Linux desktops.
-2. PyGObject is a common Python path for GTK applications.
-3. Python remains excellent for parser/writer logic.
-4. The UI can be small and native-looking.
-5. Distribution packaging is generally practical.
-6. The command/keyboard-shortcut entry point does not depend on tray support.
-
-### Weaknesses
-
-1. GTK's old tray/status-icon path is not a good foundation for a permanently visible tray icon.
-2. A modern tray/status-notifier implementation may require extra libraries or desktop-specific handling.
-3. GTK 3 versus GTK 4 choices could complicate long-term direction.
-4. Pointer-anchored menu behavior still needs testing.
-
-### Assessment
-
-Recommended as one of the two serious Phase 1 candidates.
-
-If the first configurator is command-launched and tray behavior is optional or delayed, GTK may be a better fit than originally assumed.
+PySide6 becomes especially attractive again if optional tray mode or pointer-anchored popup behavior proves much easier in Qt than GTK.
 
 ## Candidate: C or C++ with GTK or Qt
 
@@ -180,7 +186,7 @@ Go is simple to deploy for many command-line tools, but GUI binding maturity and
 
 ### Weaknesses
 
-1. Linux GUI bindings are less standard than Python + Qt or Python + GTK.
+1. Linux GUI bindings are less standard than Python + GTK or Python + Qt.
 2. Optional tray/menu behavior still needs binding-specific validation.
 3. More risk around desktop integration.
 4. Less natural for building a polished Linux configuration UI.
@@ -246,11 +252,12 @@ Shell scripts may still be useful for isolated test harnesses, especially left-e
 The recommended Phase 1 direction is:
 
 1. Python 3.
-2. A short proof comparison between PySide6 and GTK/PyGObject.
-3. A pure-Python core package for parsing, validating, rendering, backing up, and saving managed Lua sections.
-4. A command-line application entry point that starts the configurator.
-5. Optional tray support only if the chosen toolkit handles it cleanly.
-6. Subprocess calls or small helper modules for desktop/window inspection during early testing.
+2. GTK/PyGObject as the first UI proof target.
+3. PySide6 as the fallback proof target if GTK exposes a practical blocker.
+4. A pure-Python core package for parsing, validating, rendering, backing up, and saving managed Lua sections.
+5. A command-line application entry point that starts the configurator.
+6. Optional tray support only if the chosen toolkit handles it cleanly.
+7. Subprocess calls or small helper modules for desktop/window inspection during early testing.
 
 This gives the project a practical path to a working manual configurator without prematurely solving every daemon, tray, and post-resize problem.
 
@@ -281,7 +288,7 @@ The core logic should be testable without starting the GUI.
 
 ## Phase 1 proof tasks
 
-Before committing fully to PySide6 or GTK/PyGObject, build tiny proof tasks:
+Before committing fully to GTK/PyGObject, build tiny proof tasks:
 
 1. Open a main window from a command.
 2. Confirm the command can be assigned to a desktop keyboard shortcut.
@@ -292,7 +299,9 @@ Before committing fully to PySide6 or GTK/PyGObject, build tiny proof tasks:
 7. Optional: create a tray icon with a context menu.
 8. Optional: detect whether the system tray is available.
 
-If these pass on the target Qubes/XFCE environment, the chosen toolkit can become the accepted Phase 1 stack.
+If these pass on the target Qubes/XFCE environment, GTK/PyGObject should become the accepted Phase 1 stack.
+
+If GTK fails a practical proof task, repeat the same proof tasks with PySide6.
 
 ## Phase 2 technology questions
 
@@ -312,7 +321,9 @@ These questions should be handled in `docs/event-monitoring.md` after the Phase 
 
 Use Python for the first prototype.
 
-Compare PySide6 and GTK/PyGObject with small proof tasks before committing to one UI toolkit.
+Use GTK/PyGObject as the first UI proof target because the first target environment is Qubes/XFCE and the tray icon is optional.
+
+Keep PySide6 as the fallback UI proof target if GTK/PyGObject fails a practical test.
 
 Do not choose a toolkit primarily because of a tray icon. The stable entry point should be a command that the user can bind to a keyboard shortcut.
 
@@ -325,10 +336,11 @@ Do not use a webview for the first implementation.
 Before writing real application code, confirm these points:
 
 1. Python is acceptable as the first implementation language.
-2. PySide6 and GTK/PyGObject should both be tested briefly before choosing the UI toolkit.
-3. The first implementation may target X11/Qubes/XFCE behavior first.
-4. Wayland support can be treated as later compatibility work.
-5. Phase 1 uses a command/keyboard-shortcut entry point.
-6. Tray behavior is optional and should not drive the architecture.
-7. Post-resize automation remains Phase 2.
-8. The parser/writer core must be separated from the UI.
+2. GTK/PyGObject should be tested first for the UI toolkit.
+3. PySide6 remains the fallback toolkit if GTK exposes a blocker.
+4. The first implementation may target X11/Qubes/XFCE behavior first.
+5. Wayland support can be treated as later compatibility work.
+6. Phase 1 uses a command/keyboard-shortcut entry point.
+7. Tray behavior is optional and should not drive the architecture.
+8. Post-resize automation remains Phase 2.
+9. The parser/writer core must be separated from the UI.
