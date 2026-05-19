@@ -12,9 +12,9 @@ The UI flow describes what the user sees. This document describes what must exis
 
 1. The `devilspie2` Lua rules script.
 2. The configurator UI.
-3. A daemon/helper process, when event monitoring or tray behavior requires logic outside the Lua script.
+3. A daemon/helper process, when event monitoring, process ownership, or optional tray behavior requires logic outside the Lua script.
 
-The current repository starts with the Lua script as the only execution layer. The first implementation goal is to add a safe manual configurator. Post-resize automation and pointer-anchored menus should build on top of that foundation.
+The current repository starts with the Lua script as the only execution layer. The first implementation goal is to add a safe manual configurator that can be opened by command or keyboard shortcut. Post-resize automation and pointer-anchored menus should build on top of that foundation.
 
 ## Responsibilities
 
@@ -65,15 +65,16 @@ The configurator UI is the normal user-facing editing tool.
 
 It should:
 
-1. Load the current managed Lua configuration.
-2. Read the selected or active window identity.
-3. Show current domain, class, workspace, screen, and geometry.
-4. Let the user create or update rules without writing Lua manually.
-5. Preview generated rules before saving.
-6. Validate generated rules before saving.
-7. Back up the previous Lua file before saving.
-8. Write deterministic Lua for the managed sections.
-9. Request a clean reload or restart after saving.
+1. Open from a command suitable for assigning to a desktop keyboard shortcut.
+2. Load the current managed Lua configuration.
+3. Read the selected or active window identity.
+4. Show current domain, class, workspace, screen, and geometry.
+5. Let the user create or update rules without writing Lua manually.
+6. Preview generated rules before saving.
+7. Validate generated rules before saving.
+8. Back up the previous Lua file before saving.
+9. Write deterministic Lua for the managed sections.
+10. Request a clean reload or restart after saving.
 
 The configurator should not silently rewrite unrelated parts of the Lua script.
 
@@ -83,9 +84,9 @@ A daemon/helper may be required for behavior that is awkward or impossible insid
 
 The daemon/helper may own:
 
-1. System tray icon.
-2. Tray menu actions.
-3. Active-window capture.
+1. Starting, verifying, or restarting the managed `devilspie2` process.
+2. Active-window capture.
+3. Optional system tray icon and tray menu actions.
 4. Post-resize detection.
 5. Pointer-anchored `Cancel` / `Configure` menu.
 6. Suppression of resize events caused by `d2wc` itself.
@@ -93,6 +94,8 @@ The daemon/helper may own:
 8. Debug logging.
 
 The exact daemon implementation depends on the technology choice. The architecture should allow the daemon/helper and configurator to be the same process at first, then split later if needed.
+
+The daemon/helper should not require a permanently visible tray icon. After initial setup, `d2wc` should be able to run quietly in the background, with the configurator opened by command or keyboard shortcut when the user wants to make a change.
 
 ## Phase 1 runtime
 
@@ -102,11 +105,16 @@ Required runtime pieces:
 
 1. Current `devilspie2` Lua script.
 2. Manual configurator UI.
-3. A tray entry point, if the chosen toolkit supports it cleanly.
+3. Command-line/manual launch path suitable for desktop keyboard shortcuts.
 4. Config file reader/writer for the managed Lua sections.
 5. Validation before save.
 6. Backup before save.
 7. Reload or restart path after save.
+
+Optional Phase 1 runtime pieces:
+
+1. Tray entry point, if the chosen toolkit supports it cleanly and it does not drive the architecture.
+2. Setup/troubleshooting mode where the tray is visible while the user is actively configuring their workspace.
 
 Phase 1 does not need to detect post-resize events yet. A user can manually place a window, open the configurator, capture the active window, and save the desired rule.
 
@@ -354,12 +362,12 @@ The log location should be configurable later. The initial implementation can lo
 The following decisions still need testing or technology evaluation:
 
 1. Best implementation language and GUI toolkit.
-2. Best tray icon approach across desktops.
-3. Best way to observe resize completion.
-4. Best way to anchor a menu at the pointer.
-5. Best way to reload or restart only the managed `devilspie2` instance.
-6. Whether the Lua script should eventually be generated from a separate data file instead of edited directly.
-7. Whether `LEFT_EDGE_CORRECTION` can be simplified by always applying one position function after geometry.
+2. Best way to observe resize completion.
+3. Best way to anchor a menu at the pointer.
+4. Best way to reload or restart only the managed `devilspie2` instance.
+5. Whether the Lua script should eventually be generated from a separate data file instead of edited directly.
+6. Whether `LEFT_EDGE_CORRECTION` can be simplified by always applying one position function after geometry.
+7. Whether optional tray behavior is worth implementing after the command/shortcut entry point works.
 
 ## Initial development sequence
 
@@ -368,10 +376,10 @@ The recommended implementation sequence is:
 1. Keep the current Lua script working.
 2. Build a parser/writer for the managed Lua blocks.
 3. Build validation for generated rules.
-4. Build a manual configurator window.
+4. Build a manual configurator window that can be opened by command or keyboard shortcut.
 5. Add backup and save behavior.
 6. Add a reload or restart path.
-7. Add tray entry.
+7. Add optional tray entry if useful.
 8. Add post-resize detection.
 9. Add the pointer-anchored `Cancel` / `Configure` menu.
 10. Add live geometry display while resizing.
