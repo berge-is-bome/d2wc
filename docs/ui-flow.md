@@ -27,6 +27,7 @@ It should not:
 2. Rewrite unrelated Lua program logic.
 3. Apply hidden permanent changes without a visible save action.
 4. Assume that mouse buttons use a right-handed layout.
+5. Require a permanently visible tray icon for normal background operation.
 
 ## Main user objects
 
@@ -42,13 +43,35 @@ The UI should expose these concepts in user language.
 8. Exclude rule: a rule that tells `d2wc` not to manage matching windows.
 9. Left-edge correction: a compatibility setting for windows that should land at `x = 0` but do not.
 
-## Entry point 1: system tray menu
+## Entry point 1: command or keyboard shortcut
 
-The tray icon is the stable entry point. It should work even when no window was just resized.
+The stable manual entry point should be a command that opens the configurator.
 
-### Tray menu actions
+This command can be assigned to a desktop keyboard shortcut by the user. That is likely the cleanest day-to-day workflow after the workspace has mostly been configured, because `d2wc` can keep running in the background without needing a permanently visible tray icon.
 
-The tray menu should include:
+Example user flow:
+
+1. User places or selects a window.
+2. User presses their configured shortcut.
+3. The configurator opens for the active window.
+4. User captures geometry, creates a route, creates a placement rule, pins the window, or excludes it.
+5. User saves or cancels.
+
+The exact command name is not settled yet. Possible names:
+
+1. `d2wc configure`
+2. `d2wc-configure`
+3. `d2wc --configure`
+
+The command should also be usable from a terminal for debugging.
+
+## Entry point 2: optional tray menu
+
+A tray icon can still be useful during initial setup or troubleshooting, but it should not be required for normal operation.
+
+The tray mode should be optional.
+
+When enabled, the tray menu can include:
 
 1. `Configure`
 2. `Capture Active Window`
@@ -77,7 +100,7 @@ This action should immediately gather the active window's domain, class, title, 
 
 This is the fastest manual path for a user who has already placed a window where they want it.
 
-## Entry point 2: direct post-resize configure
+## Entry point 3: direct post-resize configure
 
 In this mode, `d2wc` opens the configurator directly after the user finishes resizing a window.
 
@@ -109,7 +132,7 @@ The direct post-resize flow must not trigger when `d2wc` itself moves or resizes
 
 The daemon/helper needs a short suppression window after applying rules so it can distinguish user-initiated resizing from automated placement.
 
-## Entry point 3: post-resize choice menu
+## Entry point 4: post-resize choice menu
 
 In this mode, `d2wc` does not open the full configurator immediately. It first shows a small menu fixed to the mouse pointer.
 
@@ -451,20 +474,25 @@ A small settings screen should eventually include:
 
 1. Lua config path.
 2. Backup location.
-3. Post-resize behavior:
+3. Manual configurator command.
+4. Optional tray icon:
+   1. Disabled.
+   2. Enabled during setup.
+   3. Always enabled.
+5. Post-resize behavior:
    1. Disabled.
    2. Open configurator directly.
    3. Show `Cancel` / `Configure` menu.
-4. Resize threshold.
-5. Suppression delay after automated placement.
-6. Mouse action behavior, if the toolkit cannot reliably respect swapped buttons.
-7. Debug logging.
+6. Resize threshold.
+7. Suppression delay after automated placement.
+8. Mouse action behavior, if the toolkit cannot reliably respect swapped buttons.
+9. Debug logging.
 
 ## MVP UI scope
 
 The first usable version should include:
 
-1. Tray icon with `Configure`, `Reload Rules`, and `Quit`.
+1. Command-line/manual launch path for the configurator, suitable for assigning to a desktop keyboard shortcut.
 2. Main configurator window for the active window.
 3. Current window summary.
 4. Geometry capture into `GEOM`.
@@ -472,6 +500,7 @@ The first usable version should include:
 6. Placement rule creation.
 7. Rule preview before save.
 8. Backup before save.
+9. Optional tray icon if the chosen toolkit makes it reliable without driving the architecture.
 
 Post-resize automation, pointer-anchored menus, and live geometry updates can follow after the basic configurator can safely read and write the Lua file.
 
