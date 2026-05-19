@@ -7,14 +7,15 @@ This document evaluates practical implementation choices for the future `d2wc` c
 The decision must serve the actual product shape described in the current design documents:
 
 1. A small Linux desktop configurator.
-2. A tray icon and tray menu.
-3. A main configuration window.
-4. Active-window capture.
-5. Safe parsing and writing of the managed Lua sections.
-6. Later post-resize detection.
-7. Later pointer-anchored `Cancel` / `Configure` menu.
-8. Packaging for common Linux distributions.
-9. Good behavior on Qubes OS with XFCE, while remaining useful on other Linux desktops.
+2. A command/manual launch path suitable for assigning to a desktop keyboard shortcut.
+3. An optional tray icon and tray menu for setup or troubleshooting.
+4. A main configuration window.
+5. Active-window capture.
+6. Safe parsing and writing of the managed Lua sections.
+7. Later post-resize detection.
+8. Later pointer-anchored `Cancel` / `Configure` menu.
+9. Packaging for common Linux distributions.
+10. Good behavior on Qubes OS with XFCE, while remaining useful on other Linux desktops.
 
 ## Evaluation criteria
 
@@ -26,7 +27,7 @@ The chosen stack should be judged against these criteria.
 2. Available on Fedora and Debian-family systems.
 3. Reasonable packaging path.
 4. Can create a simple desktop window.
-5. Can provide a tray icon or equivalent control point.
+5. Can provide a command-line entry point for the configurator.
 6. Can show menus and dialogs reliably.
 7. Can call out to helper tools or libraries for window identity and geometry.
 8. Can safely read, validate, preview, back up, and write text files.
@@ -40,6 +41,7 @@ The chosen stack should be judged against these criteria.
 4. Testable parser/writer code.
 5. A clear split between UI code and core rule-management code.
 6. No JavaScript or webview dependency unless it solves a real problem.
+7. Optional tray support, provided it does not dominate the architecture.
 
 ### Not required for Phase 1
 
@@ -48,6 +50,7 @@ The chosen stack should be judged against these criteria.
 3. Highly themed or flamboyant UI.
 4. Live geometry updates while resizing.
 5. Full daemon/window-event monitoring.
+6. Permanently visible tray icon.
 
 ## Initial platform assumption
 
@@ -59,13 +62,15 @@ Wayland support should not drive the first implementation. If a future desktop e
 
 ### Summary
 
-Python with PySide6 is the strongest first candidate for the configurator UI and possibly the helper process.
+Python with PySide6 is a strong first candidate for the configurator UI and possibly the helper process.
+
+The earlier assumption that the tray icon was a required primary entry point made PySide6 look like the obvious default. With the tray now optional and the command/keyboard-shortcut path promoted to the stable entry point, PySide6 remains attractive but should be tested against GTK rather than treated as settled.
 
 ### Strengths
 
 1. Python is fast for prototyping and simple file manipulation.
 2. Parser, validator, backup, and writer logic can be cleanly unit tested.
-3. Qt has a documented `QSystemTrayIcon` API for tray icons, context menus, visibility, and tray availability checks.
+3. Qt has a mature tray abstraction if optional tray mode is implemented.
 4. Qt can position popup windows and small dialogs more easily than many minimal toolkit options.
 5. PySide6 avoids PyQt's GPL/commercial-only licensing problem for this project direction.
 6. A single Python application can initially contain both the UI and helper behavior.
@@ -75,19 +80,19 @@ Python with PySide6 is the strongest first candidate for the configurator UI and
 1. Qt is heavier than a minimal GTK utility.
 2. Desktop integration may feel less native on GNOME-style desktops than a GTK application.
 3. Packaging must ensure the correct PySide6 dependency is available on target distributions.
-4. Tray behavior still depends on the user's desktop environment exposing a tray or StatusNotifier-compatible area.
+4. Optional tray behavior still depends on the user's desktop environment exposing a tray or StatusNotifier-compatible area.
 
 ### Assessment
 
-This is the recommended Phase 1 default unless testing on the actual target system shows a blocker.
+Recommended as one of the two serious Phase 1 candidates.
 
-The tray requirement is important enough that Qt's mature tray abstraction outweighs the extra dependency weight.
+PySide6 is especially attractive if optional tray mode and pointer-anchored popup behavior are kept important.
 
 ## Candidate: Python + GTK/PyGObject
 
 ### Summary
 
-Python with GTK/PyGObject is a strong Linux-native UI option, but the tray icon requirement makes it less attractive as the default.
+Python with GTK/PyGObject is now just as serious as PySide6 for the Phase 1 configurator because the tray icon is no longer a required always-visible entry point.
 
 ### Strengths
 
@@ -96,19 +101,20 @@ Python with GTK/PyGObject is a strong Linux-native UI option, but the tray icon 
 3. Python remains excellent for parser/writer logic.
 4. The UI can be small and native-looking.
 5. Distribution packaging is generally practical.
+6. The command/keyboard-shortcut entry point does not depend on tray support.
 
 ### Weaknesses
 
-1. GTK's old `GtkStatusIcon` tray API is deprecated.
+1. GTK's old tray/status-icon path is not a good foundation for a permanently visible tray icon.
 2. A modern tray/status-notifier implementation may require extra libraries or desktop-specific handling.
-3. The tray icon is not a side feature for `d2wc`; it is one of the primary entry points.
-4. GTK 3 versus GTK 4 choices could complicate long-term direction.
+3. GTK 3 versus GTK 4 choices could complicate long-term direction.
+4. Pointer-anchored menu behavior still needs testing.
 
 ### Assessment
 
-This remains a good fallback if the tray design changes or if testing proves a reliable StatusNotifier/AppIndicator path that does not add too much complexity.
+Recommended as one of the two serious Phase 1 candidates.
 
-It is not the first recommendation because the tray requirement is central.
+If the first configurator is command-launched and tray behavior is optional or delayed, GTK may be a better fit than originally assumed.
 
 ## Candidate: C or C++ with GTK or Qt
 
@@ -153,7 +159,7 @@ Rust is attractive for a long-term robust application, but it is not the best fi
 
 1. Slower first prototype compared with Python.
 2. GUI ecosystem choices require more up-front commitment.
-3. Tray and desktop integration still need specific testing.
+3. Tray and desktop integration still need specific testing if optional tray mode is implemented.
 4. The current biggest risk is product/runtime behavior, not memory safety.
 
 ### Assessment
@@ -175,7 +181,7 @@ Go is simple to deploy for many command-line tools, but GUI binding maturity and
 ### Weaknesses
 
 1. Linux GUI bindings are less standard than Python + Qt or Python + GTK.
-2. Tray/menu behavior still needs binding-specific validation.
+2. Optional tray/menu behavior still needs binding-specific validation.
 3. More risk around desktop integration.
 4. Less natural for building a polished Linux configuration UI.
 
@@ -201,9 +207,8 @@ A webview UI should not be the first implementation.
 
 1. Adds a web stack for a small desktop utility.
 2. Increases dependency and packaging complexity.
-3. Does not naturally solve tray icon behavior.
-4. Does not naturally solve window identity or resize monitoring.
-5. Conflicts with the project's preference for a minimal native utility.
+3. Does not naturally solve window identity or resize monitoring.
+4. Conflicts with the project's preference for a minimal native utility.
 
 ### Assessment
 
@@ -228,7 +233,7 @@ Shell scripts with tools such as Zenity, YAD, or KDialog could prototype a few w
 1. Poor long-term UI structure.
 2. Harder to build a reliable rule preview and conflict UI.
 3. Harder to maintain as behavior grows.
-4. Tray and post-resize behavior become messy quickly.
+4. Post-resize behavior becomes messy quickly.
 
 ### Assessment
 
@@ -238,15 +243,16 @@ Shell scripts may still be useful for isolated test harnesses, especially left-e
 
 ## Recommended Phase 1 stack
 
-The recommended Phase 1 stack is:
+The recommended Phase 1 direction is:
 
 1. Python 3.
-2. PySide6 / Qt for Python for the UI.
+2. A short proof comparison between PySide6 and GTK/PyGObject.
 3. A pure-Python core package for parsing, validating, rendering, backing up, and saving managed Lua sections.
-4. A small application entry point that starts the UI and, where available, the tray icon.
-5. Subprocess calls or small helper modules for desktop/window inspection during early testing.
+4. A command-line application entry point that starts the configurator.
+5. Optional tray support only if the chosen toolkit handles it cleanly.
+6. Subprocess calls or small helper modules for desktop/window inspection during early testing.
 
-This gives the project a practical path to a working manual configurator without prematurely solving every daemon and post-resize problem.
+This gives the project a practical path to a working manual configurator without prematurely solving every daemon, tray, and post-resize problem.
 
 ## Proposed Phase 1 internal structure
 
@@ -265,6 +271,7 @@ src/
     window_info.py
     ui/
       main_window.py
+      shortcut_entry.md
       tray.py
 ```
 
@@ -274,17 +281,18 @@ The core logic should be testable without starting the GUI.
 
 ## Phase 1 proof tasks
 
-Before committing fully to PySide6, build tiny proof tasks:
+Before committing fully to PySide6 or GTK/PyGObject, build tiny proof tasks:
 
-1. Open a main window.
-2. Create a tray icon with a context menu.
-3. Detect whether the system tray is available.
-4. Capture or receive active-window identity through the chosen method.
-5. Read the current `src/d2wc.lua` managed sections.
-6. Render those sections back without changing semantics.
-7. Save a backup and updated file in a test directory.
+1. Open a main window from a command.
+2. Confirm the command can be assigned to a desktop keyboard shortcut.
+3. Capture or receive active-window identity through the chosen method.
+4. Read the current `src/d2wc.lua` managed sections.
+5. Render those sections back without changing semantics.
+6. Save a backup and updated file in a test directory.
+7. Optional: create a tray icon with a context menu.
+8. Optional: detect whether the system tray is available.
 
-If these pass on the target Qubes/XFCE environment, PySide6 should become the accepted Phase 1 stack.
+If these pass on the target Qubes/XFCE environment, the chosen toolkit can become the accepted Phase 1 stack.
 
 ## Phase 2 technology questions
 
@@ -298,15 +306,17 @@ Open questions:
 4. How does swapped mouse-button behavior appear to the chosen toolkit?
 5. How does the behavior differ across XFCE, KDE, GNOME, and other desktops?
 
-These questions should be handled in `docs/event-monitoring.md` after the Phase 1 stack is chosen.
+These questions should be handled in `docs/event-monitoring.md` after the Phase 1 command/manual configurator path is clear.
 
 ## Current recommendation
 
-Use Python + PySide6 for the first prototype.
+Use Python for the first prototype.
 
-Do not start with GTK unless tray behavior is deliberately moved out of scope or a clean StatusNotifier/AppIndicator path is chosen and tested.
+Compare PySide6 and GTK/PyGObject with small proof tasks before committing to one UI toolkit.
 
-Do not start with Rust, Go, C, or C++ unless Python + PySide6 fails a practical proof task on the target system.
+Do not choose a toolkit primarily because of a tray icon. The stable entry point should be a command that the user can bind to a keyboard shortcut.
+
+Do not start with Rust, Go, C, or C++ unless Python fails a practical proof task on the target system.
 
 Do not use a webview for the first implementation.
 
@@ -314,8 +324,11 @@ Do not use a webview for the first implementation.
 
 Before writing real application code, confirm these points:
 
-1. PySide6 is acceptable as a project dependency.
-2. The first implementation may target X11/Qubes/XFCE behavior first.
-3. Wayland support can be treated as later compatibility work.
-4. Phase 1 may include tray behavior, but post-resize automation remains Phase 2.
-5. The parser/writer core must be separated from the UI.
+1. Python is acceptable as the first implementation language.
+2. PySide6 and GTK/PyGObject should both be tested briefly before choosing the UI toolkit.
+3. The first implementation may target X11/Qubes/XFCE behavior first.
+4. Wayland support can be treated as later compatibility work.
+5. Phase 1 uses a command/keyboard-shortcut entry point.
+6. Tray behavior is optional and should not drive the architecture.
+7. Post-resize automation remains Phase 2.
+8. The parser/writer core must be separated from the UI.
