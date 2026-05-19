@@ -14,7 +14,7 @@ Phase 1 should prove that `d2wc` can safely manage the current Lua script.
 
 Required Phase 1 behavior:
 
-1. Tray icon with `Configure`, `Reload Rules`, and `Quit`.
+1. Command-line/manual launch path for the configurator, suitable for assigning to a desktop keyboard shortcut.
 2. Main configurator window for the active window.
 3. Current window summary:
    1. Window title.
@@ -30,7 +30,12 @@ Required Phase 1 behavior:
 9. Backup before save.
 10. Clean reload or restart path for the active `devilspie2` rules.
 
-This phase gives the user a working configuration tool even before automatic resize-triggered entry is implemented.
+Optional Phase 1 behavior:
+
+1. Tray icon with `Configure`, `Reload Rules`, and `Quit`.
+2. Tray mode intended for first-time setup, testing, or troubleshooting.
+
+This phase gives the user a working configuration tool even before automatic resize-triggered entry is implemented. It does not require `d2wc` to show a tray icon all the time. After the workspace is configured, `d2wc` should be able to run quietly in the background, with the configurator opened by command or keyboard shortcut when needed.
 
 ## MVP Phase 2: post-resize configurator entry
 
