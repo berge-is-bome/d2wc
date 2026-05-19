@@ -9,6 +9,8 @@ README.md
 LICENSE
 docs/
   product-development-brief.md
+  ui-flow.md
+  mvp-scope.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -45,7 +47,7 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/ui-flow.md` for screen-by-screen UI behavior.
+1. `docs/runtime-architecture.md` for how the Lua script, configurator, and daemon/helper work together.
 2. `docs/technology-evaluation.md` for GUI toolkit and language comparison.
 3. `docs/event-monitoring.md` for daemon/window-event behavior.
 4. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
