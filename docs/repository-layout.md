@@ -11,6 +11,7 @@ docs/
   product-development-brief.md
   ui-flow.md
   mvp-scope.md
+  runtime-architecture.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -47,12 +48,11 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/runtime-architecture.md` for how the Lua script, configurator, and daemon/helper work together.
-2. `docs/technology-evaluation.md` for GUI toolkit and language comparison.
-3. `docs/event-monitoring.md` for daemon/window-event behavior.
-4. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
-5. `docs/packaging.md` for Fedora/Debian packaging notes.
-6. `examples/` for example Lua configurations once the script is stable.
+1. `docs/technology-evaluation.md` for GUI toolkit and language comparison.
+2. `docs/event-monitoring.md` for daemon/window-event behavior.
+3. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
+4. `docs/packaging.md` for Fedora/Debian packaging notes.
+5. `examples/` for example Lua configurations once the script is stable.
 
 ## Branching convention
 
