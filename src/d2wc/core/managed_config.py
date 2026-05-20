@@ -52,16 +52,38 @@ def extract_managed_config(blocks: dict[str, ManagedBlock]) -> ManagedConfig:
     )
 
 
-def render_managed_config(config: ManagedConfig) -> dict[str, str]:
-    """Render all managed sections to canonical Lua block text."""
+def render_managed_config(
+    config: ManagedConfig,
+    original_blocks: dict[str, ManagedBlock] | None = None,
+) -> dict[str, str]:
+    """Render all managed sections to canonical Lua block text.
+
+    When original blocks are supplied, user comments inside managed sections are
+    preserved. That is the normal path for dry-run rendering from an existing
+    Lua file.
+    """
+
+    if original_blocks is None:
+        return {
+            "EXCLUDE": render_rule_list_block("EXCLUDE", config.exclude),
+            "PIN": render_rule_list_block("PIN", config.pin),
+            "WORKSPACE_ROUTES": render_workspace_routes_block(config.workspace_routes),
+            "GEOM": render_geom_block(config.geom),
+            "WORKSPACE_PLACEMENT": render_rule_list_block("WORKSPACE_PLACEMENT", config.workspace_placement),
+            "LEFT_EDGE_CORRECTION": render_rule_list_block("LEFT_EDGE_CORRECTION", config.left_edge_correction),
+        }
 
     return {
-        "EXCLUDE": render_rule_list_block("EXCLUDE", config.exclude),
-        "PIN": render_rule_list_block("PIN", config.pin),
-        "WORKSPACE_ROUTES": render_workspace_routes_block(config.workspace_routes),
-        "GEOM": render_geom_block(config.geom),
-        "WORKSPACE_PLACEMENT": render_rule_list_block("WORKSPACE_PLACEMENT", config.workspace_placement),
-        "LEFT_EDGE_CORRECTION": render_rule_list_block("LEFT_EDGE_CORRECTION", config.left_edge_correction),
+        "EXCLUDE": render_rule_list_block_preserving_comments("EXCLUDE", original_blocks["EXCLUDE"].text),
+        "PIN": render_rule_list_block_preserving_comments("PIN", original_blocks["PIN"].text),
+        "WORKSPACE_ROUTES": original_blocks["WORKSPACE_ROUTES"].text,
+        "GEOM": render_geom_block_preserving_comments(config.geom, original_blocks["GEOM"].text),
+        "WORKSPACE_PLACEMENT": render_rule_list_block_preserving_comments(
+            "WORKSPACE_PLACEMENT", original_blocks["WORKSPACE_PLACEMENT"].text
+        ),
+        "LEFT_EDGE_CORRECTION": render_rule_list_block_preserving_comments(
+            "LEFT_EDGE_CORRECTION", original_blocks["LEFT_EDGE_CORRECTION"].text
+        ),
     }
 
 
@@ -73,6 +95,27 @@ def render_rule_list_block(name: str, rules: tuple[str, ...]) -> str:
         lines.append(f'  "{_escape_lua_string(rule)}",')
     lines.append("}")
     return "\n".join(lines)
+
+
+def render_rule_list_block_preserving_comments(name: str, block_text: str) -> str:
+    """Render a rule list while preserving user comments and blank lines."""
+
+    lines = block_text.splitlines()
+    if len(lines) < 2:
+        return block_text
+
+    rendered = [f"local {name} = {{"]
+    for line in lines[1:-1]:
+        active, comment = _split_lua_comment(line)
+        rules = extract_active_rule_strings(active)
+        if not rules:
+            rendered.append(line.rstrip())
+            continue
+
+        suffix = f"  {comment.strip()}" if comment else ""
+        rendered.append(f'  "{_escape_lua_string(rules[0])}",{suffix}')
+    rendered.append("}")
+    return "\n".join(rendered)
 
 
 def render_workspace_routes_block(routes: tuple[WorkspaceRoute, ...]) -> str:
@@ -90,29 +133,31 @@ def render_geom_block(profiles: tuple[GeometryProfile, ...]) -> str:
     """Render GEOM profiles with aligned numeric columns."""
 
     lines = ["local GEOM = {"]
-    if not profiles:
-        lines.append("}")
-        return "\n".join(lines)
-
-    name_width = max(22, max(len(profile.name) for profile in profiles))
-    x_width = max(len(str(profile.x)) for profile in profiles)
-    y_width = max(len(str(profile.y)) for profile in profiles)
-    w_width = max(len(str(profile.w)) for profile in profiles)
-    h_width = max(len(str(profile.h)) for profile in profiles)
-
-    for profile in profiles:
-        lines.append(
-            "  "
-            f"{profile.name:<{name_width}} = "
-            "{ "
-            f"x = {profile.x:<{x_width}}, "
-            f"y = {profile.y:<{y_width}}, "
-            f"w = {profile.w:<{w_width}}, "
-            f"h = {profile.h:<{h_width}} "
-            "},"
-        )
+    lines.extend(_render_geom_profile_lines(profiles))
     lines.append("}")
     return "\n".join(lines)
+
+
+def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...], block_text: str) -> str:
+    """Render GEOM while preserving user comments and blank lines."""
+
+    lines = block_text.splitlines()
+    if len(lines) < 2:
+        return block_text
+
+    profile_map = {profile.name: profile for profile in profiles}
+    rendered = ["local GEOM = {"]
+    for line in lines[1:-1]:
+        active, comment = _split_lua_comment(line)
+        name = _geom_profile_name_from_line(active)
+        if name is None or name not in profile_map:
+            rendered.append(line.rstrip())
+            continue
+
+        suffix = f"  {comment.strip()}" if comment else ""
+        rendered.append(_render_geom_profile_line(profile_map[name], profiles) + suffix)
+    rendered.append("}")
+    return "\n".join(rendered)
 
 
 def extract_geometry_profiles(block: ManagedBlock) -> list[GeometryProfile]:
@@ -172,8 +217,47 @@ def extract_workspace_routes(block_text: str) -> list[WorkspaceRoute]:
     return routes
 
 
+def _render_geom_profile_lines(profiles: tuple[GeometryProfile, ...]) -> list[str]:
+    return [_render_geom_profile_line(profile, profiles) for profile in profiles]
+
+
+def _render_geom_profile_line(profile: GeometryProfile, all_profiles: tuple[GeometryProfile, ...]) -> str:
+    name_width = max(22, max(len(item.name) for item in all_profiles))
+    x_width = max(len(str(item.x)) for item in all_profiles)
+    y_width = max(len(str(item.y)) for item in all_profiles)
+    w_width = max(len(str(item.w)) for item in all_profiles)
+    h_width = max(len(str(item.h)) for item in all_profiles)
+
+    return (
+        "  "
+        f"{profile.name:<{name_width}} = "
+        "{ "
+        f"x = {profile.x:<{x_width}}, "
+        f"y = {profile.y:<{y_width}}, "
+        f"w = {profile.w:<{w_width}}, "
+        f"h = {profile.h:<{h_width}} "
+        "},"
+    )
+
+
 def _strip_lua_comments(text: str) -> str:
     return "\n".join(line.split("--", 1)[0] for line in text.splitlines())
+
+
+def _split_lua_comment(line: str) -> tuple[str, str]:
+    marker = line.find("--")
+    if marker == -1:
+        return line, ""
+    return line[:marker], line[marker:]
+
+
+def _geom_profile_name_from_line(line: str) -> str | None:
+    if "=" not in line or "{" not in line:
+        return None
+    candidate = line.split("=", 1)[0].strip()
+    if not candidate or candidate[0].isdigit() or not candidate.replace("_", "").isalnum():
+        return None
+    return candidate.lower()
 
 
 def _find_matching_brace(text: str, open_brace_index: int) -> int | None:
