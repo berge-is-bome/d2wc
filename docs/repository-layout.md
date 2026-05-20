@@ -13,6 +13,7 @@ docs/
   mvp-scope.md
   runtime-architecture.md
   technology-evaluation.md
+  event-monitoring.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -49,10 +50,9 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/event-monitoring.md` for daemon/window-event behavior.
-2. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
-3. `docs/packaging.md` for Fedora/Debian packaging notes.
-4. `examples/` for example Lua configurations once the script is stable.
+1. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
+2. `docs/packaging.md` for Fedora/Debian packaging notes.
+3. `examples/` for example Lua configurations once the script is stable.
 
 ## Branching convention
 
