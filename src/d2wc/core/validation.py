@@ -55,8 +55,6 @@ def validate_managed_blocks(blocks: dict[str, ManagedBlock]) -> ValidationResult
 
     warnings.extend(warn_shadowed_target_rules(blocks["EXCLUDE"]))
     warnings.extend(warn_shadowed_target_rules(blocks["PIN"]))
-    warnings.extend(warn_shadowed_target_rules(blocks["WORKSPACE_ROUTES"]))
-    warnings.extend(warn_shadowed_target_rules(blocks["WORKSPACE_PLACEMENT"]))
     warnings.extend(warn_shadowed_target_rules(blocks["LEFT_EDGE_CORRECTION"]))
 
     return ValidationResult(ok=not errors, errors=tuple(errors), warnings=tuple(warnings))
