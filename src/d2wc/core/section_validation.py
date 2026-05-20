@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from d2wc.core.lua_blocks import ManagedBlock
-from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
+from d2wc.core.rule_grammar import LEFT_EDGE_MODES, PrefixedRule, RuleParseError, parse_prefixed_rule
 
 REQUIRED_GEOMETRY_FIELDS: tuple[str, ...] = ("x", "y", "w", "h")
 MIN_GEOMETRY_SIZE = 10
@@ -13,6 +13,8 @@ def validate_target_section(block: ManagedBlock) -> list[str]:
     """Validate EXCLUDE or PIN style rules."""
 
     messages: list[str] = []
+    seen_targets: set[tuple[str | None, str | None]] = set()
+
     for text in extract_active_rule_strings(block.text):
         try:
             rule = parse_prefixed_rule(text)
@@ -25,6 +27,12 @@ def validate_target_section(block: ManagedBlock) -> list[str]:
             messages.append(f"{block.name}: rule must not include g:: {text}")
         if rule.left_edge_mode is not None:
             messages.append(f"{block.name}: rule must not include le:: {text}")
+
+        target = _rule_target(rule)
+        if rule.has_target and target in seen_targets:
+            messages.append(f"{block.name}: duplicate rule target: {_format_target(rule)}")
+        seen_targets.add(target)
+
     return messages
 
 
@@ -33,14 +41,14 @@ def validate_workspace_routes_section(block: ManagedBlock) -> list[str]:
 
     messages: list[str] = []
     seen_keys: set[int] = set()
+    seen_targets: set[tuple[str | None, str | None]] = set()
 
     for line in block.text.splitlines():
         active = line.split("--", 1)[0].strip()
         if not active:
             continue
 
-        key = _extract_workspace_key(active)
-        if key is not None:
+        for key in _extract_workspace_keys(active):
             if key in seen_keys:
                 messages.append(f"{block.name}: duplicate workspace key: {key}")
             seen_keys.add(key)
@@ -58,6 +66,11 @@ def validate_workspace_routes_section(block: ManagedBlock) -> list[str]:
             if rule.left_edge_mode is not None:
                 messages.append(f"{block.name}: rule must not include le:: {text}")
 
+            target = _rule_target(rule)
+            if rule.has_target and target in seen_targets:
+                messages.append(f"{block.name}: duplicate route target: {_format_target(rule)}")
+            seen_targets.add(target)
+
     return messages
 
 
@@ -67,7 +80,7 @@ def validate_geom_section(block: ManagedBlock) -> list[str]:
     messages: list[str] = []
     seen_names: set[str] = set()
 
-    for name, fields in extract_geometry_profiles(block.text).items():
+    for name, fields in extract_geometry_profile_entries(block.text):
         if name in seen_names:
             messages.append(f"{block.name}: duplicate geometry profile: {name}")
         seen_names.add(name)
@@ -94,6 +107,8 @@ def validate_placement_section(block: ManagedBlock, geometry_profiles: set[str])
     """Validate WORKSPACE_PLACEMENT rules."""
 
     messages: list[str] = []
+    seen_targets: set[tuple[str | None, str | None]] = set()
+
     for text in extract_active_rule_strings(block.text):
         try:
             rule = parse_prefixed_rule(text)
@@ -108,6 +123,12 @@ def validate_placement_section(block: ManagedBlock, geometry_profiles: set[str])
             messages.append(f"{block.name}: geometry profile not found: {rule.geometry_profile}")
         if rule.left_edge_mode is not None:
             messages.append(f"{block.name}: rule must not include le:: {text}")
+
+        target = _rule_target(rule)
+        if rule.has_target and target in seen_targets:
+            messages.append(f"{block.name}: duplicate placement target: {_format_target(rule)}")
+        seen_targets.add(target)
+
     return messages
 
 
@@ -115,6 +136,8 @@ def validate_left_edge_section(block: ManagedBlock) -> list[str]:
     """Validate LEFT_EDGE_CORRECTION rules."""
 
     messages: list[str] = []
+    seen_targets: set[tuple[str | None, str | None]] = set()
+
     for text in extract_active_rule_strings(block.text):
         try:
             rule = parse_prefixed_rule(text)
@@ -129,6 +152,12 @@ def validate_left_edge_section(block: ManagedBlock) -> list[str]:
             messages.append(f"{block.name}: rule must include le:: {text}")
         elif rule.left_edge_mode not in LEFT_EDGE_MODES:
             messages.append(f"{block.name}: invalid left-edge mode: {rule.left_edge_mode}")
+
+        target = _rule_target(rule)
+        if rule.has_target and target in seen_targets:
+            messages.append(f"{block.name}: duplicate left-edge target: {_format_target(rule)}")
+        seen_targets.add(target)
+
     return messages
 
 
@@ -141,7 +170,13 @@ def extract_geometry_profile_names(geom_block_text: str) -> set[str]:
 def extract_geometry_profiles(geom_block_text: str) -> dict[str, dict[str, int | str]]:
     """Extract simple GEOM profile entries from a GEOM block."""
 
-    profiles: dict[str, dict[str, int | str]] = {}
+    return dict(extract_geometry_profile_entries(geom_block_text))
+
+
+def extract_geometry_profile_entries(geom_block_text: str) -> list[tuple[str, dict[str, int | str]]]:
+    """Extract simple GEOM profile entries while preserving duplicates."""
+
+    profiles: list[tuple[str, dict[str, int | str]]] = []
     for line in geom_block_text.splitlines():
         active = _active_lua_segment(line)
         if not active or "=" not in active or "{" not in active or "}" not in active:
@@ -150,7 +185,7 @@ def extract_geometry_profiles(geom_block_text: str) -> dict[str, dict[str, int |
         if parsed is None:
             continue
         name, fields = parsed
-        profiles[name.lower()] = fields
+        profiles.append((name.lower(), fields))
     return profiles
 
 
@@ -194,18 +229,37 @@ def _parse_geometry_profile_line(active_line: str) -> tuple[str, dict[str, int |
     return name, fields
 
 
+def _extract_workspace_keys(active_line: str) -> list[int]:
+    keys: list[int] = []
+    remaining = active_line
+    while "[" in remaining and "]" in remaining:
+        before, after_open = remaining.split("[", 1)
+        key_text, after_close = after_open.split("]", 1)
+        remaining = after_close
+        if "=" not in after_close:
+            continue
+        try:
+            keys.append(int(key_text.strip()))
+        except ValueError:
+            continue
+    return keys
+
+
+def _rule_target(rule: PrefixedRule) -> tuple[str | None, str | None]:
+    return rule.domain, rule.class_name
+
+
+def _format_target(rule: PrefixedRule) -> str:
+    parts: list[str] = []
+    if rule.domain is not None:
+        parts.append(f"d:{rule.domain}")
+    if rule.class_name is not None:
+        parts.append(f"c:{rule.class_name}")
+    return " ".join(parts)
+
+
 def _active_lua_segment(line: str) -> str:
     return line.split("--", 1)[0].strip()
-
-
-def _extract_workspace_key(active_line: str) -> int | None:
-    if not active_line.startswith("[") or "]" not in active_line:
-        return None
-    key_text = active_line.split("]", 1)[0].lstrip("[").strip()
-    try:
-        return int(key_text)
-    except ValueError:
-        return None
 
 
 def _is_lua_identifier(value: str) -> bool:
