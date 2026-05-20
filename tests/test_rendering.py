@@ -10,15 +10,30 @@ from d2wc.core.validation import validate_managed_blocks
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_render_source_canonicalizes_managed_blocks() -> None:
+def test_render_source_preserves_comments_and_formats_managed_blocks() -> None:
     source = '''before
-local EXCLUDE = { "d:personal" }
+local EXCLUDE = {
+  -- user note
+  "d:personal", -- personal note
+}
 between
-local PIN = { "c:okular" }
-local WORKSPACE_ROUTES = { [1] = { "d:personal" } }
-local GEOM = { half_left = { x = 0, y = 0, w = 10, h = 10 } }
-local WORKSPACE_PLACEMENT = { "c:okular g:half_left" }
-local LEFT_EDGE_CORRECTION = { "c:okular le:pos1" }
+local PIN = {
+  "c:okular",
+}
+local WORKSPACE_ROUTES = {
+  -- route note
+  [1] = { "d:personal" },
+}
+local GEOM = {
+  -- geometry note
+  half_left = { x = 0, y = 0, w = 10, h = 10 }, -- left note
+}
+local WORKSPACE_PLACEMENT = {
+  "c:okular g:half_left",
+}
+local LEFT_EDGE_CORRECTION = {
+  "c:okular le:pos1",
+}
 after
 '''
 
@@ -28,9 +43,10 @@ after
     assert "before\n" in result.source
     assert "\nbetween\n" in result.source
     assert "\nafter\n" in result.source
-    assert 'local EXCLUDE = {\n  "d:personal",\n}' in result.source
+    assert 'local EXCLUDE = {\n  -- user note\n  "d:personal",  -- personal note\n}' in result.source
     assert 'local PIN = {\n  "c:okular",\n}' in result.source
-    assert 'local WORKSPACE_ROUTES = {\n  [1] = { "d:personal", },\n}' in result.source
+    assert 'local WORKSPACE_ROUTES = {\n  -- route note\n  [1] = { "d:personal" },\n}' in result.source
+    assert 'local GEOM = {\n  -- geometry note\n  half_left              = { x = 0, y = 0, w = 10, h = 10 },  -- left note\n}' in result.source
     assert 'local WORKSPACE_PLACEMENT = {\n  "c:okular g:half_left",\n}' in result.source
     assert 'local LEFT_EDGE_CORRECTION = {\n  "c:okular le:pos1",\n}' in result.source
 
