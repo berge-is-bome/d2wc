@@ -8,6 +8,21 @@ The current Lua script uses `set_window_geometry(x, y, w, h)` to place and size 
 
 The goal of this test plan is to decide whether the correction logic should remain as-is, be simplified, or be hidden behind configurator-driven testing.
 
+## Confirmed observation
+
+Manual testing has shown that when a window intended to land at `x = 0` ends up a few pixels away from the left edge, the incorrect position is visible through `get_window_geometry()`.
+
+That means `d2wc` does not need to rely only on visual inspection. It can apply geometry, read the actual resulting geometry, detect that the actual `x` differs from the requested `x`, and then apply an optional correction mode.
+
+This makes left-edge correction a testable runtime behavior:
+
+1. Request geometry with `x = 0`.
+2. Apply `set_window_geometry(x, y, w, h)`.
+3. Read actual geometry with `get_window_geometry()`.
+4. If actual `x != requested x`, try `set_window_position(x, y)` or `set_window_position2(x, y)`.
+5. Read actual geometry again.
+6. Save the correction mode only if the final geometry is correct.
+
 ## Current behavior
 
 The current model is:
@@ -29,15 +44,16 @@ Current correction modes:
 The test should answer these questions:
 
 1. Does `set_window_geometry()` place each tested window exactly at `x = 0`?
-2. If not, does `set_window_position()` correct it?
-3. If not, does `set_window_position2()` correct it?
-4. Do either correction functions change the final width or height unexpectedly?
-5. Does behavior differ by application class?
-6. Does behavior differ by Qubes domain?
-7. Does behavior differ on non-Qubes Linux desktops?
-8. Does behavior differ by desktop environment or window manager?
-9. Does behavior differ by monitor layout or panel placement?
-10. Can the configurator safely detect and save the working correction mode?
+2. Can `get_window_geometry()` reliably detect the offset when placement is wrong?
+3. If normal placement is wrong, does `set_window_position()` correct it?
+4. If not, does `set_window_position2()` correct it?
+5. Do either correction functions change the final width or height unexpectedly?
+6. Does behavior differ by application class?
+7. Does behavior differ by Qubes domain?
+8. Does behavior differ on non-Qubes Linux desktops?
+9. Does behavior differ by desktop environment or window manager?
+10. Does behavior differ by monitor layout or panel placement?
+11. Can the configurator safely detect and save the working correction mode?
 
 ## Test environments
 
@@ -126,6 +142,23 @@ For each test window and geometry profile:
 9. Record actual geometry after `set_window_position2(x, y)`.
 10. Mark the best correction mode.
 
+## Automatic detection model
+
+Because `get_window_geometry()` can reveal the post-placement offset, `d2wc` can eventually perform a placement verification step.
+
+Recommended model:
+
+1. Apply `set_window_geometry(g.x, g.y, g.w, g.h)`.
+2. Wait briefly for the window manager to settle.
+3. Read actual geometry with `get_window_geometry()`.
+4. Compare requested `x` and `y` to actual `x` and `y`.
+5. If actual position matches requested position, do nothing else.
+6. If actual position does not match and the target is eligible for correction, apply the configured correction mode.
+7. Read actual geometry again.
+8. Log whether the correction worked.
+
+For Phase 1, this can be exposed as a configurator test action. For later versions, it may become part of normal runtime behavior.
+
 ## Automated test harness idea
 
 A later helper script can automate most of the test.
@@ -200,7 +233,7 @@ Relevant cases:
 
 1. The selected geometry profile has `x = 0`.
 2. The user runs a left-edge placement test.
-3. The actual window lands away from `x = 0`.
+3. `get_window_geometry()` shows that the actual window lands away from the requested `x`.
 4. The user opens advanced or troubleshooting options.
 
 Normal users should not need to understand this feature during ordinary setup.
@@ -209,10 +242,12 @@ Recommended UI behavior:
 
 1. Show `Test left-edge placement` only for profiles where `x = 0`.
 2. Run normal placement first.
-3. If normal placement is correct, report that no correction is needed.
-4. If normal placement is incorrect, offer `Try correction mode 1` and `Try correction mode 2`.
-5. Preview the resulting `LEFT_EDGE_CORRECTION` rule before saving.
-6. Save only the mode that actually worked.
+3. Read actual geometry with `get_window_geometry()`.
+4. If normal placement is correct, report that no correction is needed.
+5. If normal placement is incorrect, offer `Try correction mode 1` and `Try correction mode 2`.
+6. Read actual geometry after each correction attempt.
+7. Preview the resulting `LEFT_EDGE_CORRECTION` rule before saving.
+8. Save only the mode that actually worked.
 
 ## Rule generation
 
@@ -244,6 +279,7 @@ Possible outcomes:
 4. Use one correction function globally if it works everywhere tested.
 5. Keep per-target correction because behavior differs by application, domain, desktop, or window manager.
 6. Hide the setting in the UI but keep it in the Lua configuration for compatibility.
+7. Let `d2wc` detect the offset with `get_window_geometry()` and apply a saved correction mode only when the offset is actually present.
 
 The safe default is to keep per-target correction until testing proves a simpler rule is reliable.
 
@@ -275,7 +311,8 @@ Test logs should include:
 8. Actual geometry after normal placement.
 9. Actual geometry after `pos1`.
 10. Actual geometry after `pos2`.
-11. Final recommendation.
+11. Delta between requested and actual position.
+12. Final recommendation.
 
 ## Development sequence
 
@@ -284,9 +321,10 @@ Recommended sequence:
 1. Preserve current `LEFT_EDGE_CORRECTION` behavior.
 2. Add manual configurator support for viewing existing correction rules.
 3. Add a test action for profiles with `x = 0`.
-4. Add logging for normal, `pos1`, and `pos2` placement results.
-5. Save the working mode only after user confirmation.
-6. Revisit simplification after multiple test environments are recorded.
+4. Use `get_window_geometry()` to detect whether normal placement landed correctly.
+5. Add logging for normal, `pos1`, and `pos2` placement results.
+6. Save the working mode only after user confirmation.
+7. Revisit simplification after multiple test environments are recorded.
 
 ## Open questions
 
@@ -297,3 +335,4 @@ Recommended sequence:
 5. How should monitor-aware left edges be represented?
 6. Should the Lua script eventually attempt correction automatically and log the result?
 7. Should the configurator maintain a separate test-results file for troubleshooting?
+8. Should correction be attempted only when `get_window_geometry()` proves that normal placement failed?
