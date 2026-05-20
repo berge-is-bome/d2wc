@@ -38,7 +38,7 @@ def render_source(source: str) -> RenderResult:
         raise RenderValidationError(validation)
 
     config = extract_managed_config(parsed.blocks)
-    rendered_blocks = render_managed_config(config)
+    rendered_blocks = render_managed_config(config, parsed.blocks)
     rendered_source = _replace_managed_blocks(source, parsed.blocks, rendered_blocks)
 
     rendered_parsed = ManagedBlockParser().parse(rendered_source)
