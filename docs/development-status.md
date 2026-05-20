@@ -12,6 +12,10 @@ Current confirmed head: 2e783a1a827d607400d01a9b9209e228cfba9ce3
 Status: local verification passed
 ```
 
+## What read-only core proof means
+
+Merge PR #2 because it proves the parser, validator, renderer, CLI scaffold, settings model, split-profile logic, duplicate/shadow validation, and tests are working. But do not consider `d2wc` ready to save changes into a real user config yet.
+
 ## Latest confirmed local verification
 
 Verification reported on 2026-05-20:
@@ -32,7 +36,25 @@ Rendered /tmp/d2wc-rendered.lua validates successfully.
 Test environment: Linux, Python 3.14.4, pytest 8.3.5.
 ```
 
-This four-command set is the standard renderer verification path. It should be used whenever renderer behavior changes, because it confirms both the original Lua source and the rendered output validate cleanly.
+## Test command guidance
+
+Use the four-command renderer verification path when renderer behavior changes:
+
+```bash
+PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
+PYTHONPATH=src python -m pytest
+```
+
+When renderer behavior has not changed, the shorter verification path is normally enough:
+
+```bash
+PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m pytest
+```
+
+The four-command path confirms both the original Lua source and the rendered output validate cleanly. The shorter path is appropriate for documentation-only changes and most non-renderer logic changes unless those changes can affect generated Lua output.
 
 ## Latest renderer changes
 
@@ -63,7 +85,7 @@ The tool still does not write to a real user configuration file.
 
 ## Next practical work
 
-The next practical step is to close out PR #2 as the read-only core proof once the PR description is updated and the branch is ready for review.
+The next practical step is to close out PR #2 as the read-only core proof after the remaining discussion points are resolved.
 
 After PR #2 is merged, the next implementation branch should focus on safe save mechanics before UI work:
 
