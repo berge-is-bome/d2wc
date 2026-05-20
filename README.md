@@ -36,32 +36,27 @@ tests/                           Python tests for the read-only core proof.
 
 ## Local development
 
-The project uses a Python `src/` layout.
-
-For quick source-checkout testing without installing the package:
+Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
 
 ```bash
-PYTHONPATH=src python -m d2wc --help
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout
-PYTHONPATH=src python -m pytest
+python -m pip install -e .
+```
+
+For normal source-checkout testing:
+
+```bash
+python -m d2wc --help
+python -m d2wc validate --config src/d2wc.lua
+python -m d2wc render --config src/d2wc.lua --stdout
+python -m pytest
 ```
 
 When renderer behavior changes, use the stronger renderer verification path:
 
 ```bash
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m pytest
-```
-
-For editable development installation:
-
-```bash
-python -m pip install -e .[dev]
-d2wc validate --config src/d2wc.lua
-d2wc render --config src/d2wc.lua --stdout
+python -m d2wc validate --config src/d2wc.lua
+python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python -m d2wc validate --config /tmp/d2wc-rendered.lua
 python -m pytest
 ```
 
@@ -73,7 +68,7 @@ Comments and blank separator lines inside the managed Lua sections are treated a
 
 ## Development direction
 
-The first production goal is not a flamboyant desktop tool. The goal is a minimal configurator that hides as much manual rule-writing as possible while still allowing the user to review and edit the result before it is written to the Lua script.
+The goal is a minimal configurator that hides as much manual rule-writing as possible while still allowing the user to review and edit the result before it is written to the Lua script.
 
 Planned entry points:
 
