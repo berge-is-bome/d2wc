@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlock
 from d2wc.core.section_validation import (
     extract_geometry_profile_names,
+    validate_geom_section,
     validate_left_edge_section,
     validate_placement_section,
     validate_target_section,
+    validate_workspace_routes_section,
 )
 
 
@@ -37,6 +39,8 @@ def validate_managed_blocks(blocks: dict[str, ManagedBlock]) -> ValidationResult
 
     messages.extend(validate_target_section(blocks["EXCLUDE"]))
     messages.extend(validate_target_section(blocks["PIN"]))
+    messages.extend(validate_workspace_routes_section(blocks["WORKSPACE_ROUTES"]))
+    messages.extend(validate_geom_section(blocks["GEOM"]))
     messages.extend(validate_placement_section(blocks["WORKSPACE_PLACEMENT"], geometry_profiles))
     messages.extend(validate_left_edge_section(blocks["LEFT_EDGE_CORRECTION"]))
 
