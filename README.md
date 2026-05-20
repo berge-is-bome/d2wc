@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the Lua rules engine. The next development step is the configurator that can observe windows, capture geometry, and write safe user-facing changes back into the Lua configuration sections.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the Lua rules engine plus an early read-only Python configurator core proof. The next development step is to keep expanding the safe parser, validator, renderer, and backup workflow before any real user configuration writes are allowed.
 
 ## Current status
 
@@ -16,6 +16,8 @@ The active Lua script supports:
 4. Applying named geometry profiles to matching windows.
 5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
 
+The Python core proof currently supports read-only validation of the managed Lua sections.
+
 ## Repository layout
 
 ```text
@@ -25,7 +27,31 @@ docs/
   repository-layout.md            Repository structure and development conventions.
 src/
   d2wc.lua                        Current devilspie2 Lua rules script.
+  d2wc/                           Python configurator core proof.
+tests/                            Python tests for the read-only core proof.
 ```
+
+## Local development
+
+The project uses a Python `src/` layout.
+
+For quick source-checkout testing without installing the package:
+
+```bash
+PYTHONPATH=src python -m d2wc --help
+PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m pytest
+```
+
+For editable development installation:
+
+```bash
+python -m pip install -e .[dev]
+d2wc validate --config src/d2wc.lua
+python -m pytest
+```
+
+The `validate` command is read-only. It parses and validates the managed Lua sections but does not write or modify any file.
 
 ## Development direction
 
@@ -33,8 +59,9 @@ The first production goal is not a flamboyant desktop tool. The goal is a minima
 
 Planned entry points:
 
-1. Open `Configure` from the system tray menu.
-2. Go straight to `Configure` after a user resizes a window and releases the primary mouse button.
-3. Show a small pointer-anchored menu after resize with `Cancel` and `Configure`.
+1. Command or keyboard shortcut to open the configurator for the active window.
+2. Optional system tray menu for setup or troubleshooting.
+3. Optional direct `Configure` flow after a user resizes a window and releases the primary mouse button.
+4. Optional small pointer-anchored menu after resize with `Cancel` and `Configure`.
 
-The configurator should eventually update the Lua sections `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION` without requiring the user to edit Lua manually.
+The configurator should eventually update the Lua sections `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `GEOM`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION` without requiring the user to edit Lua manually.
