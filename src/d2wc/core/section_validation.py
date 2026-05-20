@@ -136,28 +136,17 @@ def extract_geometry_profile_names(geom_block_text: str) -> set[str]:
 
 
 def extract_geometry_profiles(geom_block_text: str) -> dict[str, dict[str, int | str]]:
-    """Extract simple one-line GEOM profiles from a GEOM block."""
+    """Extract simple GEOM profile entries from a GEOM block."""
 
     profiles: dict[str, dict[str, int | str]] = {}
     for line in geom_block_text.splitlines():
-        active = line.split("--", 1)[0].strip()
-        if "=" not in active or "{" not in active or "}" not in active:
+        active = _active_lua_segment(line)
+        if not active or "=" not in active or "{" not in active or "}" not in active:
             continue
-        name = active.split("=", 1)[0].strip()
-        if not _is_lua_identifier(name):
+        parsed = _parse_geometry_profile_line(active)
+        if parsed is None:
             continue
-        body = active.split("{", 1)[1].split("}", 1)[0]
-        fields: dict[str, int | str] = {}
-        for chunk in body.split(","):
-            if "=" not in chunk:
-                continue
-            key, value = chunk.split("=", 1)
-            key = key.strip()
-            raw_value = value.strip()
-            try:
-                fields[key] = int(raw_value)
-            except ValueError:
-                fields[key] = raw_value
+        name, fields = parsed
         profiles[name.lower()] = fields
     return profiles
 
@@ -171,6 +160,39 @@ def extract_active_rule_strings(block_text: str) -> list[str]:
         pieces = active.split('"')
         strings.extend(pieces[index] for index in range(1, len(pieces), 2))
     return strings
+
+
+def _parse_geometry_profile_line(active_line: str) -> tuple[str, dict[str, int | str]] | None:
+    candidate = active_line.strip()
+
+    if candidate.startswith("local ") and "{" in candidate:
+        candidate = candidate.split("{", 1)[1].strip()
+
+    if "=" not in candidate or "{" not in candidate or "}" not in candidate:
+        return None
+
+    name = candidate.split("=", 1)[0].strip()
+    if not _is_lua_identifier(name):
+        return None
+
+    body = candidate.split("{", 1)[1].split("}", 1)[0]
+    fields: dict[str, int | str] = {}
+    for chunk in body.split(","):
+        if "=" not in chunk:
+            continue
+        key, value = chunk.split("=", 1)
+        key = key.strip()
+        raw_value = value.strip()
+        try:
+            fields[key] = int(raw_value)
+        except ValueError:
+            fields[key] = raw_value
+
+    return name, fields
+
+
+def _active_lua_segment(line: str) -> str:
+    return line.split("--", 1)[0].strip()
 
 
 def _extract_workspace_key(active_line: str) -> int | None:
