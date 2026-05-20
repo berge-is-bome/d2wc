@@ -20,28 +20,35 @@ class ValidationResult:
     """Validation outcome for managed configuration data."""
 
     ok: bool
-    messages: tuple[str, ...] = field(default_factory=tuple)
+    errors: tuple[str, ...] = field(default_factory=tuple)
+    warnings: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def messages(self) -> tuple[str, ...]:
+        """Compatibility alias for blocking validation errors."""
+
+        return self.errors
 
 
 def validate_managed_blocks(blocks: dict[str, ManagedBlock]) -> ValidationResult:
     """Validate required managed blocks and first-layer rule grammar."""
 
-    messages: list[str] = []
+    errors: list[str] = []
 
     for name in MANAGED_BLOCK_NAMES:
         if name not in blocks:
-            messages.append(f"Missing managed block: {name}")
+            errors.append(f"Missing managed block: {name}")
 
-    if messages:
-        return ValidationResult(ok=False, messages=tuple(messages))
+    if errors:
+        return ValidationResult(ok=False, errors=tuple(errors))
 
     geometry_profiles = extract_geometry_profile_names(blocks["GEOM"].text)
 
-    messages.extend(validate_target_section(blocks["EXCLUDE"]))
-    messages.extend(validate_target_section(blocks["PIN"]))
-    messages.extend(validate_workspace_routes_section(blocks["WORKSPACE_ROUTES"]))
-    messages.extend(validate_geom_section(blocks["GEOM"]))
-    messages.extend(validate_placement_section(blocks["WORKSPACE_PLACEMENT"], geometry_profiles))
-    messages.extend(validate_left_edge_section(blocks["LEFT_EDGE_CORRECTION"]))
+    errors.extend(validate_target_section(blocks["EXCLUDE"]))
+    errors.extend(validate_target_section(blocks["PIN"]))
+    errors.extend(validate_workspace_routes_section(blocks["WORKSPACE_ROUTES"]))
+    errors.extend(validate_geom_section(blocks["GEOM"]))
+    errors.extend(validate_placement_section(blocks["WORKSPACE_PLACEMENT"], geometry_profiles))
+    errors.extend(validate_left_edge_section(blocks["LEFT_EDGE_CORRECTION"]))
 
-    return ValidationResult(ok=not messages, messages=tuple(messages))
+    return ValidationResult(ok=not errors, errors=tuple(errors))
