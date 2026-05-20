@@ -81,8 +81,8 @@ def validate_geom_section(block: ManagedBlock) -> list[str]:
 
         for size_field in ("w", "h"):
             value = fields.get(size_field)
-            if isinstance(value, int) and value < 0:
-                messages.append(f"{block.name}: profile {name} field {size_field} must be zero or greater")
+            if isinstance(value, int) and value <= 0:
+                messages.append(f"{block.name}: profile {name} field {size_field} must be greater than zero")
 
     return messages
 
