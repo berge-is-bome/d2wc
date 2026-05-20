@@ -16,7 +16,7 @@ The active Lua script supports:
 4. Applying named geometry profiles to matching windows.
 5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
 
-The Python core proof currently supports read-only validation of the managed Lua sections.
+The Python core proof currently supports read-only validation and dry-run rendering of the managed Lua sections.
 
 ## Repository layout
 
@@ -40,6 +40,7 @@ For quick source-checkout testing without installing the package:
 ```bash
 PYTHONPATH=src python -m d2wc --help
 PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout
 PYTHONPATH=src python -m pytest
 ```
 
@@ -48,10 +49,13 @@ For editable development installation:
 ```bash
 python -m pip install -e .[dev]
 d2wc validate --config src/d2wc.lua
+d2wc render --config src/d2wc.lua --stdout
 python -m pytest
 ```
 
 The `validate` command is read-only. It parses and validates the managed Lua sections but does not write or modify any file.
+
+The `render` command is also read-only in this proof stage. It requires `--stdout` and prints the rendered Lua to standard output only.
 
 ## Development direction
 
