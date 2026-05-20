@@ -154,6 +154,24 @@ The first implementation can parse the known block names:
 
 The configurator should preserve program logic outside those blocks.
 
+## Runtime settings model
+
+Some configurator behavior is not naturally stored as a window-matching rule. These values should live in a small `d2wc` settings file rather than being mixed into `WORKSPACE_PLACEMENT` rules.
+
+Early settings should include:
+
+1. Lua config path.
+2. Backup location.
+3. Manual configurator command.
+4. `window_border_width` for generated split profiles.
+5. Optional tray behavior.
+6. Post-resize behavior.
+7. Resize threshold.
+8. Suppression delay after automated placement.
+9. Debug logging.
+
+The `window_border_width` setting should be used by the configurator when generating `half_left` and `half_right` geometry profiles. It does not need to be consumed by the Lua runtime after the generated `GEOM` values have been written.
+
 ## Managed block writing
 
 Managed blocks should be written in a deterministic style.
@@ -185,6 +203,7 @@ Validation should check:
 6. Invalid geometry values.
 7. Invalid left-edge correction modes.
 8. Workspace numbers outside the available workspace range, when that range is known.
+9. Valid numeric settings such as `window_border_width`, when generated profile settings are saved.
 
 The configurator should explain validation failures in user language.
 
@@ -218,7 +237,7 @@ A safe save should use this order:
 
 1. Parse current Lua file.
 2. Apply pending user changes in memory.
-3. Validate the resulting managed blocks.
+3. Validate the resulting managed blocks and runtime settings.
 4. Render updated Lua content.
 5. Create a backup of the current file.
 6. Write the new Lua file to a temporary file in the same directory.
@@ -296,6 +315,8 @@ The common path should be:
 4. `d2wc` writes the `GEOM` profile.
 5. User links the profile to a placement rule.
 
+Generated split profiles should additionally use screen or monitor geometry plus the configured `window_border_width` setting. The generated `half_left` and `half_right` profiles should be previewed together so the user can see how border width changes the resulting `x` and `w` values.
+
 ## Left-edge correction model
 
 `LEFT_EDGE_CORRECTION` remains part of the runtime design for now.
@@ -368,6 +389,15 @@ The following decisions still need testing or technology evaluation:
 5. Whether the Lua script should eventually be generated from a separate data file instead of edited directly.
 6. Whether `LEFT_EDGE_CORRECTION` can be simplified by always applying one position function after geometry.
 7. Whether optional tray behavior is worth implementing after the command/shortcut entry point works.
+8. How `window_border_width` should interact with panels, usable work area, and monitor-specific split profiles.
+
+## Related documents
+
+1. [UI Flow](ui-flow.md)
+2. [Lua Configurables](lua-configurables.md)
+3. [Event Monitoring](event-monitoring.md)
+4. [Implementation Plan](implementation-plan.md)
+5. [Testing](testing.md)
 
 ## Initial development sequence
 
@@ -380,6 +410,7 @@ The recommended implementation sequence is:
 5. Add backup and save behavior.
 6. Add a reload or restart path.
 7. Add optional tray entry if useful.
-8. Add post-resize detection.
-9. Add the pointer-anchored `Cancel` / `Configure` menu.
-10. Add live geometry display while resizing.
+8. Add generated split profile support with `window_border_width` preview.
+9. Add post-resize detection.
+10. Add the pointer-anchored `Cancel` / `Configure` menu.
+11. Add live geometry display while resizing.
