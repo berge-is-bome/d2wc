@@ -16,6 +16,7 @@ docs/
   event-monitoring.md
   left-edge-correction-testing.md
   packaging.md
+  implementation-plan.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -56,17 +57,16 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `examples/` for example Lua configurations once the script is stable.
-2. `docs/implementation-plan.md` for converting the documentation into ordered development tasks.
-3. `docs/testing.md` for the first parser/writer and UI proof tests.
+1. `docs/testing.md` for the first parser/writer and UI proof tests.
+2. `examples/` for example Lua configurations once the script is stable.
 
 ## Branching convention
 
 Use short topic branches for repo changes. Examples:
 
 1. `init-project-structure`
-2. `docs-ui-flow`
-3. `configurator-prototype`
+2. `configurator-core-proof`
+3. `configurator-gtk-proof`
 4. `left-edge-correction-tests`
 
 ## Documentation style
