@@ -10,13 +10,19 @@ The testing goal is simple: the configurator must never damage a user's working 
 
 The latest confirmed source-checkout verification is recorded in [Development Status](development-status.md).
 
+Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
+
+```bash
+python -m pip install -e .
+```
+
 For renderer-related work, use this standard verification sequence:
 
 ```bash
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m pytest
+python -m d2wc validate --config src/d2wc.lua
+python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python -m d2wc validate --config /tmp/d2wc-rendered.lua
+python -m pytest
 ```
 
 This proves that:
@@ -327,25 +333,25 @@ Before real saving exists, the tool should support a dry-run path.
 Possible command:
 
 ```bash
-d2wc validate --config tests/fixtures/d2wc-current.lua
+python -m d2wc validate --config tests/fixtures/d2wc-current.lua
 ```
 
 Possible command:
 
 ```bash
-d2wc render --config tests/fixtures/d2wc-current.lua --stdout
+python -m d2wc render --config tests/fixtures/d2wc-current.lua --stdout
 ```
 
 Possible command:
 
 ```bash
-d2wc plan-add-geom --config tests/fixtures/d2wc-current.lua --name test_left --x 0 --y 0 --w 1200 --h 900
+python -m d2wc plan-add-geom --config tests/fixtures/d2wc-current.lua --name test_left --x 0 --y 0 --w 1200 --h 900
 ```
 
 Possible command:
 
 ```bash
-d2wc plan-split-profiles --screen-x 0 --screen-y 0 --screen-w 3840 --screen-h 2160 --window-border-width 6
+python -m d2wc plan-split-profiles --screen-x 0 --screen-y 0 --screen-w 3840 --screen-h 2160 --window-border-width 6
 ```
 
 The exact command names can change, but dry-run behavior should exist before real writes.
