@@ -87,12 +87,29 @@ def render_workspace_routes_block(routes: tuple[WorkspaceRoute, ...]) -> str:
 
 
 def render_geom_block(profiles: tuple[GeometryProfile, ...]) -> str:
-    """Render GEOM profiles."""
+    """Render GEOM profiles with aligned numeric columns."""
 
     lines = ["local GEOM = {"]
+    if not profiles:
+        lines.append("}")
+        return "\n".join(lines)
+
+    name_width = max(22, max(len(profile.name) for profile in profiles))
+    x_width = max(len(str(profile.x)) for profile in profiles)
+    y_width = max(len(str(profile.y)) for profile in profiles)
+    w_width = max(len(str(profile.w)) for profile in profiles)
+    h_width = max(len(str(profile.h)) for profile in profiles)
+
     for profile in profiles:
         lines.append(
-            f"  {profile.name:<22} = {{ x = {profile.x}, y = {profile.y}, w = {profile.w}, h = {profile.h} }},"
+            "  "
+            f"{profile.name:<{name_width}} = "
+            "{ "
+            f"x = {profile.x:<{x_width}}, "
+            f"y = {profile.y:<{y_width}}, "
+            f"w = {profile.w:<{w_width}}, "
+            f"h = {profile.h:<{h_width}} "
+            "},"
         )
     lines.append("}")
     return "\n".join(lines)
