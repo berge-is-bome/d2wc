@@ -16,6 +16,7 @@ The decision must serve the actual product shape described in the current design
 8. Later pointer-anchored `Cancel` / `Configure` menu.
 9. Packaging for common Linux distributions.
 10. Good behavior on Qubes OS with XFCE, while remaining useful on other Linux desktops.
+11. A development roadmap that can later support Qt/KDE-oriented users without rewriting the core logic.
 
 ## Evaluation criteria
 
@@ -33,6 +34,7 @@ The chosen stack should be judged against these criteria.
 8. Can safely read, validate, preview, back up, and write text files.
 9. Can be developed quickly enough to get a working Phase 1 configurator.
 10. Fits Qubes OS with XFCE well as the first target environment.
+11. Allows a future Qt/KDE front end without replacing the parser/writer core.
 
 ### Strongly preferred
 
@@ -52,6 +54,7 @@ The chosen stack should be judged against these criteria.
 4. Live geometry updates while resizing.
 5. Full daemon/window-event monitoring.
 6. Permanently visible tray icon.
+7. A Qt/KDE-specific UI.
 
 ## Initial platform assumption
 
@@ -85,6 +88,7 @@ For Qubes OS with XFCE, a GTK application is likely to fit the desktop better th
 2. A modern tray/status-notifier implementation may require extra libraries or desktop-specific handling if optional tray mode is added later.
 3. GTK 3 versus GTK 4 needs a deliberate choice.
 4. Pointer-anchored menu behavior still needs testing.
+5. KDE users may prefer a Qt-native UI in a later version.
 
 ### Assessment
 
@@ -100,6 +104,8 @@ Python with PySide6 remains a strong fallback candidate for the configurator UI 
 
 The earlier assumption that the tray icon was a required primary entry point made PySide6 look like the obvious default. With the tray now optional and the command/keyboard-shortcut path promoted to the stable entry point, PySide6 is no longer the first default.
 
+Qt should still be on the development roadmap because many Linux users run KDE Plasma or other Qt-friendly environments. If `d2wc` becomes useful outside Qubes/XFCE, a Qt front end may offer a better desktop fit for KDE users.
+
 ### Strengths
 
 1. Python is fast for prototyping and simple file manipulation.
@@ -108,6 +114,7 @@ The earlier assumption that the tray icon was a required primary entry point mad
 4. Qt can position popup windows and small dialogs more easily than many minimal toolkit options.
 5. PySide6 avoids PyQt's GPL/commercial-only licensing problem for this project direction.
 6. A single Python application can initially contain both the UI and helper behavior.
+7. Qt is the natural long-term UI path for KDE-oriented users.
 
 ### Weaknesses
 
@@ -119,6 +126,8 @@ The earlier assumption that the tray icon was a required primary entry point mad
 ### Assessment
 
 Recommended as the fallback Phase 1 UI candidate if GTK/PyGObject fails a practical proof task.
+
+Recommended as a later roadmap item for KDE and non-Qubes desktop support, provided the core parser/writer logic remains UI-toolkit independent.
 
 PySide6 becomes especially attractive again if optional tray mode or pointer-anchored popup behavior proves much easier in Qt than GTK.
 
@@ -247,6 +256,19 @@ Useful for experiments, not recommended for the configurator.
 
 Shell scripts may still be useful for isolated test harnesses, especially left-edge correction testing.
 
+## Toolkit roadmap
+
+The UI should be kept separate from the core rule-management logic.
+
+The long-term roadmap should allow multiple front ends to share the same backend:
+
+1. Core parser/writer/validator package.
+2. GTK front end for the first Qubes/XFCE-centered implementation.
+3. Qt front end or Qt mode later for KDE-oriented users and distributions where Qt integration is preferred.
+4. Optional CLI or diagnostic commands for testing and support.
+
+This does not mean the project should build two full GUIs immediately. It means the first implementation should avoid coupling business logic to GTK widgets so that a later Qt front end can reuse the same core.
+
 ## Recommended Phase 1 stack
 
 The recommended Phase 1 direction is:
@@ -254,10 +276,11 @@ The recommended Phase 1 direction is:
 1. Python 3.
 2. GTK/PyGObject as the first UI proof target.
 3. PySide6 as the fallback proof target if GTK exposes a practical blocker.
-4. A pure-Python core package for parsing, validating, rendering, backing up, and saving managed Lua sections.
-5. A command-line application entry point that starts the configurator.
-6. Optional tray support only if the chosen toolkit handles it cleanly.
-7. Subprocess calls or small helper modules for desktop/window inspection during early testing.
+4. PySide6 or another Qt path as a later roadmap item for KDE-oriented users.
+5. A pure-Python core package for parsing, validating, rendering, backing up, and saving managed Lua sections.
+6. A command-line application entry point that starts the configurator.
+7. Optional tray support only if the chosen toolkit handles it cleanly.
+8. Subprocess calls or small helper modules for desktop/window inspection during early testing.
 
 This gives the project a practical path to a working manual configurator without prematurely solving every daemon, tray, and post-resize problem.
 
@@ -277,7 +300,10 @@ src/
     backup.py
     window_info.py
     ui/
-      main_window.py
+      gtk/
+        main_window.py
+      qt/
+        README.md
       shortcut_entry.md
       tray.py
 ```
@@ -285,6 +311,8 @@ src/
 The important design point is that Lua parsing and rule validation must not be buried inside UI widgets.
 
 The core logic should be testable without starting the GUI.
+
+The `ui/qt/` path should not be implemented until there is a real need, but leaving room for it helps avoid a GTK-only architecture.
 
 ## Phase 1 proof tasks
 
@@ -314,6 +342,7 @@ Open questions:
 3. Can pointer-anchored menu placement be implemented consistently?
 4. How does swapped mouse-button behavior appear to the chosen toolkit?
 5. How does the behavior differ across XFCE, KDE, GNOME, and other desktops?
+6. What parts of the UI need toolkit-specific implementations versus shared core behavior?
 
 These questions should be handled in `docs/event-monitoring.md` after the Phase 1 command/manual configurator path is clear.
 
@@ -324,6 +353,8 @@ Use Python for the first prototype.
 Use GTK/PyGObject as the first UI proof target because the first target environment is Qubes/XFCE and the tray icon is optional.
 
 Keep PySide6 as the fallback UI proof target if GTK/PyGObject fails a practical test.
+
+Keep Qt on the development roadmap for KDE-oriented users and broader non-Qubes Linux support.
 
 Do not choose a toolkit primarily because of a tray icon. The stable entry point should be a command that the user can bind to a keyboard shortcut.
 
@@ -338,9 +369,10 @@ Before writing real application code, confirm these points:
 1. Python is acceptable as the first implementation language.
 2. GTK/PyGObject should be tested first for the UI toolkit.
 3. PySide6 remains the fallback toolkit if GTK exposes a blocker.
-4. The first implementation may target X11/Qubes/XFCE behavior first.
-5. Wayland support can be treated as later compatibility work.
-6. Phase 1 uses a command/keyboard-shortcut entry point.
-7. Tray behavior is optional and should not drive the architecture.
-8. Post-resize automation remains Phase 2.
-9. The parser/writer core must be separated from the UI.
+4. Qt remains on the roadmap for KDE-oriented users.
+5. The first implementation may target X11/Qubes/XFCE behavior first.
+6. Wayland support can be treated as later compatibility work.
+7. Phase 1 uses a command/keyboard-shortcut entry point.
+8. Tray behavior is optional and should not drive the architecture.
+9. Post-resize automation remains Phase 2.
+10. The parser/writer core must be separated from the UI.
