@@ -42,6 +42,7 @@ The UI should expose these concepts in user language.
 7. Pin rule: a rule that keeps matching windows visible on all workspaces.
 8. Exclude rule: a rule that tells `d2wc` not to manage matching windows.
 9. Left-edge correction: a compatibility setting for windows that should land at `x = 0` but do not.
+10. Window border width: a configurable pixel value used when generating matching left/right split profiles.
 
 ## Entry point 1: command or keyboard shortcut
 
@@ -394,9 +395,10 @@ The user wants common split-screen profiles without manually typing pixel values
 1. User opens settings or the configurator for a selected window.
 2. User chooses `Generate half-left and half-right profiles`.
 3. Configurator detects the current screen geometry.
-4. Configurator calculates left and right profiles.
-5. Configurator previews the resulting `GEOM` entries.
-6. User saves.
+4. Configurator reads the current `window_border_width` setting.
+5. Configurator calculates left and right profiles that account for the configured border width.
+6. Configurator previews the resulting `GEOM` entries.
+7. User saves.
 
 ### Generated profile behavior
 
@@ -405,6 +407,18 @@ The first implementation can generate standard profiles:
 1. `half_left`
 2. `half_right`
 
+When `half_left` and `half_right` are intended to sit beside each other and the two windows are the same size, `d2wc` should provide a `window_border_width` setting. The user should be able to enter the border width in pixels instead of manually nudging window widths until the two windows meet correctly.
+
+The setting should be used when generating the width and position values for the split profiles. If the configured border width is too small or too large, the user can adjust one value and regenerate or preview both profiles.
+
+Possible user-facing field names:
+
+1. `window_border_width`
+2. `Window border width`
+3. `Border width in pixels`
+
+The underlying setting should use a clear, consistent name. `window_border_width` is the preferred internal name.
+
 Later versions may support monitor-specific names:
 
 1. `monitor1_half_left`
@@ -412,9 +426,23 @@ Later versions may support monitor-specific names:
 3. `monitor2_half_left`
 4. `monitor2_half_right`
 
+### Border width preview
+
+The configurator should preview how `window_border_width` changes the generated split profiles.
+
+The preview should show:
+
+1. Screen or monitor geometry.
+2. Current `window_border_width`.
+3. Generated `half_left` geometry.
+4. Generated `half_right` geometry.
+5. Combined expected coverage.
+
+The user should be able to change `window_border_width`, preview again, and save only after the generated values look correct.
+
 ### Open design question
 
-The exact handling of panels, usable work area, and window decorations still needs testing.
+The exact handling of panels, usable work area, window decorations, and border width still needs testing.
 
 The UI should therefore present generated values as editable before saving.
 
@@ -451,7 +479,7 @@ The first implementation should be conservative:
 4. Ask `devilspie2` or the launcher wrapper to reload or restart cleanly.
 5. Show success or failure to the user.
 
-The exact reload mechanism belongs in `docs/runtime-architecture.md`.
+The exact reload mechanism belongs in [Runtime Architecture](runtime-architecture.md).
 
 ## Conflict and validation behavior
 
@@ -475,18 +503,19 @@ A small settings screen should eventually include:
 1. Lua config path.
 2. Backup location.
 3. Manual configurator command.
-4. Optional tray icon:
+4. Window border width in pixels for generated split profiles.
+5. Optional tray icon:
    1. Disabled.
    2. Enabled during setup.
    3. Always enabled.
-5. Post-resize behavior:
+6. Post-resize behavior:
    1. Disabled.
    2. Open configurator directly.
    3. Show `Cancel` / `Configure` menu.
-6. Resize threshold.
-7. Suppression delay after automated placement.
-8. Mouse action behavior, if the toolkit cannot reliably respect swapped buttons.
-9. Debug logging.
+7. Resize threshold.
+8. Suppression delay after automated placement.
+9. Mouse action behavior, if the toolkit cannot reliably respect swapped buttons.
+10. Debug logging.
 
 ## MVP UI scope
 
@@ -502,7 +531,7 @@ The first usable version should include:
 8. Backup before save.
 9. Optional tray icon if the chosen toolkit makes it reliable without driving the architecture.
 
-Post-resize automation, pointer-anchored menus, and live geometry updates can follow after the basic configurator can safely read and write the Lua file.
+Post-resize automation, pointer-anchored menus, live geometry updates, and generated split-profile border tuning can follow after the basic configurator can safely read and write the Lua file.
 
 ## Development notes
 
