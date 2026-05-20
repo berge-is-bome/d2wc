@@ -24,11 +24,26 @@ src/
   d2wc.lua
 ```
 
+## Document index
+
+1. [Product Development Brief](product-development-brief.md) describes the product direction and user outcomes.
+2. [UI Flow](ui-flow.md) describes the configurator screens, entry points, generated split profiles, and user-facing workflows.
+3. [MVP Scope](mvp-scope.md) separates the safe manual configurator from post-resize automation.
+4. [Runtime Architecture](runtime-architecture.md) describes the Lua script, configurator, daemon/helper, runtime settings, save model, and reload model.
+5. [Technology Evaluation](technology-evaluation.md) explains the Python, GTK-first, Qt-roadmap direction.
+6. [Event Monitoring](event-monitoring.md) describes resize detection, pointer menus, suppression, and desktop event behavior.
+7. [Left-Edge Correction Testing](left-edge-correction-testing.md) defines repeatable tests for `set_window_geometry()`, `set_window_position()`, and `set_window_position2()`.
+8. [Packaging](packaging.md) describes Fedora-first RPM direction, later Debian packaging, and Qubes/dom0 offline installation routes.
+9. [Implementation Plan](implementation-plan.md) turns the design into ordered development stages.
+10. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
+11. [Lua Configurables](lua-configurables.md) explains the managed Lua sections and rule grammar.
+12. [Repository Layout](repository-layout.md) describes this repository structure.
+
 ## Directory purposes
 
 ### `docs/`
 
-Project planning, product design, UI behavior, and development notes.
+Project planning, product design, UI behavior, architecture, packaging, and development notes.
 
 The documentation should describe `d2wc` from the user's point of view first, then map that behavior back to implementation details.
 
@@ -36,7 +51,7 @@ The documentation should describe `d2wc` from the user's point of view first, th
 
 Source code.
 
-At the start of the project this should contain the current `devilspie2` Lua script. As the configurator is developed, this directory may split into more specific subdirectories, for example:
+At the start of the project this contains the current `devilspie2` Lua script. As the configurator is developed, this directory may split into more specific subdirectories, for example:
 
 ```text
 src/
