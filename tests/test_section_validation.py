@@ -2,9 +2,12 @@ from d2wc.core.lua_blocks import ManagedBlock
 from d2wc.core.section_validation import (
     extract_active_rule_strings,
     extract_geometry_profile_names,
+    extract_geometry_profiles,
+    validate_geom_section,
     validate_left_edge_section,
     validate_placement_section,
     validate_target_section,
+    validate_workspace_routes_section,
 )
 
 
@@ -32,6 +35,16 @@ def test_extract_geometry_profile_names() -> None:
     assert extract_geometry_profile_names(text) == {"half_left", "dom0_qubes_app_menu"}
 
 
+def test_extract_geometry_profiles() -> None:
+    text = '''local GEOM = {
+      half_left = { x = 0, y = 0, w = 1920, h = 1080 },
+    }'''
+
+    assert extract_geometry_profiles(text) == {
+        "half_left": {"x": 0, "y": 0, "w": 1920, "h": 1080}
+    }
+
+
 def test_validate_target_section_accepts_domain_or_class_rules() -> None:
     messages = validate_target_section(
         block("PIN", 'local PIN = { "d:dom0 c:xfce4-terminal", "c:okular" }')
@@ -47,6 +60,42 @@ def test_validate_target_section_rejects_geometry_and_left_edge_tokens() -> None
 
     assert "EXCLUDE: rule must not include g:: d:personal g:half_left" in messages
     assert "EXCLUDE: rule must not include le:: c:okular le:pos1" in messages
+
+
+def test_validate_workspace_routes_section_accepts_valid_routes() -> None:
+    messages = validate_workspace_routes_section(
+        block("WORKSPACE_ROUTES", 'local WORKSPACE_ROUTES = { [1] = { "d:personal", "d:work c:navigator" } }')
+    )
+
+    assert messages == []
+
+
+def test_validate_workspace_routes_section_rejects_invalid_route_tokens() -> None:
+    messages = validate_workspace_routes_section(
+        block("WORKSPACE_ROUTES", 'local WORKSPACE_ROUTES = { [1] = { "g:half_left", "c:okular le:pos1" } }')
+    )
+
+    assert "WORKSPACE_ROUTES: rule must include d: or c:: g:half_left" in messages
+    assert "WORKSPACE_ROUTES: rule must not include g:: g:half_left" in messages
+    assert "WORKSPACE_ROUTES: rule must not include le:: c:okular le:pos1" in messages
+
+
+def test_validate_geom_section_accepts_current_placeholder_zero_sizes() -> None:
+    messages = validate_geom_section(
+        block("GEOM", 'local GEOM = { custom = { x = 0, y = 0, w = 0, h = 0 } }')
+    )
+
+    assert messages == []
+
+
+def test_validate_geom_section_rejects_missing_and_invalid_fields() -> None:
+    messages = validate_geom_section(
+        block("GEOM", 'local GEOM = { broken = { x = 0, y = nope, w = -1 } }')
+    )
+
+    assert "GEOM: profile broken field y must be an integer" in messages
+    assert "GEOM: profile broken missing h" in messages
+    assert "GEOM: profile broken field w must be zero or greater" in messages
 
 
 def test_validate_placement_section_requires_existing_geometry_profile() -> None:
