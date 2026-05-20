@@ -92,8 +92,12 @@ def _print_validation_result(config_path: Path, result: ValidationResult) -> Non
 
     if result.ok:
         print("OK: managed Lua blocks parsed and validated.")
-        return
+    else:
+        print("ERROR: managed Lua block validation failed.")
+        for message in result.errors:
+            print(f"- {message}")
 
-    print("ERROR: managed Lua block validation failed.")
-    for message in result.messages:
-        print(f"- {message}")
+    if result.warnings:
+        print("WARNINGS:")
+        for warning in result.warnings:
+            print(f"- {warning}")
