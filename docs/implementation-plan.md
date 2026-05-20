@@ -36,6 +36,7 @@ The implementation should follow these decisions:
 8. Make the stable entry point a command that can be assigned to a keyboard shortcut.
 9. Treat tray behavior as optional.
 10. Support source-checkout execution because Qubes dom0 is normally offline.
+11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 
 ## Stage 0: repository preparation
 
@@ -74,6 +75,8 @@ src/
       validation.py
       rendering.py
       backup.py
+      settings.py
+      split_profiles.py
     window/
       __init__.py
       active_window.py
@@ -137,7 +140,8 @@ Required validation:
 5. No unknown geometry profile references.
 6. Valid left-edge correction modes.
 7. Valid integer geometry values.
-8. Useful user-facing error messages.
+8. Valid numeric settings such as `window_border_width`.
+9. Useful user-facing error messages.
 
 Completion criteria:
 
@@ -288,7 +292,27 @@ Completion criteria:
 2. Exclude rules short-circuit behavior as expected.
 3. Existing matching rules are shown before saving.
 
-## Stage 11: reload or restart managed runtime
+## Stage 11: generated split profiles
+
+Implement generated `half_left` and `half_right` profile support.
+
+Required behavior:
+
+1. Read screen or monitor geometry.
+2. Read `window_border_width` from settings.
+3. Generate matching `half_left` and `half_right` profiles.
+4. Show a preview of both generated profiles together.
+5. Let the user edit `window_border_width` and preview again.
+6. Write generated profiles to `GEOM` only after confirmation.
+
+Completion criteria:
+
+1. The user can generate split profiles without manually calculating border offsets.
+2. Updating `window_border_width` changes the generated `x` and `w` values predictably.
+3. Generated profile changes are previewed before save.
+4. Validation rejects invalid border widths.
+
+## Stage 12: reload or restart managed runtime
 
 Implement a safe reload/restart path.
 
@@ -310,7 +334,7 @@ Completion criteria:
 1. Saved rules can be activated without manual process hunting.
 2. Failure leaves the saved file intact and reports the problem clearly.
 
-## Stage 12: left-edge correction test action
+## Stage 13: left-edge correction test action
 
 Implement the configurator-assisted left-edge test.
 
@@ -329,7 +353,7 @@ Completion criteria:
 2. The configurator can identify which correction mode works.
 3. The saved rule uses the prefixed grammar.
 
-## Stage 13: post-resize monitoring proof
+## Stage 14: post-resize monitoring proof
 
 Begin Phase 2 automation.
 
@@ -346,7 +370,7 @@ Completion criteria:
 1. Resize completion is detected reliably in Qubes/XFCE testing.
 2. Automated `d2wc` placements do not trigger false positives, or suppression design is ready.
 
-## Stage 14: post-resize configurator entry
+## Stage 15: post-resize configurator entry
 
 Add user-facing post-resize behavior.
 
@@ -364,7 +388,7 @@ Completion criteria:
 2. Pointer menu defaults to safe cancellation.
 3. Mouse-button swapping is handled or documented.
 
-## Stage 15: packaging proof
+## Stage 16: packaging proof
 
 Create the first local package proof.
 
@@ -383,7 +407,7 @@ Completion criteria:
 2. A Qubes/dom0 offline workflow is documented.
 3. The package does not overwrite user-managed Lua rules.
 
-## Stage 16: future Qt/KDE front end
+## Stage 17: future Qt/KDE front end
 
 This is not part of the first implementation, but the architecture should keep it possible.
 
@@ -412,6 +436,13 @@ Review is useful at these points:
 5. Before adding post-resize automation.
 6. Before building the first RPM.
 
+## Related documents
+
+1. [UI Flow](ui-flow.md)
+2. [Runtime Architecture](runtime-architecture.md)
+3. [Testing](testing.md)
+4. [Packaging](packaging.md)
+
 ## Immediate next implementation tasks
 
 After the initial documentation PR is merged, the next branch should likely be:
@@ -427,6 +458,7 @@ First tasks on that branch:
 3. Add parser for managed Lua blocks.
 4. Add validation model.
 5. Add tests using `src/d2wc.lua` as the fixture.
-6. Add a dry-run render command.
+6. Add settings model, including `window_border_width`.
+7. Add a dry-run render command.
 
 No GTK UI should be built until the parser/validator can safely read the current Lua script.
