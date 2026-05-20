@@ -43,10 +43,10 @@ after
     assert "before\n" in result.source
     assert "\nbetween\n" in result.source
     assert "\nafter\n" in result.source
-    assert 'local EXCLUDE = {\n  -- user note\n  "d:personal",  -- personal note\n}' in result.source
+    assert 'local EXCLUDE = {\n  -- user note\n  "d:personal",     -- personal note\n}' in result.source
     assert 'local PIN = {\n  "c:okular",\n}' in result.source
     assert 'local WORKSPACE_ROUTES = {\n  -- route note\n  [1] = { "d:personal" },\n}' in result.source
-    assert 'local GEOM = {\n  -- geometry note\n  half_left              = { x = 0, y = 0, w = 10, h = 10 },  -- left note\n}' in result.source
+    assert 'local GEOM = {\n  -- geometry note\n  half_left              = { x = 0   , y = 0   , w = 10  , h = 10   },     -- left note\n}' in result.source
     assert 'local WORKSPACE_PLACEMENT = {\n  "c:okular g:half_left",\n}' in result.source
     assert 'local LEFT_EDGE_CORRECTION = {\n  "c:okular le:pos1",\n}' in result.source
 
