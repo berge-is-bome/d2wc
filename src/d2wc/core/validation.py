@@ -1,14 +1,16 @@
-"""Validation for managed d2wc configuration.
-
-The first scaffold validates only that all managed blocks were detected.
-Detailed rule grammar validation will follow after the parser has tests.
-"""
+"""Validation for managed d2wc configuration."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
 from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlock
+from d2wc.core.section_validation import (
+    extract_geometry_profile_names,
+    validate_left_edge_section,
+    validate_placement_section,
+    validate_target_section,
+)
 
 
 @dataclass(frozen=True)
@@ -20,17 +22,22 @@ class ValidationResult:
 
 
 def validate_managed_blocks(blocks: dict[str, ManagedBlock]) -> ValidationResult:
-    """Validate that required managed blocks were detected.
-
-    This function is intentionally minimal for the first core proof. It gives
-    the CLI a safe read-only validation path while more specific validators are
-    added.
-    """
+    """Validate required managed blocks and first-layer rule grammar."""
 
     messages: list[str] = []
 
     for name in MANAGED_BLOCK_NAMES:
         if name not in blocks:
             messages.append(f"Missing managed block: {name}")
+
+    if messages:
+        return ValidationResult(ok=False, messages=tuple(messages))
+
+    geometry_profiles = extract_geometry_profile_names(blocks["GEOM"].text)
+
+    messages.extend(validate_target_section(blocks["EXCLUDE"]))
+    messages.extend(validate_target_section(blocks["PIN"]))
+    messages.extend(validate_placement_section(blocks["WORKSPACE_PLACEMENT"], geometry_profiles))
+    messages.extend(validate_left_edge_section(blocks["LEFT_EDGE_CORRECTION"]))
 
     return ValidationResult(ok=not messages, messages=tuple(messages))
