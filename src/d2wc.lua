@@ -56,6 +56,7 @@ local WORKSPACE_ROUTES = {
 ------------------------------------------------------------
 -- Geometry profiles.
 -- Geometry profiles determine where a window will be placed and what size it will be.
+-- Width and height must be greater than zero.
 ------------------------------------------------------------
 local GEOM = {
   wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
@@ -70,8 +71,6 @@ local GEOM = {
   dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
   dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
 
-  custom_name1           = { x = 0,    y = 0,    w = 0,    h = 0    },
-  custom_name2           = { x = 0,    y = 0,    w = 0,    h = 0    },
   -- add more here
 }
 
