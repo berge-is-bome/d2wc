@@ -80,12 +80,21 @@ def test_validate_workspace_routes_section_rejects_invalid_route_tokens() -> Non
     assert "WORKSPACE_ROUTES: rule must not include le:: c:okular le:pos1" in messages
 
 
-def test_validate_geom_section_accepts_current_placeholder_zero_sizes() -> None:
+def test_validate_geom_section_accepts_positive_sizes() -> None:
+    messages = validate_geom_section(
+        block("GEOM", 'local GEOM = { custom = { x = 0, y = 0, w = 1, h = 1 } }')
+    )
+
+    assert messages == []
+
+
+def test_validate_geom_section_rejects_zero_sizes() -> None:
     messages = validate_geom_section(
         block("GEOM", 'local GEOM = { custom = { x = 0, y = 0, w = 0, h = 0 } }')
     )
 
-    assert messages == []
+    assert "GEOM: profile custom field w must be greater than zero" in messages
+    assert "GEOM: profile custom field h must be greater than zero" in messages
 
 
 def test_validate_geom_section_rejects_missing_and_invalid_fields() -> None:
@@ -95,7 +104,7 @@ def test_validate_geom_section_rejects_missing_and_invalid_fields() -> None:
 
     assert "GEOM: profile broken field y must be an integer" in messages
     assert "GEOM: profile broken missing h" in messages
-    assert "GEOM: profile broken field w must be zero or greater" in messages
+    assert "GEOM: profile broken field w must be greater than zero" in messages
 
 
 def test_validate_placement_section_requires_existing_geometry_profile() -> None:
