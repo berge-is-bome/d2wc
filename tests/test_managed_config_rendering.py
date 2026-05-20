@@ -22,10 +22,10 @@ def test_render_geom_block_aligns_profile_names_and_numeric_columns() -> None:
     )
 
     assert rendered == """local GEOM = {
-  wide                   = { x = 100 , y = 456, w = 3624, h = 1389 },
-  centered_mid           = { x = 960 , y = 540, w = 1200, h = 900  },
-  half_left              = { x = 0   , y = 0  , w = 1920, h = 2115 },
-  dom0_template_manager  = { x = 1129, y = 0  , w = 1220, h = 2115 },
+  wide                   = { x = 100 , y = 456 , w = 3624, h = 1389 },
+  centered_mid           = { x = 960 , y = 540 , w = 1200, h = 900  },
+  half_left              = { x = 0   , y = 0   , w = 1920, h = 2115 },
+  dom0_template_manager  = { x = 1129, y = 0   , w = 1220, h = 2115 },
 }"""
 
 
@@ -52,7 +52,7 @@ def test_render_rule_list_preserves_comments_and_blank_lines() -> None:
 
     assert rendered == '''local EXCLUDE = {
   -- keep this note
-  "d:personal",  -- personal note
+  "d:personal",     -- personal note
 
   "c:okular",
 }'''
@@ -81,9 +81,9 @@ def test_render_geom_preserves_comments_and_blank_lines() -> None:
 
     assert rendered == '''local GEOM = {
   -- main split profiles
-  half_left              = { x = 0 , y = 0, w = 10, h = 10 },  -- left note
+  half_left              = { x = 0   , y = 0   , w = 10  , h = 10   },     -- left note
 
-  half_right             = { x = 20, y = 0, w = 10, h = 10 },
+  half_right             = { x = 20  , y = 0   , w = 10  , h = 10   },
 }'''
 
 
