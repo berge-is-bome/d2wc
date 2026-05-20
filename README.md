@@ -57,6 +57,8 @@ The `validate` command is read-only. It parses and validates the managed Lua sec
 
 The `render` command is also read-only in this proof stage. It requires `--stdout` and prints the rendered Lua to standard output only.
 
+Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer must preserve them, and the future configurator should expose simple actions to add a user comment or insert a blank separator line.
+
 ## Development direction
 
 The first production goal is not a flamboyant desktop tool. The goal is a minimal configurator that hides as much manual rule-writing as possible while still allowing the user to review and edit the result before it is written to the Lua script.
