@@ -20,6 +20,7 @@ Typical examples:
 4. Pin selected windows so they are visible on all workspaces.
 5. Exclude menus, splash windows, panels, or troublesome applications from automation.
 6. Capture a resized window and convert that geometry into a reusable profile.
+7. Generate matching `half_left` and `half_right` profiles from screen geometry and a configured window border width.
 
 ## Operating model
 
@@ -39,11 +40,14 @@ The configurator should not rewrite arbitrary Lua logic. It should edit only the
 
 ## Configurator entry points
 
-The configurator should be reachable in three ways.
+The stable entry point should be a command that can be assigned to a desktop keyboard shortcut.
 
-1. System tray menu. The user clicks the tray icon with either mouse button and chooses `Configure`.
-2. Direct post-resize flow. The user resizes a window, releases the primary mouse button, and `d2wc` opens the configurator directly for that window.
-3. Post-resize choice menu. The user resizes a window, releases the primary mouse button, and `d2wc` opens a small pointer-anchored menu with `Cancel` and `Configure`.
+The configurator should be reachable in these ways:
+
+1. Command or keyboard shortcut. The user focuses or places a window, presses the configured shortcut, and `d2wc` opens the configurator for the active window.
+2. Optional tray menu. During setup or troubleshooting, the user can enable a tray menu and choose `Configure` or `Capture Active Window`.
+3. Direct post-resize flow. The user resizes a window, releases the primary mouse button, and `d2wc` opens the configurator directly for that window.
+4. Post-resize choice menu. The user resizes a window, releases the primary mouse button, and `d2wc` opens a small pointer-anchored menu with `Cancel` and `Configure`.
 
 The pointer-anchored menu should center the pointer on `Cancel` by default. This protects the user from accidentally configuring a window after every resize. `Configure` should be the second action in the menu.
 
@@ -82,13 +86,16 @@ The `half_left` and `half_right` profiles should become mostly automated.
 
 The configurator should derive these from the active screen instead of expecting the user to manually enter pixel values. On a simple single-monitor layout, `half_left` should represent the left half of the usable screen area and `half_right` should represent the right half.
 
+When two equal-size windows are placed side by side using `half_left` and `half_right`, window borders can cause the apparent combined width to be wrong. `d2wc` should therefore provide a configurable `window_border_width` value. The user can adjust that one pixel value, preview the regenerated split profiles, and avoid manually nudging the width and x-position values.
+
 The generated values should account for:
 
 1. Screen width and height.
 2. Panel or reserved desktop areas where discoverable.
 3. Multi-monitor layouts.
 4. Window manager decoration differences where they affect actual placement.
-5. Any required left-edge correction.
+5. Configured `window_border_width`.
+6. Any required left-edge correction.
 
 The user should still be able to override the derived values.
 
@@ -96,24 +103,33 @@ The user should still be able to override the derived values.
 
 The current Lua script supports `LEFT_EDGE_CORRECTION` because `set_window_geometry()` may place a window a few pixels away from `x = 0` on some systems.
 
-The development task is to test whether the logic can be simplified by using `set_window_position()` or `set_window_position2()` consistently after setting geometry, or only when the resulting window geometry is wrong.
+Manual testing has shown that this incorrect position is visible through `get_window_geometry()`. That means `d2wc` can detect the offset after applying geometry and then test or apply `set_window_position()` or `set_window_position2()` only when needed.
+
+The development task is to test whether the logic can be simplified by using one correction function consistently after setting geometry, or only when the resulting window geometry is wrong.
 
 The safe design is to keep `LEFT_EDGE_CORRECTION` for now. It is a compatibility feature and should remain configurable until testing proves it can be replaced.
 
 ## Technology direction
 
-The configurator should be portable across common Linux distributions where practical.
+The first implementation should use Python, with GTK/PyGObject as the first UI proof target for Qubes/XFCE. The core parser, writer, validator, and rule model should remain independent from GTK so a future Qt front end can support KDE-oriented users.
 
-The implementation language and GUI toolkit are not decided yet. The first technical decision should compare lightweight, distribution-friendly options with a bias toward open-source tooling, simple packaging, and low runtime friction.
+Evaluation criteria:
 
-Likely evaluation criteria:
-
-1. Can it provide a system tray icon reliably?
+1. Can it open the configurator from a command or keyboard shortcut?
 2. Can it observe window resize events or cooperate with a daemon that does?
 3. Can it read and write the Lua configuration safely?
 4. Can it run on Qubes OS and ordinary Linux desktops?
 5. Can it be packaged cleanly for Fedora and Debian-family systems?
 6. Can it avoid a heavy dependency stack?
+7. Can the non-UI core be reused by a future Qt/KDE front end?
+
+## Related documents
+
+1. [UI Flow](ui-flow.md)
+2. [Runtime Architecture](runtime-architecture.md)
+3. [Technology Evaluation](technology-evaluation.md)
+4. [Implementation Plan](implementation-plan.md)
+5. [Testing](testing.md)
 
 ## Development document status
 
