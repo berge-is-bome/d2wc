@@ -5,6 +5,8 @@ from __future__ import annotations
 from d2wc.core.lua_blocks import ManagedBlock
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 
+REQUIRED_GEOMETRY_FIELDS: tuple[str, ...] = ("x", "y", "w", "h")
+
 
 def validate_target_section(block: ManagedBlock) -> list[str]:
     """Validate EXCLUDE or PIN style rules."""
@@ -22,6 +24,66 @@ def validate_target_section(block: ManagedBlock) -> list[str]:
             messages.append(f"{block.name}: rule must not include g:: {text}")
         if rule.left_edge_mode is not None:
             messages.append(f"{block.name}: rule must not include le:: {text}")
+    return messages
+
+
+def validate_workspace_routes_section(block: ManagedBlock) -> list[str]:
+    """Validate WORKSPACE_ROUTES keys and route rules."""
+
+    messages: list[str] = []
+    seen_keys: set[int] = set()
+
+    for line in block.text.splitlines():
+        active = line.split("--", 1)[0].strip()
+        if not active:
+            continue
+
+        key = _extract_workspace_key(active)
+        if key is not None:
+            if key in seen_keys:
+                messages.append(f"{block.name}: duplicate workspace key: {key}")
+            seen_keys.add(key)
+
+        for text in extract_active_rule_strings(active):
+            try:
+                rule = parse_prefixed_rule(text)
+            except RuleParseError as exc:
+                messages.append(f"{block.name}: {exc}")
+                continue
+            if not rule.has_target:
+                messages.append(f"{block.name}: rule must include d: or c:: {text}")
+            if rule.geometry_profile is not None:
+                messages.append(f"{block.name}: rule must not include g:: {text}")
+            if rule.left_edge_mode is not None:
+                messages.append(f"{block.name}: rule must not include le:: {text}")
+
+    return messages
+
+
+def validate_geom_section(block: ManagedBlock) -> list[str]:
+    """Validate simple GEOM profile entries."""
+
+    messages: list[str] = []
+    seen_names: set[str] = set()
+
+    for name, fields in extract_geometry_profiles(block.text).items():
+        if name in seen_names:
+            messages.append(f"{block.name}: duplicate geometry profile: {name}")
+        seen_names.add(name)
+
+        for field in REQUIRED_GEOMETRY_FIELDS:
+            if field not in fields:
+                messages.append(f"{block.name}: profile {name} missing {field}")
+                continue
+            value = fields[field]
+            if not isinstance(value, int):
+                messages.append(f"{block.name}: profile {name} field {field} must be an integer")
+
+        for size_field in ("w", "h"):
+            value = fields.get(size_field)
+            if isinstance(value, int) and value < 0:
+                messages.append(f"{block.name}: profile {name} field {size_field} must be zero or greater")
+
     return messages
 
 
@@ -70,15 +132,34 @@ def validate_left_edge_section(block: ManagedBlock) -> list[str]:
 def extract_geometry_profile_names(geom_block_text: str) -> set[str]:
     """Extract simple `name = { ... }` profile names from the GEOM block."""
 
-    names: set[str] = set()
+    return set(extract_geometry_profiles(geom_block_text))
+
+
+def extract_geometry_profiles(geom_block_text: str) -> dict[str, dict[str, int | str]]:
+    """Extract simple one-line GEOM profiles from a GEOM block."""
+
+    profiles: dict[str, dict[str, int | str]] = {}
     for line in geom_block_text.splitlines():
         active = line.split("--", 1)[0].strip()
-        if "=" not in active or "{" not in active:
+        if "=" not in active or "{" not in active or "}" not in active:
             continue
         name = active.split("=", 1)[0].strip()
-        if name and name.replace("_", "").isalnum() and not name[0].isdigit():
-            names.add(name.lower())
-    return names
+        if not _is_lua_identifier(name):
+            continue
+        body = active.split("{", 1)[1].split("}", 1)[0]
+        fields: dict[str, int | str] = {}
+        for chunk in body.split(","):
+            if "=" not in chunk:
+                continue
+            key, value = chunk.split("=", 1)
+            key = key.strip()
+            raw_value = value.strip()
+            try:
+                fields[key] = int(raw_value)
+            except ValueError:
+                fields[key] = raw_value
+        profiles[name.lower()] = fields
+    return profiles
 
 
 def extract_active_rule_strings(block_text: str) -> list[str]:
@@ -90,3 +171,17 @@ def extract_active_rule_strings(block_text: str) -> list[str]:
         pieces = active.split('"')
         strings.extend(pieces[index] for index in range(1, len(pieces), 2))
     return strings
+
+
+def _extract_workspace_key(active_line: str) -> int | None:
+    if not active_line.startswith("[") or "]" not in active_line:
+        return None
+    key_text = active_line.split("]", 1)[0].lstrip("[").strip()
+    try:
+        return int(key_text)
+    except ValueError:
+        return None
+
+
+def _is_lua_identifier(value: str) -> bool:
+    return bool(value) and not value[0].isdigit() and value.replace("_", "").isalnum()
