@@ -6,6 +6,7 @@ from d2wc.core.lua_blocks import ManagedBlock
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 
 REQUIRED_GEOMETRY_FIELDS: tuple[str, ...] = ("x", "y", "w", "h")
+MIN_GEOMETRY_SIZE = 10
 
 
 def validate_target_section(block: ManagedBlock) -> list[str]:
@@ -81,8 +82,10 @@ def validate_geom_section(block: ManagedBlock) -> list[str]:
 
         for size_field in ("w", "h"):
             value = fields.get(size_field)
-            if isinstance(value, int) and value <= 0:
-                messages.append(f"{block.name}: profile {name} field {size_field} must be greater than zero")
+            if isinstance(value, int) and value < MIN_GEOMETRY_SIZE:
+                messages.append(
+                    f"{block.name}: profile {name} field {size_field} must be at least {MIN_GEOMETRY_SIZE}"
+                )
 
     return messages
 
