@@ -46,6 +46,15 @@ def test_extract_geometry_profiles() -> None:
     }
 
 
+def test_extract_geometry_profiles_multiple_profiles_on_one_line() -> None:
+    text = 'local GEOM = { half_left = { x = 0, y = 0, w = 10, h = 10 }, half_right = { x = 20, y = 0, w = 10, h = 10 } }'
+
+    assert extract_geometry_profiles(text) == {
+        "half_left": {"x": 0, "y": 0, "w": 10, "h": 10},
+        "half_right": {"x": 20, "y": 0, "w": 10, "h": 10},
+    }
+
+
 def test_validate_target_section_accepts_domain_or_class_rules() -> None:
     messages = validate_target_section(
         block("PIN", 'local PIN = { "d:dom0 c:xfce4-terminal", "c:okular" }')
