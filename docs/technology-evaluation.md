@@ -344,7 +344,7 @@ Open questions:
 5. How does the behavior differ across XFCE, KDE, GNOME, and other desktops?
 6. What parts of the UI need toolkit-specific implementations versus shared core behavior?
 
-These questions should be handled in `docs/event-monitoring.md` after the Phase 1 command/manual configurator path is clear.
+These questions should be handled in [Event Monitoring](event-monitoring.md) after the Phase 1 command/manual configurator path is clear.
 
 ## Current recommendation
 
@@ -361,6 +361,14 @@ Do not choose a toolkit primarily because of a tray icon. The stable entry point
 Do not start with Rust, Go, C, or C++ unless Python fails a practical proof task on the target system.
 
 Do not use a webview for the first implementation.
+
+## Related documents
+
+1. [Runtime Architecture](runtime-architecture.md)
+2. [Event Monitoring](event-monitoring.md)
+3. [Implementation Plan](implementation-plan.md)
+4. [Testing](testing.md)
+5. [Packaging](packaging.md)
 
 ## Review checkpoint
 
