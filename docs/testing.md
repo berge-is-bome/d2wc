@@ -6,6 +6,28 @@ This document defines the first testing strategy for `d2wc`.
 
 The testing goal is simple: the configurator must never damage a user's working Lua rules file. The parser, validator, renderer, backup logic, and UI proof must therefore be tested before the configurator is allowed to write to a real user configuration.
 
+## Current confirmed verification
+
+The latest confirmed source-checkout verification is recorded in [Development Status](development-status.md).
+
+For renderer-related work, use this standard verification sequence:
+
+```bash
+PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
+PYTHONPATH=src python -m pytest
+```
+
+This proves that:
+
+1. The committed `src/d2wc.lua` validates.
+2. The renderer can produce a real output file.
+3. The rendered output validates as managed Lua config.
+4. The full Python test suite passes.
+
+For non-renderer-only changes, a shorter validation plus pytest run may be enough, but renderer changes should keep the four-command sequence above.
+
 ## Testing principles
 
 The project should follow these principles:
@@ -19,6 +41,7 @@ The project should follow these principles:
 7. Keep Qubes/XFCE behavior as the first desktop integration target.
 8. Keep future Qt/KDE support possible by not tying core tests to GTK.
 9. Test generated geometry before writing it to `GEOM`.
+10. Re-validate rendered Lua output after renderer changes.
 
 ## Test levels
 
@@ -49,9 +72,10 @@ Examples:
 1. Parse the full current `src/d2wc.lua`.
 2. Render managed blocks back to Lua.
 3. Write to a temporary file.
-4. Create backups in a temporary directory.
-5. Verify invalid Lua configuration samples produce useful errors.
-6. Generate `half_left` and `half_right` profiles into a temporary config.
+4. Validate the rendered temporary file.
+5. Create backups in a temporary directory.
+6. Verify invalid Lua configuration samples produce useful errors.
+7. Generate `half_left` and `half_right` profiles into a temporary config.
 
 These tests should not modify the user's real `~/.config/d2wc/` files.
 
@@ -217,6 +241,7 @@ Tests should verify:
 4. Width and height are positive.
 5. Duplicate profile names are detected.
 6. Generated `half_left` and `half_right` profiles are valid `GEOM` entries.
+7. Rendered `x`, `y`, `w`, and `h` columns remain readable and aligned.
 
 ### `WORKSPACE_PLACEMENT`
 
@@ -278,15 +303,20 @@ Required behavior:
 2. Keep valid Lua syntax.
 3. Preserve unmanaged Lua program logic.
 4. Avoid duplicate workspace keys.
-5. Preserve or regenerate useful comments where practical.
-6. Render generated `half_left` and `half_right` profiles as normal `GEOM` entries.
+5. Preserve pure note comments.
+6. Preserve blank separator lines.
+7. Align right-side comments in managed rule-list sections.
+8. Align right-side comments in `GEOM` entries.
+9. Render generated `half_left` and `half_right` profiles as normal `GEOM` entries.
 
 Test approach:
 
 1. Parse fixture.
 2. Render without changes.
-3. Parse rendered output again.
-4. Confirm parsed model is equivalent.
+3. Write rendered output to a temporary file.
+4. Parse rendered output again.
+5. Confirm parsed model is equivalent.
+6. Validate rendered output.
 
 This is more important than byte-for-byte output matching.
 
@@ -350,7 +380,7 @@ Required manual proof tests:
 6. Configurator can show parsed configuration summary.
 7. No real user config is modified.
 
-GTK proof should happen after parser and validator proof, not before.
+GTK proof should happen after parser, validator, renderer, and safe save behavior are proven, not before.
 
 ## Active-window capture tests
 
@@ -425,13 +455,14 @@ The following gates must pass before the configurator can write to a real user c
 1. Parser reads current script.
 2. Validator accepts current script.
 3. Renderer round-trip preserves the model.
-4. Backup/write tests pass in temporary directories.
-5. Dry-run preview works.
-6. `window_border_width` validation passes before generated split profiles are written.
-7. Generated split profiles are previewed before save.
-8. User explicitly selects a real config file or initializes one.
-9. Backup location is writable.
-10. Save preview is shown.
+4. Rendered output validates.
+5. Backup/write tests pass in temporary directories.
+6. Dry-run preview works.
+7. `window_border_width` validation passes before generated split profiles are written.
+8. Generated split profiles are previewed before save.
+9. User explicitly selects a real config file or initializes one.
+10. Backup location is writable.
+11. Save preview is shown.
 
 The default behavior during early development should be read-only or test-file-only.
 
@@ -467,7 +498,7 @@ Suggested fields:
 
 ## Continuous integration later
 
-CI can be added after the Python package skeleton exists.
+CI can be added after the source-checkout workflow is stable.
 
 First CI checks:
 
@@ -475,30 +506,30 @@ First CI checks:
 2. Run parser tests against fixtures.
 3. Run validation tests.
 4. Run render round-trip tests.
-5. Run generated split-profile tests.
+5. Validate rendered Lua output.
+6. Run generated split-profile tests.
 
 Desktop behavior will remain manual until a suitable test environment is designed.
 
 ## Related documents
 
-1. [UI Flow](ui-flow.md)
-2. [Runtime Architecture](runtime-architecture.md)
-3. [Implementation Plan](implementation-plan.md)
-4. [Left-Edge Correction Testing](left-edge-correction-testing.md)
+1. [Development Status](development-status.md)
+2. [UI Flow](ui-flow.md)
+3. [Runtime Architecture](runtime-architecture.md)
+4. [Implementation Plan](implementation-plan.md)
+5. [Left-Edge Correction Testing](left-edge-correction-testing.md)
 
 ## Immediate test priorities
 
-The first real implementation branch should prioritize tests in this order:
+The current core proof has already covered the first parser, grammar, validation, renderer, settings, split-profile, backup path, CLI, duplicate-validation, and shadow-validation tests.
 
-1. Parser can find managed blocks.
-2. Rule grammar validation.
-3. Section validation.
-4. Runtime settings validation.
-5. Generated split-profile calculation.
-6. Renderer round-trip.
-7. Backup/write to temporary directory.
-8. CLI dry-run commands.
-9. GTK window proof.
-10. Active-window capture proof.
+The next immediate test priorities are:
 
-No UI save workflow should be built before the parser, validator, renderer, and backup tests exist.
+1. Safe write behavior using temporary directories only.
+2. Backup creation before replacement.
+3. Render-to-temp and validate-before-replace workflow.
+4. Failure handling that leaves the original file intact.
+5. Additional fixture coverage for valid and invalid Lua samples.
+6. GTK window proof only after safe save behavior is tested.
+
+No UI save workflow should be built before the parser, validator, renderer, and backup/write tests exist.
