@@ -260,6 +260,24 @@ The project should avoid Fedora-only assumptions in the application code.
 
 Qubes needs special care.
 
+Qubes dom0 is normally offline and has no ordinary network access. That affects how `d2wc` should be distributed, tested, and installed for Qubes users.
+
+Likely Qubes installation routes:
+
+1. Clone the repository in a networked qube.
+2. Move the cloned repository into dom0 using Qubes built-in copy mechanisms.
+3. Run `d2wc` from the copied source tree or perform a local developer install.
+4. Alternatively, download or build an RPM in a networked environment.
+5. Move the RPM into dom0 using Qubes built-in copy mechanisms.
+6. Install the RPM locally in dom0.
+
+This means the project should support both:
+
+1. Running from a source checkout.
+2. Installing from a local RPM file without requiring network access at install time.
+
+The documentation should never assume that dom0 can run `git clone`, install dependencies from the network, or fetch package repositories directly.
+
 Questions to answer later:
 
 1. Where should `d2wc` run for Qubes workflows?
@@ -268,6 +286,8 @@ Questions to answer later:
 4. How should the managed Lua script be installed or copied?
 5. What Qubes-specific dependencies are needed?
 6. How should documentation warn users before modifying dom0 behavior?
+7. How should offline dependency handling be documented for dom0?
+8. Should Qubes users be offered a source-checkout workflow before RPM packaging is ready?
 
 The first implementation can target the user's known Qubes/XFCE workflow, but packaging should not blindly assume all Qubes users want the same install path.
 
@@ -289,6 +309,8 @@ The exact command depends on the final source layout.
 
 The developer workflow should use test files by default to avoid damaging the user's active Lua configuration.
 
+For Qubes/dom0 testing, the source-checkout workflow should remain important even after RPM packaging exists. It gives users a way to inspect the source in a networked qube, copy it into dom0, and run or test it without relying on dom0 network access.
+
 ## Testing package behavior
 
 Packaging tests should check:
@@ -300,6 +322,7 @@ Packaging tests should check:
 5. Backup directory can be created.
 6. The package can be removed cleanly.
 7. User config is not deleted on normal uninstall unless explicitly purged.
+8. Local RPM install works without network access once dependencies are present.
 
 ## Uninstall behavior
 
@@ -335,3 +358,5 @@ Possible approach:
 5. Should GTK and future Qt front ends be separate packages or optional extras?
 6. What is the cleanest Fedora RPM dependency set for PyGObject and GTK?
 7. What is the cleanest Debian dependency set?
+8. How should Qubes/dom0 offline install instructions be structured?
+9. Which source-checkout workflow should be supported before RPM packaging is ready?
