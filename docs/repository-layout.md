@@ -17,6 +17,7 @@ docs/
   left-edge-correction-testing.md
   packaging.md
   implementation-plan.md
+  testing.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -57,8 +58,8 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/testing.md` for the first parser/writer and UI proof tests.
-2. `examples/` for example Lua configurations once the script is stable.
+1. `examples/` for example Lua configurations once the script is stable.
+2. `docs/developer-notes.md` for implementation discoveries that do not belong in product docs.
 
 ## Branching convention
 
