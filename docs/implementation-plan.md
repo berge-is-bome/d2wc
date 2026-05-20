@@ -19,6 +19,9 @@ The repository currently contains:
 5. Event monitoring documentation.
 6. Left-edge correction testing documentation.
 7. Packaging documentation.
+8. Python package skeleton for the read-only configurator core proof.
+9. Parser, validator, renderer, settings, split-profile, backup path, duplicate-validation, and shadow-validation tests.
+10. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator is developed.
 
@@ -37,17 +40,18 @@ The implementation should follow these decisions:
 9. Treat tray behavior as optional.
 10. Support source-checkout execution because Qubes dom0 is normally offline.
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
+12. Keep real user configuration writes disabled until safe save behavior is tested with temporary directories.
 
 ## Stage 0: repository preparation
 
-Stage 0 is mostly complete in the current draft PR.
+Stage 0 is complete in the current draft PR.
 
-Required outputs:
+Completed outputs:
 
 1. Initial repository structure.
 2. Current Lua script in `src/d2wc.lua`.
 3. Core planning documentation.
-4. A clear branch and PR for the initial structure.
+4. Clear branch and PR for the initial structure and core proof.
 
 Completion criteria:
 
@@ -57,9 +61,9 @@ Completion criteria:
 
 ## Stage 1: source layout for Python development
 
-Create the initial Python package layout without building the full UI yet.
+Stage 1 is complete in the current draft PR.
 
-Proposed structure:
+Current structure:
 
 ```text
 src/
@@ -70,39 +74,28 @@ src/
     cli.py
     core/
       __init__.py
-      config_model.py
-      lua_blocks.py
-      validation.py
-      rendering.py
       backup.py
+      lua_blocks.py
+      managed_config.py
+      rendering.py
+      rule_grammar.py
+      section_validation.py
       settings.py
+      shadow_validation.py
       split_profiles.py
-    window/
-      __init__.py
-      active_window.py
-      geometry.py
-    ui/
-      __init__.py
-      gtk/
-        __init__.py
-        main_window.py
+      validation.py
 ```
 
-Required behavior:
+Completed behavior:
 
 1. `python -m d2wc --help` works from the source checkout.
-2. `python -m d2wc configure` starts a placeholder configurator or prints a clear placeholder message.
-3. The package can be imported without starting the UI.
-
-Completion criteria:
-
-1. CLI command exists.
-2. Core modules import cleanly.
-3. No real user config is modified.
+2. `python -m d2wc configure` has a clear placeholder path.
+3. The package can be imported without starting a UI.
+4. No real user config is modified.
 
 ## Stage 2: Lua managed-block parser
 
-Build the parser that reads the known managed sections from the Lua script.
+Stage 2 is complete for the current managed sections.
 
 Managed sections:
 
@@ -113,25 +106,19 @@ Managed sections:
 5. `WORKSPACE_PLACEMENT`
 6. `LEFT_EDGE_CORRECTION`
 
-Required behavior:
+Completed behavior:
 
-1. Read `src/d2wc.lua`.
-2. Locate each managed block.
-3. Parse block content into structured Python objects.
-4. Preserve non-managed Lua program logic outside those blocks.
-5. Report clear errors if a managed block cannot be found or parsed.
-
-Completion criteria:
-
-1. Parser can read the current `src/d2wc.lua`.
-2. Parsed data matches the current Lua configuration.
-3. Unit tests cover the current script and at least one malformed block.
+1. Reads `src/d2wc.lua`.
+2. Locates each managed block.
+3. Preserves non-managed Lua program logic outside those blocks.
+4. Reports clear errors if a managed block cannot be found or parsed.
+5. Test coverage exists for managed-block parsing.
 
 ## Stage 3: rule model and validation
 
-Build the internal model for rules and validation.
+Stage 3 is complete for the current read-only core proof.
 
-Required validation:
+Completed validation:
 
 1. Valid prefixed grammar: `d:`, `c:`, `g:`, `le:`.
 2. No duplicate prefixes inside one rule.
@@ -141,26 +128,39 @@ Required validation:
 6. Valid left-edge correction modes.
 7. Valid integer geometry values.
 8. Valid numeric settings such as `window_border_width`.
-9. Useful user-facing error messages.
+9. Duplicate managed target detection.
+10. Shadowed-rule detection where currently practical.
+11. Useful user-facing error messages.
 
 Completion criteria:
 
-1. Current Lua script validates cleanly or reports only intentional test/sample issues.
+1. Current Lua script validates cleanly.
 2. Invalid sample rules fail with useful messages.
 3. Validation logic has no dependency on GTK.
 
 ## Stage 4: renderer and safe file writer
 
-Build the renderer that writes managed blocks back to Lua.
+Stage 4 is partially complete.
 
-Required behavior:
+Completed renderer behavior:
 
-1. Render deterministic Lua for managed blocks.
+1. Render deterministic Lua for managed blocks where practical.
 2. Keep program logic outside managed blocks intact.
-3. Create a backup before saving.
-4. Write to a temporary file first.
-5. Replace the target file only after successful render/write.
-6. Support a dry-run or preview mode.
+3. Support a dry-run render command through stdout only.
+4. Preserve pure note comments and blank separator lines.
+5. Align right-side comments in managed rule-list sections.
+6. Align `GEOM` numeric columns with minimum width 4 for `x`, `y`, `w`, and `h`.
+7. Align right-side comments in `GEOM` entries.
+8. Validate rendered output in the standard renderer verification path.
+
+Still required before real writes:
+
+1. Create a backup before saving.
+2. Write to a temporary file first.
+3. Validate rendered temporary content before replacement.
+4. Replace the target file only after successful render, validation, and backup.
+5. Add temporary-directory tests for write success and write failure.
+6. Keep real user config writes disabled until these tests pass.
 
 Completion criteria:
 
@@ -169,7 +169,31 @@ Completion criteria:
 3. Dry-run output can be inspected.
 4. Tests use temporary files, not the user's real config.
 
-## Stage 5: first GTK configurator proof
+## Stage 5: safe save proof
+
+This is the next implementation stage.
+
+Required behavior:
+
+1. Accept an explicit config path.
+2. Render to a temporary file in the same directory or another safe staging location.
+3. Validate the staged rendered file.
+4. Create a timestamped backup of the original file.
+5. Replace the target only after staging, validation, and backup succeed.
+6. Leave the original file intact on failure.
+7. Report clear errors.
+8. Keep a dry-run preview path.
+9. Add tests using temporary directories only.
+
+Completion criteria:
+
+1. Safe save tests pass.
+2. Backup tests prove the original file is preserved.
+3. Validation failure prevents replacement.
+4. No test targets a user's real config directory.
+5. The CLI remains safe by default.
+
+## Stage 6: first GTK configurator proof
 
 Build the smallest GTK configurator window.
 
@@ -188,7 +212,7 @@ Completion criteria:
 3. The command can be assigned to a desktop keyboard shortcut.
 4. No permanent config changes happen yet.
 
-## Stage 6: active-window capture proof
+## Stage 7: active-window capture proof
 
 Add active-window identity capture.
 
@@ -216,7 +240,7 @@ Completion criteria:
 3. Treats empty `_QUBES_VMNAME` as `dom0` where relevant.
 4. Refuses or ignores non-normal windows where detectable.
 
-## Stage 7: geometry capture and profile creation
+## Stage 8: geometry capture and profile creation
 
 Implement the first useful configurator action.
 
@@ -236,7 +260,7 @@ Completion criteria:
 3. Backup is created.
 4. Validation runs before save.
 
-## Stage 8: placement rule creation
+## Stage 9: placement rule creation
 
 Implement `WORKSPACE_PLACEMENT` creation.
 
@@ -257,7 +281,7 @@ Completion criteria:
 2. Reopening the application allows the Lua script to place the window.
 3. The configurator shows existing matching placement rules.
 
-## Stage 9: workspace route creation
+## Stage 10: workspace route creation
 
 Implement `WORKSPACE_ROUTES` creation.
 
@@ -275,7 +299,7 @@ Completion criteria:
 2. Duplicate workspace table keys are prevented.
 3. Matching windows route correctly after reload/restart.
 
-## Stage 10: pin and exclude rules
+## Stage 11: pin and exclude rules
 
 Implement simple `PIN` and `EXCLUDE` workflows.
 
@@ -292,7 +316,7 @@ Completion criteria:
 2. Exclude rules short-circuit behavior as expected.
 3. Existing matching rules are shown before saving.
 
-## Stage 11: generated split profiles
+## Stage 12: generated split profiles
 
 Implement generated `half_left` and `half_right` profile support.
 
@@ -312,7 +336,7 @@ Completion criteria:
 3. Generated profile changes are previewed before save.
 4. Validation rejects invalid border widths.
 
-## Stage 12: reload or restart managed runtime
+## Stage 13: reload or restart managed runtime
 
 Implement a safe reload/restart path.
 
@@ -334,7 +358,7 @@ Completion criteria:
 1. Saved rules can be activated without manual process hunting.
 2. Failure leaves the saved file intact and reports the problem clearly.
 
-## Stage 13: left-edge correction test action
+## Stage 14: left-edge correction test action
 
 Implement the configurator-assisted left-edge test.
 
@@ -353,7 +377,7 @@ Completion criteria:
 2. The configurator can identify which correction mode works.
 3. The saved rule uses the prefixed grammar.
 
-## Stage 14: post-resize monitoring proof
+## Stage 15: post-resize monitoring proof
 
 Begin Phase 2 automation.
 
@@ -370,7 +394,7 @@ Completion criteria:
 1. Resize completion is detected reliably in Qubes/XFCE testing.
 2. Automated `d2wc` placements do not trigger false positives, or suppression design is ready.
 
-## Stage 15: post-resize configurator entry
+## Stage 16: post-resize configurator entry
 
 Add user-facing post-resize behavior.
 
@@ -388,7 +412,7 @@ Completion criteria:
 2. Pointer menu defaults to safe cancellation.
 3. Mouse-button swapping is handled or documented.
 
-## Stage 16: packaging proof
+## Stage 17: packaging proof
 
 Create the first local package proof.
 
@@ -407,7 +431,7 @@ Completion criteria:
 2. A Qubes/dom0 offline workflow is documented.
 3. The package does not overwrite user-managed Lua rules.
 
-## Stage 17: future Qt/KDE front end
+## Stage 18: future Qt/KDE front end
 
 This is not part of the first implementation, but the architecture should keep it possible.
 
@@ -429,36 +453,37 @@ Completion criteria for this stage later:
 
 Review is useful at these points:
 
-1. Before merging the initial documentation PR.
-2. Before committing to GTK after the first UI proof.
-3. Before the parser/writer is allowed to modify a real user Lua file.
+1. Before merging PR #2 as the read-only core proof.
+2. Before enabling any real user config writes.
+3. Before committing to GTK after the first UI proof.
 4. Before adding reload/restart behavior.
 5. Before adding post-resize automation.
 6. Before building the first RPM.
 
 ## Related documents
 
-1. [UI Flow](ui-flow.md)
-2. [Runtime Architecture](runtime-architecture.md)
-3. [Testing](testing.md)
-4. [Packaging](packaging.md)
+1. [Development Status](development-status.md)
+2. [UI Flow](ui-flow.md)
+3. [Runtime Architecture](runtime-architecture.md)
+4. [Testing](testing.md)
+5. [Packaging](packaging.md)
 
 ## Immediate next implementation tasks
 
-After the initial documentation PR is merged, the next branch should likely be:
+After PR #2 is merged, the next branch should likely be:
 
 ```text
-configurator-core-proof
+configurator-save-proof
 ```
 
 First tasks on that branch:
 
-1. Create Python package skeleton.
-2. Add CLI entry point.
-3. Add parser for managed Lua blocks.
-4. Add validation model.
-5. Add tests using `src/d2wc.lua` as the fixture.
-6. Add settings model, including `window_border_width`.
-7. Add a dry-run render command.
+1. Define the safe save contract.
+2. Add a save path that stages rendered output in a temporary file.
+3. Validate staged rendered output before replacement.
+4. Create a timestamped backup before replacement.
+5. Replace the target only after validation and backup succeed.
+6. Add failure tests that prove the original file remains intact.
+7. Keep all tests inside temporary directories.
 
-No GTK UI should be built until the parser/validator can safely read the current Lua script.
+No GTK UI should be built until safe save behavior is covered by tests.
