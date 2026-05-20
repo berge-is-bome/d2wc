@@ -14,6 +14,7 @@ docs/
   runtime-architecture.md
   technology-evaluation.md
   event-monitoring.md
+  left-edge-correction-testing.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -50,9 +51,8 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/left-edge-correction-testing.md` for repeatable geometry tests.
-2. `docs/packaging.md` for Fedora/Debian packaging notes.
-3. `examples/` for example Lua configurations once the script is stable.
+1. `docs/packaging.md` for Fedora/Debian packaging notes.
+2. `examples/` for example Lua configurations once the script is stable.
 
 ## Branching convention
 
