@@ -21,10 +21,10 @@ Merge PR #2 because it proves the parser, validator, renderer, CLI scaffold, set
 Verification reported on 2026-05-20:
 
 ```bash
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m pytest
+python -m d2wc validate --config src/d2wc.lua
+python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python -m d2wc validate --config /tmp/d2wc-rendered.lua
+python -m pytest
 ```
 
 Result:
@@ -38,20 +38,26 @@ Test environment: Linux, Python 3.14.4, pytest 8.3.5.
 
 ## Test command guidance
 
+Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
+
+```bash
+python -m pip install -e .
+```
+
 Use the four-command renderer verification path when renderer behavior changes:
 
 ```bash
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
-PYTHONPATH=src python -m pytest
+python -m d2wc validate --config src/d2wc.lua
+python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python -m d2wc validate --config /tmp/d2wc-rendered.lua
+python -m pytest
 ```
 
 When renderer behavior has not changed, the shorter verification path is normally enough:
 
 ```bash
-PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
-PYTHONPATH=src python -m pytest
+python -m d2wc validate --config src/d2wc.lua
+python -m pytest
 ```
 
 The four-command path confirms both the original Lua source and the rendered output validate cleanly. The shorter path is appropriate for documentation-only changes and most non-renderer logic changes unless those changes can affect generated Lua output.
@@ -71,7 +77,7 @@ The latest renderer patch confirms these behaviors:
 
 The current Python core proof supports:
 
-1. Source-checkout CLI execution.
+1. Editable development installation.
 2. Read-only validation of managed Lua blocks.
 3. Dry-run rendering to stdout.
 4. Parser and validator tests for managed Lua sections.
