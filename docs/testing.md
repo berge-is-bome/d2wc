@@ -18,6 +18,7 @@ The project should follow these principles:
 6. Keep parser/writer/validator tests independent from GTK.
 7. Keep Qubes/XFCE behavior as the first desktop integration target.
 8. Keep future Qt/KDE support possible by not tying core tests to GTK.
+9. Test generated geometry before writing it to `GEOM`.
 
 ## Test levels
 
@@ -34,6 +35,8 @@ Examples:
 5. Workspace route validation.
 6. Managed-block detection.
 7. Rendering deterministic Lua for one block.
+8. Runtime setting validation.
+9. Split-profile generation from screen geometry and `window_border_width`.
 
 These tests should not require a running desktop session.
 
@@ -48,6 +51,7 @@ Examples:
 3. Write to a temporary file.
 4. Create backups in a temporary directory.
 5. Verify invalid Lua configuration samples produce useful errors.
+6. Generate `half_left` and `half_right` profiles into a temporary config.
 
 These tests should not modify the user's real `~/.config/d2wc/` files.
 
@@ -63,6 +67,7 @@ Examples:
 4. Capture active-window domain where `_QUBES_VMNAME` exists.
 5. Capture active-window geometry.
 6. Detect left-edge placement offset using `get_window_geometry()`.
+7. Preview generated split profiles on the active screen.
 
 These tests may require manual confirmation at first.
 
@@ -211,6 +216,7 @@ Tests should verify:
 3. Values are integers.
 4. Width and height are positive.
 5. Duplicate profile names are detected.
+6. Generated `half_left` and `half_right` profiles are valid `GEOM` entries.
 
 ### `WORKSPACE_PLACEMENT`
 
@@ -230,6 +236,38 @@ Tests should verify:
 3. Correction mode is `pos1` or `pos2`.
 4. Duplicate correction rules are detected.
 
+## Runtime settings tests
+
+Runtime settings are not Lua rule strings, but they affect generated output and save behavior.
+
+Required tests for `window_border_width`:
+
+1. Default value exists or is derived safely.
+2. Value must be numeric.
+3. Value must be an integer.
+4. Value must be zero or positive.
+5. Negative values are rejected.
+6. Non-numeric values are rejected.
+7. Changing the value changes generated split-profile geometry predictably.
+8. Validation errors explain the problem in user-facing language.
+
+## Generated split-profile tests
+
+Generated split-profile tests should prove that `d2wc` can calculate `half_left` and `half_right` from screen geometry and `window_border_width`.
+
+Required tests:
+
+1. Generate `half_left` and `half_right` from a simple single-monitor geometry.
+2. Use `window_border_width` when calculating width and x-position values.
+3. Confirm both generated profiles have valid integer `x`, `y`, `w`, and `h` values.
+4. Confirm width and height are positive.
+5. Confirm changing `window_border_width` changes generated output.
+6. Preview both generated profiles together before writing.
+7. Reject invalid border widths before rendering.
+8. Write generated profiles only to a temporary config during tests.
+
+The first tests should not assume the final split-profile formula is settled. They should confirm that the calculation is deterministic, validated, and previewable.
+
 ## Renderer tests
 
 Renderer tests should prove that generated Lua is stable and readable.
@@ -241,6 +279,7 @@ Required behavior:
 3. Preserve unmanaged Lua program logic.
 4. Avoid duplicate workspace keys.
 5. Preserve or regenerate useful comments where practical.
+6. Render generated `half_left` and `half_right` profiles as normal `GEOM` entries.
 
 Test approach:
 
@@ -273,6 +312,12 @@ Possible command:
 d2wc plan-add-geom --config tests/fixtures/d2wc-current.lua --name test_left --x 0 --y 0 --w 1200 --h 900
 ```
 
+Possible command:
+
+```bash
+d2wc plan-split-profiles --screen-x 0 --screen-y 0 --screen-w 3840 --screen-h 2160 --window-border-width 6
+```
+
 The exact command names can change, but dry-run behavior should exist before real writes.
 
 ## Backup and write tests
@@ -287,6 +332,7 @@ Required tests:
 4. Target file is replaced only after successful write.
 5. Failed validation prevents any write.
 6. Failed write leaves previous file intact where possible.
+7. Generated split profiles are not written if `window_border_width` validation fails.
 
 No backup/write test should target the user's actual config directory.
 
@@ -327,7 +373,7 @@ The test output should be inspectable before it is connected to save workflows.
 
 ## Left-edge correction tests
 
-Left-edge tests should use the method described in `docs/left-edge-correction-testing.md`.
+Left-edge tests should use the method described in [Left-Edge Correction Testing](left-edge-correction-testing.md).
 
 Required proof:
 
@@ -381,9 +427,11 @@ The following gates must pass before the configurator can write to a real user c
 3. Renderer round-trip preserves the model.
 4. Backup/write tests pass in temporary directories.
 5. Dry-run preview works.
-6. User explicitly selects a real config file or initializes one.
-7. Backup location is writable.
-8. Save preview is shown.
+6. `window_border_width` validation passes before generated split profiles are written.
+7. Generated split profiles are previewed before save.
+8. User explicitly selects a real config file or initializes one.
+9. Backup location is writable.
+10. Save preview is shown.
 
 The default behavior during early development should be read-only or test-file-only.
 
@@ -427,8 +475,16 @@ First CI checks:
 2. Run parser tests against fixtures.
 3. Run validation tests.
 4. Run render round-trip tests.
+5. Run generated split-profile tests.
 
 Desktop behavior will remain manual until a suitable test environment is designed.
+
+## Related documents
+
+1. [UI Flow](ui-flow.md)
+2. [Runtime Architecture](runtime-architecture.md)
+3. [Implementation Plan](implementation-plan.md)
+4. [Left-Edge Correction Testing](left-edge-correction-testing.md)
 
 ## Immediate test priorities
 
@@ -437,10 +493,12 @@ The first real implementation branch should prioritize tests in this order:
 1. Parser can find managed blocks.
 2. Rule grammar validation.
 3. Section validation.
-4. Renderer round-trip.
-5. Backup/write to temporary directory.
-6. CLI dry-run commands.
-7. GTK window proof.
-8. Active-window capture proof.
+4. Runtime settings validation.
+5. Generated split-profile calculation.
+6. Renderer round-trip.
+7. Backup/write to temporary directory.
+8. CLI dry-run commands.
+9. GTK window proof.
+10. Active-window capture proof.
 
 No UI save workflow should be built before the parser, validator, renderer, and backup tests exist.
