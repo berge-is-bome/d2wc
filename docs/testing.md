@@ -177,26 +177,46 @@ d:personal c:okular g:half_left
 d:dom0 c:qubes-qube-manager le:pos1
 ```
 
-Required invalid examples:
+Required grammar-invalid examples:
+
+These examples test one complete rule string at a time. The point is not whether the rule belongs in a specific Lua section yet. The point is whether the rule string itself uses the prefixed grammar correctly.
+
+A valid `WORKSPACE_PLACEMENT` rule can contain one domain, one class, and one geometry profile:
 
 ```text
-d:personal d:work
+"d:personal c:okular g:half_left"
 ```
 
-```text
-c:okular c:krusader
-```
+The following examples are invalid because the same prefix appears more than once inside one rule string.
+
+Duplicate domain prefix:
 
 ```text
-g:half_left g:half_right
+"d:personal d:work c:okular g:half_left"
 ```
 
-```text
-le:pos1 le:pos2
-```
+Duplicate class prefix:
 
 ```text
-unknown:value
+"d:personal c:okular c:krusader g:half_left"
+```
+
+Duplicate geometry profile prefix:
+
+```text
+"d:personal c:okular g:half_left g:half_right"
+```
+
+Duplicate left-edge correction prefix:
+
+```text
+"d:personal c:okular le:pos1 le:pos2"
+```
+
+Unknown prefix:
+
+```text
+"d:personal c:okular x:unknown"
 ```
 
 Completion criteria:
