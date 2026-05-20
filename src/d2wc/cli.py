@@ -13,6 +13,7 @@ from pathlib import Path
 
 from d2wc import __version__
 from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.rendering import RenderValidationError, render_source
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
 
 
@@ -46,6 +47,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the Lua config to validate. Defaults to src/d2wc.lua.",
     )
     validate.set_defaults(func=_cmd_validate)
+
+    render = subcommands.add_parser(
+        "render",
+        help="Render managed Lua config as a dry run. Writes only to stdout.",
+    )
+    render.add_argument(
+        "--config",
+        type=Path,
+        default=Path("src/d2wc.lua"),
+        help="Path to the Lua config to render. Defaults to src/d2wc.lua.",
+    )
+    render.add_argument(
+        "--stdout",
+        action="store_true",
+        help="Print rendered Lua to stdout. Required because render is currently dry-run only.",
+    )
+    render.set_defaults(func=_cmd_render)
 
     return parser
 
@@ -85,6 +103,34 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
     _print_validation_result(config_path, validation)
     return 0 if validation.ok else 1
+
+
+def _cmd_render(args: argparse.Namespace) -> int:
+    config_path: Path = args.config
+
+    if not args.stdout:
+        print("ERROR: render is dry-run only for now; pass --stdout to print rendered Lua")
+        return 2
+
+    try:
+        text = config_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        print(f"ERROR: config file not found: {config_path}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not read config file {config_path}: {exc}")
+        return 2
+
+    try:
+        result = render_source(text)
+    except RenderValidationError as exc:
+        print(f"ERROR: cannot render invalid config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+
+    print(result.source, end="")
+    return 0
 
 
 def _print_validation_result(config_path: Path, result: ValidationResult) -> None:
