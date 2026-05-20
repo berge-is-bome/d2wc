@@ -43,6 +43,24 @@ local LEFT_EDGE_CORRECTION = {}
     )
 
 
+def test_route_and_placement_overrides_are_not_warnings() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = { [1] = { "d:personal" }, [2] = { "d:personal c:navigator" } }
+local GEOM = { half_left = { x = 0, y = 0, w = 10, h = 10 }, half_right = { x = 20, y = 0, w = 10, h = 10 } }
+local WORKSPACE_PLACEMENT = { "c:okular g:half_right", "d:personal c:okular g:half_left" }
+local LEFT_EDGE_CORRECTION = {}
+'''
+    parsed = ManagedBlockParser().parse(source)
+
+    result = validate_managed_blocks(parsed.blocks)
+
+    assert result.ok
+    assert result.errors == ()
+    assert result.warnings == ()
+
+
 def test_validation_errors_still_fail_validation() -> None:
     source = '''
 local EXCLUDE = { "g:half_left" }
