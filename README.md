@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the Lua rules engine plus an early read-only Python configurator core proof. The next development step is to keep expanding the safe parser, validator, renderer, and backup workflow before any real user configuration writes are allowed.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the Lua rules engine plus an early read-only Python configurator core proof. The next development step is to finish the safe save and backup workflow before any real user configuration writes are allowed.
 
 ## Current status
 
@@ -18,17 +18,20 @@ The active Lua script supports:
 
 The Python core proof currently supports read-only validation and dry-run rendering of the managed Lua sections.
 
+Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The current confirmed result is that `src/d2wc.lua` validates, rendered output validates, and the full pytest suite passes with 59 tests.
+
 ## Repository layout
 
 ```text
 docs/
-  product-development-brief.md    In-depth product and UI direction.
-  lua-configurables.md            User-facing explanation of the Lua configuration sections.
-  repository-layout.md            Repository structure and development conventions.
+  development-status.md          Current PR status, latest local verification, and next work.
+  product-development-brief.md   In-depth product and UI direction.
+  lua-configurables.md           User-facing explanation of the Lua configuration sections.
+  repository-layout.md           Repository structure and development conventions.
 src/
-  d2wc.lua                        Current devilspie2 Lua rules script.
-  d2wc/                           Python configurator core proof.
-tests/                            Python tests for the read-only core proof.
+  d2wc.lua                       Current devilspie2 Lua rules script.
+  d2wc/                          Python configurator core proof.
+tests/                           Python tests for the read-only core proof.
 ```
 
 ## Local development
@@ -41,6 +44,15 @@ For quick source-checkout testing without installing the package:
 PYTHONPATH=src python -m d2wc --help
 PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
 PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout
+PYTHONPATH=src python -m pytest
+```
+
+When renderer behavior changes, use the stronger renderer verification path:
+
+```bash
+PYTHONPATH=src python -m d2wc validate --config src/d2wc.lua
+PYTHONPATH=src python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+PYTHONPATH=src python -m d2wc validate --config /tmp/d2wc-rendered.lua
 PYTHONPATH=src python -m pytest
 ```
 
