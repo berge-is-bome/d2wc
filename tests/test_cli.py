@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from d2wc.cli import main
+from d2wc.core.rendering import render_source
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -15,9 +16,10 @@ def test_cli_render_requires_stdout(capsys) -> None:
     assert "render is dry-run only" in captured.out
 
 
-def test_cli_render_stdout_prints_lua_source(capsys) -> None:
+def test_cli_render_stdout_prints_rendered_lua_source(capsys) -> None:
     config_path = REPO_ROOT / "src" / "d2wc.lua"
-    expected = config_path.read_text(encoding="utf-8")
+    source = config_path.read_text(encoding="utf-8")
+    expected = render_source(source).source
 
     exit_code = main(["render", "--config", str(config_path), "--stdout"])
 
