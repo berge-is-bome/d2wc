@@ -15,6 +15,7 @@ docs/
   technology-evaluation.md
   event-monitoring.md
   left-edge-correction-testing.md
+  packaging.md
   lua-configurables.md
   repository-layout.md
 src/
@@ -39,10 +40,14 @@ At the start of the project this should contain the current `devilspie2` Lua scr
 src/
   devilspie2/
     d2wc.lua
-  configurator/
-    ...
-  daemon/
-    ...
+  d2wc/
+    core/
+      ...
+    ui/
+      gtk/
+        ...
+      qt/
+        ...
 ```
 
 The split should only happen when the implementation language and packaging approach are chosen.
@@ -51,8 +56,9 @@ The split should only happen when the implementation language and packaging appr
 
 The next useful files after the initial structure are:
 
-1. `docs/packaging.md` for Fedora/Debian packaging notes.
-2. `examples/` for example Lua configurations once the script is stable.
+1. `examples/` for example Lua configurations once the script is stable.
+2. `docs/implementation-plan.md` for converting the documentation into ordered development tasks.
+3. `docs/testing.md` for the first parser/writer and UI proof tests.
 
 ## Branching convention
 
