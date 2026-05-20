@@ -181,11 +181,7 @@ def extract_geometry_profile_entries(geom_block_text: str) -> list[tuple[str, di
         active = _active_lua_segment(line)
         if not active or "=" not in active or "{" not in active or "}" not in active:
             continue
-        parsed = _parse_geometry_profile_line(active)
-        if parsed is None:
-            continue
-        name, fields = parsed
-        profiles.append((name.lower(), fields))
+        profiles.extend(_parse_geometry_profile_entries_from_line(active))
     return profiles
 
 
@@ -200,20 +196,43 @@ def extract_active_rule_strings(block_text: str) -> list[str]:
     return strings
 
 
-def _parse_geometry_profile_line(active_line: str) -> tuple[str, dict[str, int | str]] | None:
+def _parse_geometry_profile_entries_from_line(active_line: str) -> list[tuple[str, dict[str, int | str]]]:
     candidate = active_line.strip()
+    entries: list[tuple[str, dict[str, int | str]]] = []
 
     if candidate.startswith("local ") and "{" in candidate:
-        candidate = candidate.split("{", 1)[1].strip()
+        candidate = candidate.split("{", 1)[1]
+        if candidate.rstrip().endswith("}"):
+            candidate = candidate.rsplit("}", 1)[0]
 
-    if "=" not in candidate or "{" not in candidate or "}" not in candidate:
-        return None
+    index = 0
+    while index < len(candidate):
+        equal_index = candidate.find("=", index)
+        if equal_index == -1:
+            break
 
-    name = candidate.split("=", 1)[0].strip()
-    if not _is_lua_identifier(name):
-        return None
+        name = _name_before_equals(candidate, equal_index)
+        if name is None:
+            index = equal_index + 1
+            continue
 
-    body = candidate.split("{", 1)[1].split("}", 1)[0]
+        open_brace_index = candidate.find("{", equal_index)
+        if open_brace_index == -1:
+            break
+
+        close_brace_index = _find_matching_brace(candidate, open_brace_index)
+        if close_brace_index is None:
+            break
+
+        body = candidate[open_brace_index + 1 : close_brace_index]
+        fields = _parse_geometry_fields(body)
+        entries.append((name.lower(), fields))
+        index = close_brace_index + 1
+
+    return entries
+
+
+def _parse_geometry_fields(body: str) -> dict[str, int | str]:
     fields: dict[str, int | str] = {}
     for chunk in body.split(","):
         if "=" not in chunk:
@@ -225,8 +244,35 @@ def _parse_geometry_profile_line(active_line: str) -> tuple[str, dict[str, int |
             fields[key] = int(raw_value)
         except ValueError:
             fields[key] = raw_value
+    return fields
 
-    return name, fields
+
+def _name_before_equals(text: str, equal_index: int) -> str | None:
+    end = equal_index
+    while end > 0 and text[end - 1].isspace():
+        end -= 1
+
+    start = end
+    while start > 0 and (text[start - 1].isalnum() or text[start - 1] == "_"):
+        start -= 1
+
+    name = text[start:end]
+    if not _is_lua_identifier(name):
+        return None
+    return name
+
+
+def _find_matching_brace(text: str, open_brace_index: int) -> int | None:
+    depth = 0
+    for index in range(open_brace_index, len(text)):
+        char = text[index]
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return index
+    return None
 
 
 def _extract_workspace_keys(active_line: str) -> list[int]:
