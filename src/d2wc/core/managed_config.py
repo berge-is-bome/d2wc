@@ -104,16 +104,27 @@ def render_rule_list_block_preserving_comments(name: str, block_text: str) -> st
     if len(lines) < 2:
         return block_text
 
-    rendered = [f"local {name} = {{"]
+    entries: list[tuple[str, str | None]] = []
     for line in lines[1:-1]:
         active, comment = _split_lua_comment(line)
         rules = extract_active_rule_strings(active)
         if not rules:
-            rendered.append(line.rstrip())
+            entries.append((line.rstrip(), None))
             continue
 
-        suffix = f"  {comment.strip()}" if comment else ""
-        rendered.append(f'  "{_escape_lua_string(rules[0])}",{suffix}')
+        left = f'  "{_escape_lua_string(rules[0])}",'
+        entries.append((left, comment.strip() if comment else ""))
+
+    max_left_width = max((len(left) for left, comment in entries if comment is not None), default=0)
+
+    rendered = [f"local {name} = {{"]
+    for left, comment in entries:
+        if comment is None:
+            rendered.append(left)
+        elif comment:
+            rendered.append(_append_aligned_comment(left, comment, max_left_width))
+        else:
+            rendered.append(left)
     rendered.append("}")
     return "\n".join(rendered)
 
@@ -146,6 +157,8 @@ def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...],
         return block_text
 
     profile_map = {profile.name: profile for profile in profiles}
+    max_left_width = max((len(_render_geom_profile_line(profile, profiles)) for profile in profiles), default=0)
+
     rendered = ["local GEOM = {"]
     for line in lines[1:-1]:
         active, comment = _split_lua_comment(line)
@@ -154,8 +167,11 @@ def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...],
             rendered.append(line.rstrip())
             continue
 
-        suffix = f"  {comment.strip()}" if comment else ""
-        rendered.append(_render_geom_profile_line(profile_map[name], profiles) + suffix)
+        left = _render_geom_profile_line(profile_map[name], profiles)
+        if comment:
+            rendered.append(_append_aligned_comment(left, comment.strip(), max_left_width))
+        else:
+            rendered.append(left)
     rendered.append("}")
     return "\n".join(rendered)
 
@@ -222,11 +238,11 @@ def _render_geom_profile_lines(profiles: tuple[GeometryProfile, ...]) -> list[st
 
 
 def _render_geom_profile_line(profile: GeometryProfile, all_profiles: tuple[GeometryProfile, ...]) -> str:
-    name_width = max(22, max(len(item.name) for item in all_profiles))
-    x_width = max(len(str(item.x)) for item in all_profiles)
-    y_width = max(len(str(item.y)) for item in all_profiles)
-    w_width = max(len(str(item.w)) for item in all_profiles)
-    h_width = max(len(str(item.h)) for item in all_profiles)
+    name_width = max(22, max((len(item.name) for item in all_profiles), default=0))
+    x_width = max(4, max((len(str(item.x)) for item in all_profiles), default=0))
+    y_width = max(4, max((len(str(item.y)) for item in all_profiles), default=0))
+    w_width = max(4, max((len(str(item.w)) for item in all_profiles), default=0))
+    h_width = max(4, max((len(str(item.h)) for item in all_profiles), default=0))
 
     return (
         "  "
@@ -238,6 +254,10 @@ def _render_geom_profile_line(profile: GeometryProfile, all_profiles: tuple[Geom
         f"h = {profile.h:<{h_width}} "
         "},"
     )
+
+
+def _append_aligned_comment(left: str, comment: str, max_left_width: int) -> str:
+    return left + (" " * (max_left_width - len(left) + 5)) + comment
 
 
 def _strip_lua_comments(text: str) -> str:
