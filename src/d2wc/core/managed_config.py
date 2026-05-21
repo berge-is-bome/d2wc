@@ -150,7 +150,7 @@ def render_geom_block(profiles: tuple[GeometryProfile, ...]) -> str:
 
 
 def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...], block_text: str) -> str:
-    """Render GEOM while preserving user comments, blank lines, and new profiles."""
+    """Render GEOM while preserving comments and applying profile additions/removals."""
 
     lines = block_text.splitlines()
     if len(lines) < 2:
@@ -164,8 +164,10 @@ def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...],
     for line in lines[1:-1]:
         active, comment = _split_lua_comment(line)
         name = _geom_profile_name_from_line(active)
-        if name is None or name not in profile_map:
+        if name is None:
             rendered.append(line.rstrip())
+            continue
+        if name not in profile_map:
             continue
 
         left = _render_geom_profile_line(profile_map[name], profiles)
