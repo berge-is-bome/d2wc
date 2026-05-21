@@ -61,6 +61,14 @@ local LEFT_EDGE_CORRECTION = {}
     assert route_lines[-2].strip() == "-- add more here"
 
 
+def test_add_route_rule_allows_shadowed_domain_class_target() -> None:
+    result = add_route_rule_to_source(_minimal_source(), 3, "d:personal c:krusader")
+
+    assert result.validation.ok
+    assert '[1] = { "d:personal", "d:work", },' in result.source
+    assert '[3] = { "d:personal c:krusader", },' in result.source
+
+
 def test_add_route_rule_rejects_duplicate_target_across_workspaces() -> None:
     with pytest.raises(RouteRuleExistsError, match="route rule already exists for target: d:personal"):
         add_route_rule_to_source(_minimal_source(), 2, "d:personal")
@@ -75,13 +83,13 @@ def test_add_route_rule_rejects_invalid_route_rule() -> None:
 
 
 def test_modify_route_rule_moves_rule_to_existing_workspace() -> None:
-    result = modify_route_rule_in_source(_minimal_source(), "d:personal", 2, "d:personal c:navigator")
+    result = modify_route_rule_in_source(_minimal_source(), "d:personal", 2, "d:personal c:krusader")
 
     assert result.validation.ok
     assert result.old_workspace == 1
     assert result.new_workspace == 2
     assert '[1] = { "d:work", },' in result.source
-    assert '[2] = { "d:personal c:navigator", },' in result.source
+    assert '[2] = { "d:personal c:navigator", "d:personal c:krusader", },' in result.source
 
 
 def test_modify_route_rule_matches_noncanonical_stored_rule() -> None:
@@ -109,6 +117,9 @@ def test_modify_route_rule_rejects_missing_and_duplicate_rules() -> None:
 
     with pytest.raises(RouteRuleExistsError, match="route rule already exists for target: d:work"):
         modify_route_rule_in_source(_minimal_source(), "d:personal", 1, "d:work")
+
+    with pytest.raises(RouteRuleExistsError, match="route rule already exists for target: d:personal c:navigator"):
+        modify_route_rule_in_source(_minimal_source(), "d:personal", 2, "d:personal c:navigator")
 
 
 def test_delete_route_rule_removes_rule_and_preserves_notes() -> None:
