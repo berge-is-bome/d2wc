@@ -1,29 +1,25 @@
 # d2wc Development Status
 
-## Current PR
+## Current Branch
 
-Current active PR:
+Current active branch:
 
 ```text
-PR: #2
-Branch: configurator-core-proof
-Previous confirmed baseline: c2371920ac834144a8052f47091a3e7596ff3ae2
-Current confirmed head: 2e783a1a827d607400d01a9b9209e228cfba9ce3
-Status: local verification passed
+Branch: configurator-save-proof
+Base: main at PR #2 squash merge commit 903cc20f2133f359fa2280dd7fd5d7c49d17d917
+Status: first safe-save checkpoint locally verified
 ```
 
 ## What read-only core proof means
 
-Merge PR #2 because it proves the parser, validator, renderer, CLI scaffold, settings model, split-profile logic, duplicate/shadow validation, and tests are working. But do not consider `d2wc` ready to save changes into a real user config yet.
+PR #2 was merged because it proves the parser, validator, renderer, CLI scaffold, settings model, split-profile logic, duplicate/shadow validation, and tests are working. But do not consider `d2wc` ready to save changes into a real user config yet.
 
 ## Latest confirmed local verification
 
-Verification reported on 2026-05-20:
+Verification reported on 2026-05-21:
 
 ```bash
 python -m d2wc validate --config src/d2wc.lua
-python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-python -m d2wc validate --config /tmp/d2wc-rendered.lua
 python -m pytest
 ```
 
@@ -31,9 +27,7 @@ Result:
 
 ```text
 src/d2wc.lua validates successfully.
-Rendered /tmp/d2wc-rendered.lua validates successfully.
-59 pytest tests passed.
-Test environment: Linux, Python 3.14.4, pytest 8.3.5.
+68 pytest tests passed.
 ```
 
 ## Test command guidance
@@ -62,6 +56,26 @@ python -m pytest
 
 The four-command path confirms both the original Lua source and the rendered output validate cleanly. The shorter path is appropriate for documentation-only changes and most non-renderer logic changes unless those changes can affect generated Lua output.
 
+## Latest safe-save changes
+
+The current `configurator-save-proof` branch adds the first core-only safe-save implementation.
+
+Confirmed behavior:
+
+1. Renders the target config in memory.
+2. Writes rendered output to a temporary file in the target directory.
+3. Flushes and fsyncs the staged temporary file.
+4. Validates the staged temporary file.
+5. Creates a non-overwriting timestamped backup.
+6. Flushes and fsyncs the backup file.
+7. Fsyncs the backup directory after backup creation.
+8. Replaces the target with `os.replace()` only after staging, validation, and backup succeed.
+9. Fsyncs the target directory after replacement.
+10. Cleans up staged temporary files on failure.
+11. Leaves the original file intact when validation or backup creation fails.
+
+This is still a core helper only. There is no user-facing `save` CLI command yet.
+
 ## Latest renderer changes
 
 The latest renderer patch confirms these behaviors:
@@ -75,32 +89,31 @@ The latest renderer patch confirms these behaviors:
 
 ## Current safe capability
 
-The current Python core proof supports:
+The current Python core supports:
 
 1. Editable development installation.
 2. Read-only validation of managed Lua blocks.
 3. Dry-run rendering to stdout.
 4. Parser and validator tests for managed Lua sections.
 5. Renderer round-trip tests.
-6. Backup path helper tests.
-7. Runtime settings validation tests.
-8. Split-profile generation tests.
-9. Duplicate and shadow validation tests.
+6. Runtime settings validation tests.
+7. Split-profile generation tests.
+8. Duplicate and shadow validation tests.
+9. Core safe-save tests using temporary directories.
+10. Power-loss-oriented fsync ordering for staged files, backup files, backup directories, and target directories.
 
-The tool still does not write to a real user configuration file.
+The tool still does not expose a user-facing command that writes to a real user configuration file.
 
 ## Next practical work
 
-The next practical step is to close out PR #2 as the read-only core proof after the remaining discussion points are resolved.
+The next practical step is to open a draft PR for `configurator-save-proof` and continue the safe-save proof in small slices.
 
-After PR #2 is merged, the next implementation branch should focus on safe save mechanics before UI work:
+Recommended next implementation slice:
 
-1. Define the file write safety contract.
-2. Render to temporary file first.
-3. Validate rendered content before replacement.
-4. Create a timestamped backup before replacing the target.
-5. Replace the target only after all validation and backup steps succeed.
-6. Add tests that use temporary directories only.
-7. Keep real user config writes disabled until the safety gates are proven.
+1. Add an explicit, guarded CLI save command only if it requires an affirmative flag such as `--write`.
+2. Keep the default path preview/dry-run oriented.
+3. Print the backup path after a successful write.
+4. Keep tests in temporary directories.
+5. Add CLI tests proving that save refuses to write unless the affirmative flag is present.
 
 GTK UI work should remain deferred until parser, validator, renderer, and safe save behavior are all covered by tests.
