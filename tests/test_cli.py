@@ -95,8 +95,9 @@ def test_cli_save_preview_uses_explicit_backup_directory_without_creating_it(tmp
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert f"Planned backup: {backup_dir / 'd2wc.lua'}" not in captured.out
-    assert "Planned backup:" in captured.out
+    assert f"Planned backup: {backup_dir / 'd2wc.lua.'}" not in captured.out
+    assert f"Planned backup: {backup_dir / 'd2wc.lua'}" in captured.out
+    assert captured.out.count(".bak") == 1
     assert not backup_dir.exists()
 
 
