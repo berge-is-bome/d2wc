@@ -1,3 +1,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+nextcloudsync.log
+sync_*.db
+sync_*.db-shm
+sync_*.db-wal
