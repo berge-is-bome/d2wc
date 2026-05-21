@@ -2,17 +2,18 @@
 
 ## Current Branch
 
-Current active branch:
+Current repository status:
 
 ```text
-Branch: configurator-placement-proof
-Base: main at PR #4 squash merge commit 5b902c133fdb3fca5cfec2e709709fc37ddae6cc
-Status: WORKSPACE_PLACEMENT core and CLI checkpoint locally verified
+Branch: main
+Status: PR #5 merged; WORKSPACE_PLACEMENT core and CLI proof complete
+Next branch: configurator-routes-proof
+Next implementation target: WORKSPACE_ROUTES add, modify, and delete operations
 ```
 
 ## Latest confirmed local verification
 
-Verification reported on 2026-05-21:
+Verification reported on 2026-05-21 before PR #5 merge:
 
 ```bash
 python -m d2wc validate --config src/d2wc.lua
@@ -29,9 +30,9 @@ Rendered /tmp/d2wc-rendered.lua validates successfully.
 124 pytest tests passed.
 ```
 
-## Current WORKSPACE_PLACEMENT edit proof
+## Completed WORKSPACE_PLACEMENT edit proof from PR #5
 
-The current branch adds the first tested config-editing operation set for `WORKSPACE_PLACEMENT` rules.
+PR #5 added the first tested config-editing operation set for `WORKSPACE_PLACEMENT` rules and has been merged into `main`.
 
 Confirmed core behavior:
 
@@ -62,7 +63,19 @@ Confirmed CLI behavior:
 6. Successful writes create timestamped backups.
 7. Failed edits leave the original config unchanged.
 
-This branch now exposes the placement edit proof through guarded CLI commands. GTK UI work remains deferred.
+Manual placement smoke test reported on 2026-05-21:
+
+1. `add-placement` preview modified nothing.
+2. `add-placement --write` added the test placement rule and created a backup.
+3. `modify-placement` preview modified nothing.
+4. `modify-placement --write` updated the test placement rule and created a backup.
+5. `delete-placement` preview modified nothing.
+6. `delete-placement --write` removed the test placement rule and created a backup.
+7. The copied config validated after each write.
+8. Token order did not matter for add, modify, or delete input.
+9. Timestamped backups existed after writes.
+
+GTK UI work remains deferred.
 
 ## GEOM edit baseline from PR #4
 
@@ -167,6 +180,16 @@ The current Python core supports:
 
 ## Next practical work
 
-The next practical step is to run a manual smoke test on copied temporary configs, then decide whether PR #5 is ready for review.
+The next implementation branch should be `configurator-routes-proof`.
 
-GTK UI work should remain deferred until the config-editing operation is proven through CLI/core tests.
+The next practical implementation target is `WORKSPACE_ROUTES` add, modify, and delete operations:
+
+1. Start with core in-memory operations.
+2. Preserve comments, blank lines, and `-- add more here` marker-tail behavior in managed route lists.
+3. Reject duplicate route targets across workspace buckets.
+4. Support token-order-independent matching for modify and delete.
+5. Render route rules in canonical prefix order: `d:`, then `c:`.
+6. Add guarded CLI commands that preview by default and write only with `--write`.
+7. Inspect and update stale tests and renderer-output expectations before handing back local test commands.
+
+GTK UI work should remain deferred until the config-editing operations are proven through CLI/core tests.
