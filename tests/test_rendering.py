@@ -51,6 +51,29 @@ after
     assert 'local LEFT_EDGE_CORRECTION = {\n  "c:okular le:pos1",\n}' in result.source
 
 
+def test_render_source_keeps_add_more_marker_last_in_rule_lists() -> None:
+    source = '''
+local EXCLUDE = {
+  -- add more here
+  "d:personal",
+}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 10, h = 10 },
+}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = render_source(source)
+
+    assert result.validation.ok
+    exclude_lines = _managed_block_lines(result.source, "EXCLUDE")
+    assert '  "d:personal",' in exclude_lines
+    assert exclude_lines[-2].strip() == "-- add more here"
+
+
 def test_render_source_round_trips_current_lua_through_parser_and_validator() -> None:
     source = (REPO_ROOT / "src" / "d2wc.lua").read_text(encoding="utf-8")
 
@@ -76,3 +99,12 @@ local LEFT_EDGE_CORRECTION = {}
         render_source(source)
 
     assert "EXCLUDE: rule must include d: or c:: g:half_left" in exc_info.value.validation.errors
+
+
+def _managed_block_lines(source: str, name: str) -> list[str]:
+    lines = source.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.strip() == f"local {name} = {{")
+    for end in range(start + 1, len(lines)):
+        if lines[end].strip() == "}":
+            return lines[start : end + 1]
+    raise AssertionError(f"block not found: {name}")

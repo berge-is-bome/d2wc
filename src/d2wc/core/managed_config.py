@@ -98,14 +98,19 @@ def render_rule_list_block(name: str, rules: tuple[str, ...]) -> str:
 
 
 def render_rule_list_block_preserving_comments(name: str, block_text: str) -> str:
-    """Render a rule list while preserving user comments and blank lines."""
+    """Render a rule list while preserving comments and keeping add markers last."""
 
     lines = block_text.splitlines()
     if len(lines) < 2:
         return block_text
 
     entries: list[tuple[str, str | None]] = []
+    tail_marker_lines: list[str] = []
     for line in lines[1:-1]:
+        if _is_add_more_marker(line):
+            tail_marker_lines.append(line.rstrip())
+            continue
+
         active, comment = _split_lua_comment(line)
         rules = extract_active_rule_strings(active)
         if not rules:
@@ -125,6 +130,7 @@ def render_rule_list_block_preserving_comments(name: str, block_text: str) -> st
             rendered.append(_append_aligned_comment(left, comment, max_left_width))
         else:
             rendered.append(left)
+    rendered.extend(tail_marker_lines)
     rendered.append("}")
     return "\n".join(rendered)
 
@@ -150,28 +156,43 @@ def render_geom_block(profiles: tuple[GeometryProfile, ...]) -> str:
 
 
 def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...], block_text: str) -> str:
-    """Render GEOM while preserving user comments and blank lines."""
+    """Render GEOM while preserving comments and applying profile additions/removals."""
 
     lines = block_text.splitlines()
     if len(lines) < 2:
         return block_text
 
     profile_map = {profile.name: profile for profile in profiles}
+    rendered_names: set[str] = set()
+    tail_marker_lines: list[str] = []
     max_left_width = max((len(_render_geom_profile_line(profile, profiles)) for profile in profiles), default=0)
 
     rendered = ["local GEOM = {"]
     for line in lines[1:-1]:
+        if _is_add_more_marker(line):
+            tail_marker_lines.append(line.rstrip())
+            continue
+
         active, comment = _split_lua_comment(line)
         name = _geom_profile_name_from_line(active)
-        if name is None or name not in profile_map:
+        if name is None:
             rendered.append(line.rstrip())
+            continue
+        if name not in profile_map:
             continue
 
         left = _render_geom_profile_line(profile_map[name], profiles)
+        rendered_names.add(name)
         if comment:
             rendered.append(_append_aligned_comment(left, comment.strip(), max_left_width))
         else:
             rendered.append(left)
+
+    for profile in profiles:
+        if profile.name not in rendered_names:
+            rendered.append(_render_geom_profile_line(profile, profiles))
+
+    rendered.extend(tail_marker_lines)
     rendered.append("}")
     return "\n".join(rendered)
 
@@ -258,6 +279,10 @@ def _render_geom_profile_line(profile: GeometryProfile, all_profiles: tuple[Geom
 
 def _append_aligned_comment(left: str, comment: str, max_left_width: int) -> str:
     return left + (" " * (max_left_width - len(left) + 5)) + comment
+
+
+def _is_add_more_marker(line: str) -> bool:
+    return line.strip().lower() == "-- add more here"
 
 
 def _strip_lua_comments(text: str) -> str:

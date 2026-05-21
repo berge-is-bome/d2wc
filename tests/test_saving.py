@@ -8,7 +8,9 @@ from d2wc.core.saving import (
     SaveValidationError,
     create_backup,
     preview_save_config,
+    preview_source_save_config,
     save_rendered_config,
+    save_source_config,
 )
 
 
@@ -34,6 +36,26 @@ def test_preview_save_config_reports_paths_without_writing(tmp_path: Path) -> No
     assert preview.config_path == config_path
     assert preview.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
     assert preview.bytes_written > 0
+    assert preview.validation.ok
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not preview.backup_path.exists()
+    assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
+
+
+def test_preview_source_save_config_reports_paths_without_writing(tmp_path: Path) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+    edited_source = original.replace("local GEOM = {", "local GEOM = {\n  smoke_test             = { x = 1   , y = 2   , w = 300 , h = 400  },", 1)
+
+    preview = preview_source_save_config(
+        config_path,
+        edited_source,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+
+    assert preview.config_path == config_path
+    assert preview.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
+    assert preview.bytes_written == len(edited_source.encode("utf-8"))
     assert preview.validation.ok
     assert config_path.read_text(encoding="utf-8") == original
     assert not preview.backup_path.exists()
@@ -143,6 +165,28 @@ def test_save_rendered_config_writes_rendered_output_and_creates_backup(tmp_path
     assert result.validation.ok
     assert result.bytes_written == len(saved.encode("utf-8"))
     assert 'local EXCLUDE = {' in saved
+    assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
+
+
+def test_save_source_config_writes_supplied_source_and_creates_backup(tmp_path: Path) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+    edited_source = original.replace("local GEOM = {", "local GEOM = {\n  smoke_test             = { x = 1   , y = 2   , w = 300 , h = 400  },", 1)
+
+    result = save_source_config(
+        config_path,
+        edited_source,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+
+    saved = config_path.read_text(encoding="utf-8")
+
+    assert result.config_path == config_path
+    assert result.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
+    assert result.backup_path.read_text(encoding="utf-8") == original
+    assert result.validation.ok
+    assert result.bytes_written == len(saved.encode("utf-8"))
+    assert "smoke_test" in saved
     assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
 
 
