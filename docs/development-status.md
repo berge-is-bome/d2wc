@@ -7,7 +7,7 @@ Current active branch:
 ```text
 Branch: configurator-add-geom-proof
 Base: main at PR #3 squash merge commit 71b0f911ce0b0e631cb891ed905056eae18a1aa8
-Status: GEOM add, modify, delete checkpoint locally verified
+Status: GEOM add, modify, delete, marker-tail behavior, and manual smoke checkpoint locally verified
 ```
 
 ## Latest confirmed local verification
@@ -29,6 +29,25 @@ Rendered /tmp/d2wc-rendered.lua validates successfully.
 99 pytest tests passed.
 ```
 
+A later renderer verification and GEOM smoke rerun also passed after adding marker-tail behavior for `-- add more here`.
+
+## Manual GEOM smoke verification
+
+Manual smoke verification reported on 2026-05-21 using a copied temporary config.
+
+Result:
+
+```text
+add-geom preview modified nothing.
+add-geom --write added the test profile and created a backup.
+modify-geom preview modified nothing.
+modify-geom --write updated the test profile and created a backup.
+delete-geom preview modified nothing.
+delete-geom --write removed the test profile and created a backup.
+The copied config validated after each write.
+The -- add more here marker remained the final table entry after add/write testing.
+```
+
 ## Current GEOM edit proof
 
 The current branch adds the first tested config-editing operation set for `GEOM` profiles.
@@ -41,12 +60,13 @@ Confirmed core behavior:
 4. Preserves existing `GEOM` comments and blank lines where practical.
 5. Appends new profiles that did not exist in the original `GEOM` block.
 6. Skips removed profiles when rendering the updated `GEOM` block.
-7. Rejects duplicate profile names on add.
-8. Rejects missing profile names on modify or delete.
-9. Rejects deletion when `WORKSPACE_PLACEMENT` still references the profile.
-10. Rejects invalid profile names.
-11. Rejects profile width or height below the current minimum size.
-12. Re-validates rendered output after each edit.
+7. Keeps the `-- add more here` marker as the final entry in managed table render paths while the marker exists.
+8. Rejects duplicate profile names on add.
+9. Rejects missing profile names on modify or delete.
+10. Rejects deletion when `WORKSPACE_PLACEMENT` still references the profile.
+11. Rejects invalid profile names.
+12. Rejects profile width or height below the current minimum size.
+13. Re-validates rendered output after each edit.
 
 Confirmed CLI behavior:
 
@@ -136,9 +156,10 @@ The current Python core supports:
 12. Guarded CLI save behavior requiring `--write` before modification.
 13. In-memory `GEOM` add, modify, and delete operations.
 14. Guarded CLI GEOM add, modify, and delete commands.
+15. Marker-tail preservation for `-- add more here`.
 
 ## Next practical work
 
-The next practical step is to run a manual smoke test on copied temporary configs, then decide whether PR #4 is ready for review.
+The next practical step is to decide whether PR #4 is ready for review.
 
 GTK UI work should remain deferred until the config-editing operation is proven through CLI/core tests.
