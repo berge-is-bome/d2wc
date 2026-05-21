@@ -74,15 +74,15 @@ def render_managed_config(
         }
 
     return {
-        "EXCLUDE": render_rule_list_block_preserving_comments("EXCLUDE", original_blocks["EXCLUDE"].text),
-        "PIN": render_rule_list_block_preserving_comments("PIN", original_blocks["PIN"].text),
+        "EXCLUDE": render_rule_list_block_preserving_comments("EXCLUDE", original_blocks["EXCLUDE"].text, config.exclude),
+        "PIN": render_rule_list_block_preserving_comments("PIN", original_blocks["PIN"].text, config.pin),
         "WORKSPACE_ROUTES": original_blocks["WORKSPACE_ROUTES"].text,
         "GEOM": render_geom_block_preserving_comments(config.geom, original_blocks["GEOM"].text),
         "WORKSPACE_PLACEMENT": render_rule_list_block_preserving_comments(
-            "WORKSPACE_PLACEMENT", original_blocks["WORKSPACE_PLACEMENT"].text
+            "WORKSPACE_PLACEMENT", original_blocks["WORKSPACE_PLACEMENT"].text, config.workspace_placement
         ),
         "LEFT_EDGE_CORRECTION": render_rule_list_block_preserving_comments(
-            "LEFT_EDGE_CORRECTION", original_blocks["LEFT_EDGE_CORRECTION"].text
+            "LEFT_EDGE_CORRECTION", original_blocks["LEFT_EDGE_CORRECTION"].text, config.left_edge_correction
         ),
     }
 
@@ -97,28 +97,43 @@ def render_rule_list_block(name: str, rules: tuple[str, ...]) -> str:
     return "\n".join(lines)
 
 
-def render_rule_list_block_preserving_comments(name: str, block_text: str) -> str:
-    """Render a rule list while preserving comments and keeping add markers last."""
+def render_rule_list_block_preserving_comments(
+    name: str,
+    block_text: str,
+    rules: tuple[str, ...] | None = None,
+) -> str:
+    """Render a rule list while preserving comments and applying rule changes."""
 
     lines = block_text.splitlines()
     if len(lines) < 2:
         return block_text
 
+    remaining_rules = list(rules if rules is not None else extract_active_rule_strings(block_text))
     entries: list[tuple[str, str | None]] = []
     tail_marker_lines: list[str] = []
+
     for line in lines[1:-1]:
         if _is_add_more_marker(line):
             tail_marker_lines.append(line.rstrip())
             continue
 
         active, comment = _split_lua_comment(line)
-        rules = extract_active_rule_strings(active)
-        if not rules:
+        line_rules = extract_active_rule_strings(active)
+        if not line_rules:
             entries.append((line.rstrip(), None))
             continue
 
-        left = f'  "{_escape_lua_string(rules[0])}",'
+        rule = line_rules[0]
+        if rule not in remaining_rules:
+            continue
+
+        remaining_rules.remove(rule)
+        left = f'  "{_escape_lua_string(rule)}",'
         entries.append((left, comment.strip() if comment else ""))
+
+    for rule in remaining_rules:
+        left = f'  "{_escape_lua_string(rule)}",'
+        entries.append((left, ""))
 
     max_left_width = max((len(left) for left, comment in entries if comment is not None), default=0)
 
