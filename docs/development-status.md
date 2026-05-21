@@ -7,7 +7,7 @@ Current active branch:
 ```text
 Branch: configurator-save-proof
 Base: main at PR #2 squash merge commit 903cc20f2133f359fa2280dd7fd5d7c49d17d917
-Status: guarded save CLI checkpoint locally verified
+Status: save preview and guarded write checkpoint locally verified
 ```
 
 ## What read-only core proof means
@@ -27,7 +27,7 @@ Result:
 
 ```text
 src/d2wc.lua validates successfully.
-73 pytest tests passed.
+78 pytest tests passed.
 ```
 
 ## Test command guidance
@@ -54,36 +54,41 @@ python -m d2wc validate --config src/d2wc.lua
 python -m pytest
 ```
 
-The four-command path confirms both the original Lua source and the rendered output validate cleanly. The shorter path is appropriate for documentation-only changes and most non-renderer logic changes unless those changes can affect generated Lua output.
-
 ## Latest safe-save changes
 
-The current `configurator-save-proof` branch adds core safe-save behavior and a guarded save CLI.
+The current `configurator-save-proof` branch adds core safe-save behavior, save preview, and guarded save writes.
 
-Confirmed core behavior:
+Confirmed preview behavior:
 
-1. Renders the target config in memory.
-2. Writes rendered output to a temporary file in the target directory.
-3. Flushes and fsyncs the staged temporary file.
-4. Validates the staged temporary file.
-5. Creates a non-overwriting timestamped backup.
-6. Flushes and fsyncs the backup file.
-7. Fsyncs the backup directory after backup creation.
-8. Replaces the target with `os.replace()` only after staging, validation, and backup succeed.
-9. Fsyncs the target directory after replacement.
-10. Cleans up staged temporary files on failure.
-11. Leaves the original file intact when validation or backup creation fails.
+1. `python -m d2wc save --config <path>` previews by default.
+2. Preview validates and renders in memory.
+3. Preview prints the config path, planned backup path, and rendered byte count.
+4. Preview creates no backup files.
+5. Preview creates no backup directories.
+6. Preview modifies no config file.
+7. Invalid config exits without writing and reports validation errors.
 
-Confirmed CLI behavior:
+Confirmed write behavior:
 
-1. `python -m d2wc save --config <path>` refuses to write.
-2. `python -m d2wc save --config <path> --write` uses the safe-save helper.
-3. Successful guarded saves print the config path, backup path, and success message.
-4. `--backup-dir <path>` can direct backups to an explicit directory.
-5. Invalid config exits without writing and reports validation errors.
-6. Backup failures leave the original file unchanged.
+1. `python -m d2wc save --config <path> --write` uses the safe-save helper.
+2. Successful guarded saves print the config path, backup path, and success message.
+3. `--backup-dir <path>` can direct backups to an explicit directory.
+4. Invalid config exits without writing and reports validation errors.
+5. Backup failures leave the original file unchanged.
 
-The save command is now user-facing, but it is guarded by the explicit `--write` flag and covered by temporary-directory tests.
+Confirmed power-loss-oriented save behavior:
+
+1. Rendered output is written to a temporary file in the target directory.
+2. The temporary file is flushed and fsynced.
+3. The staged temporary file is validated.
+4. A non-overwriting timestamped backup is created.
+5. The backup file is flushed and fsynced.
+6. The backup directory is fsynced.
+7. The target is replaced with `os.replace()`.
+8. The target directory is fsynced after replacement.
+9. Staged temporary files are cleaned up on failure.
+
+The save command is user-facing, safe by default, and covered by temporary-directory tests.
 
 ## Latest renderer changes
 
@@ -110,17 +115,11 @@ The current Python core supports:
 8. Duplicate and shadow validation tests.
 9. Core safe-save tests using temporary directories.
 10. Power-loss-oriented fsync ordering for staged files, backup files, backup directories, and target directories.
-11. Guarded CLI save behavior requiring `--write`.
+11. Save preview by default.
+12. Guarded CLI save behavior requiring `--write` before modification.
 
 ## Next practical work
 
-The next practical step is to open or update a draft PR for `configurator-save-proof` and continue the safe-save proof in small slices.
-
-Recommended next implementation slice:
-
-1. Add a dry-run save preview command or option that reports what would happen without writing.
-2. Add tests proving the preview path does not create backups or modify the config.
-3. Consider whether the final CLI should use `save --dry-run` or a separate `plan-save` command.
-4. Keep GTK UI work deferred.
+The next practical step is to run a manual verification using a copied temporary config, then decide whether PR #3 is ready for review.
 
 GTK UI work should remain deferred until parser, validator, renderer, and safe save behavior are all covered by tests.
