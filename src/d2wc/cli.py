@@ -15,7 +15,11 @@ from d2wc import __version__
 from d2wc.core.geom_operations import (
     GeometryOperationError,
     GeometryProfileExistsError,
+    GeometryProfileInUseError,
+    GeometryProfileNotFoundError,
     add_geometry_profile_to_source,
+    delete_geometry_profile_from_source,
+    modify_geometry_profile_in_source,
 )
 from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.managed_config import GeometryProfile
@@ -83,59 +87,62 @@ def build_parser() -> argparse.ArgumentParser:
         "save",
         help="Preview or save rendered Lua config. Writes only when --write is supplied.",
     )
-    save.add_argument(
-        "--config",
-        type=Path,
-        required=True,
-        help="Path to the Lua config to save.",
-    )
+    save.add_argument("--config", type=Path, required=True, help="Path to the Lua config to save.")
     save.add_argument(
         "--backup-dir",
         type=Path,
         default=None,
         help="Optional directory for timestamped backups. Defaults to the config directory.",
     )
-    save.add_argument(
-        "--write",
-        action="store_true",
-        help="Actually write the rendered config after validation and backup.",
-    )
+    save.add_argument("--write", action="store_true", help="Actually write after validation and backup.")
     save.set_defaults(func=_cmd_save)
 
     add_geom = subcommands.add_parser(
         "add-geom",
-        help="Preview or add one GEOM profile. Writes only when --write is supplied.",
+        help="Preview or add one new GEOM profile. Writes only when --write is supplied.",
     )
-    add_geom.add_argument(
-        "--config",
-        type=Path,
-        required=True,
-        help="Path to the Lua config to edit.",
+    _add_geom_common_arguments(add_geom)
+    add_geom.set_defaults(func=_cmd_add_geom)
+
+    modify_geom = subcommands.add_parser(
+        "modify-geom",
+        help="Preview or modify one existing GEOM profile. Writes only when --write is supplied.",
     )
-    add_geom.add_argument("--name", required=True, help="GEOM profile name to add.")
-    add_geom.add_argument("--x", type=int, required=True, help="Window x position.")
-    add_geom.add_argument("--y", type=int, required=True, help="Window y position.")
-    add_geom.add_argument("--w", type=int, required=True, help="Window width.")
-    add_geom.add_argument("--h", type=int, required=True, help="Window height.")
-    add_geom.add_argument(
-        "--replace",
-        action="store_true",
-        help="Replace an existing GEOM profile with the same name.",
+    _add_geom_common_arguments(modify_geom)
+    modify_geom.set_defaults(func=_cmd_modify_geom)
+
+    delete_geom = subcommands.add_parser(
+        "delete-geom",
+        help="Preview or delete one unused GEOM profile. Writes only when --write is supplied.",
     )
-    add_geom.add_argument(
+    delete_geom.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    delete_geom.add_argument("--name", required=True, help="GEOM profile name to delete.")
+    delete_geom.add_argument(
         "--backup-dir",
         type=Path,
         default=None,
         help="Optional directory for timestamped backups. Defaults to the config directory.",
     )
-    add_geom.add_argument(
-        "--write",
-        action="store_true",
-        help="Actually write the edited config after validation and backup.",
-    )
-    add_geom.set_defaults(func=_cmd_add_geom)
+    delete_geom.add_argument("--write", action="store_true", help="Actually write after validation and backup.")
+    delete_geom.set_defaults(func=_cmd_delete_geom)
 
     return parser
+
+
+def _add_geom_common_arguments(subparser: argparse.ArgumentParser) -> None:
+    subparser.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    subparser.add_argument("--name", required=True, help="GEOM profile name.")
+    subparser.add_argument("--x", type=int, required=True, help="Window x position.")
+    subparser.add_argument("--y", type=int, required=True, help="Window y position.")
+    subparser.add_argument("--w", type=int, required=True, help="Window width.")
+    subparser.add_argument("--h", type=int, required=True, help="Window height.")
+    subparser.add_argument(
+        "--backup-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for timestamped backups. Defaults to the config directory.",
+    )
+    subparser.add_argument("--write", action="store_true", help="Actually write after validation and backup.")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -249,12 +256,37 @@ def _cmd_save(args: argparse.Namespace) -> int:
 
 
 def _cmd_add_geom(args: argparse.Namespace) -> int:
-    config_path: Path = args.config
     profile = GeometryProfile(name=args.name, x=args.x, y=args.y, w=args.w, h=args.h)
+    return _run_geom_edit(
+        args,
+        operation="add",
+        edit_callback=lambda source: add_geometry_profile_to_source(source, profile),
+    )
+
+
+def _cmd_modify_geom(args: argparse.Namespace) -> int:
+    profile = GeometryProfile(name=args.name, x=args.x, y=args.y, w=args.w, h=args.h)
+    return _run_geom_edit(
+        args,
+        operation="modify",
+        edit_callback=lambda source: modify_geometry_profile_in_source(source, profile),
+    )
+
+
+def _cmd_delete_geom(args: argparse.Namespace) -> int:
+    return _run_geom_edit(
+        args,
+        operation="delete",
+        edit_callback=lambda source: delete_geometry_profile_from_source(source, args.name),
+    )
+
+
+def _run_geom_edit(args: argparse.Namespace, operation: str, edit_callback) -> int:
+    config_path: Path = args.config
 
     try:
         source = config_path.read_text(encoding="utf-8")
-        edit = add_geometry_profile_to_source(source, profile, replace=args.replace)
+        edit = edit_callback(source)
     except FileNotFoundError:
         print(f"ERROR: config file not found: {config_path}")
         return 2
@@ -263,7 +295,14 @@ def _cmd_add_geom(args: argparse.Namespace) -> int:
         return 2
     except GeometryProfileExistsError as exc:
         print(f"ERROR: {exc}")
-        print("Use --replace to update an existing GEOM profile.")
+        print("Use modify-geom to update an existing GEOM profile.")
+        return 2
+    except GeometryProfileNotFoundError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except GeometryProfileInUseError as exc:
+        print(f"ERROR: {exc}")
+        print("Remove or change the WORKSPACE_PLACEMENT rule before deleting this profile.")
         return 2
     except GeometryOperationError as exc:
         print(f"ERROR: {exc}")
@@ -273,6 +312,8 @@ def _cmd_add_geom(args: argparse.Namespace) -> int:
         for message in exc.validation.errors:
             print(f"- {message}")
         return 1
+
+    profile_name = getattr(edit, "profile_name", None) or edit.profile.name
 
     if not args.write:
         try:
@@ -289,11 +330,12 @@ def _cmd_add_geom(args: argparse.Namespace) -> int:
             print(f"ERROR: could not preview save: {exc}")
             return 2
 
-        action = "replace" if edit.replaced else "add"
         print(f"Config: {preview.config_path}")
         print(f"Planned backup: {preview.backup_path}")
-        print(f"Planned GEOM {action}: {edit.profile.name}")
-        print(f"Geometry: x={edit.profile.x} y={edit.profile.y} w={edit.profile.w} h={edit.profile.h}")
+        print(f"Planned GEOM {operation}: {profile_name}")
+        if operation != "delete":
+            profile = edit.profile
+            print(f"Geometry: x={profile.x} y={profile.y} w={profile.w} h={profile.h}")
         print(f"Rendered bytes: {preview.bytes_written}")
         print("Preview only: no files were modified.")
         print("Run again with --write to save.")
@@ -313,10 +355,9 @@ def _cmd_add_geom(args: argparse.Namespace) -> int:
         print(f"ERROR: could not save config: {exc}")
         return 2
 
-    action = "replaced" if edit.replaced else "added"
     print(f"Config: {result.config_path}")
     print(f"Backup: {result.backup_path}")
-    print(f"OK: GEOM profile {action}: {edit.profile.name}")
+    print(f"OK: GEOM profile {operation}d: {profile_name}")
     return 0
 
 
