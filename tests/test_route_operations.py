@@ -75,13 +75,13 @@ def test_add_route_rule_rejects_invalid_route_rule() -> None:
 
 
 def test_modify_route_rule_moves_rule_to_existing_workspace() -> None:
-    result = modify_route_rule_in_source(_minimal_source(), "d:personal", 2, "d:personal c:krusader")
+    result = modify_route_rule_in_source(_minimal_source(), "d:personal", 2, "d:personal c:navigator")
 
     assert result.validation.ok
     assert result.old_workspace == 1
     assert result.new_workspace == 2
     assert '[1] = { "d:work", },' in result.source
-    assert '[2] = { "d:personal c:navigator", "d:personal c:krusader", },' in result.source
+    assert '[2] = { "d:personal c:navigator", },' in result.source
 
 
 def test_modify_route_rule_matches_noncanonical_stored_rule() -> None:
