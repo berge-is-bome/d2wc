@@ -1,5 +1,6 @@
-from d2wc.core.lua_blocks import ManagedBlock
+from d2wc.core.lua_blocks import ManagedBlock, ManagedBlockParser
 from d2wc.core.shadow_validation import warn_shadowed_target_rules
+from d2wc.core.validation import validate_managed_blocks
 
 
 def block(name: str, text: str) -> ManagedBlock:
@@ -35,6 +36,50 @@ def test_warns_when_exact_rule_overrides_domain_and_class_wide_rules() -> None:
         "EXCLUDE: exact rule d:personal c:okular overrides broader d:personal",
         "EXCLUDE: exact rule d:personal c:okular overrides broader c:okular",
     ]
+
+
+def test_warns_when_workspace_route_exact_rule_overrides_domain_wide_route() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = { "d:personal", },
+  [2] = { "d:personal c:navigator", },
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    parsed = ManagedBlockParser().parse(source)
+    result = validate_managed_blocks(parsed.blocks)
+
+    assert result.ok
+    assert result.errors == ()
+    assert result.warnings == (
+        "WORKSPACE_ROUTES: exact rule d:personal c:navigator overrides broader d:personal",
+    )
+
+
+def test_exact_duplicate_workspace_route_target_is_error_not_warning() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = { "d:personal", },
+  [2] = { "d:personal", },
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    parsed = ManagedBlockParser().parse(source)
+    result = validate_managed_blocks(parsed.blocks)
+
+    assert not result.ok
+    assert result.errors == ("WORKSPACE_ROUTES: duplicate route target: d:personal",)
+    assert result.warnings == ()
 
 
 def test_no_warning_for_unrelated_rules() -> None:
