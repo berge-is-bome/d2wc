@@ -175,12 +175,14 @@ def _modify_rule(
             if existing_signature == old_signature:
                 found = True
                 old_workspace = route.workspace
-                if route.workspace == new_workspace:
+                if route.workspace == new_workspace and existing_signature != new_signature:
                     updated_rules.append(new_rule)
                     placed = True
                 continue
             if existing_signature == new_signature:
-                raise RouteRuleExistsError(f"route rule already exists for target: {_format_target(new_rule)}")
+                updated_rules.append(existing_rule)
+                placed = True
+                continue
             updated_rules.append(existing_rule)
 
         if updated_rules:
