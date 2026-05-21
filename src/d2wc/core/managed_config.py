@@ -301,21 +301,28 @@ def _append_aligned_comment(left: str, comment: str, max_left_width: int) -> str
 def _render_rule_entries(entries: list[tuple[str, str | None, bool]]) -> list[tuple[str, str | None]]:
     existing = [(left, comment) for left, comment, is_new in entries if comment is not None and not is_new]
     existing_with_comments = [(left, comment) for left, comment in existing if comment]
-    existing_no_comment = [(left, comment) for left, comment in existing if comment == ""]
+
     if not existing:
-        return [(left, comment) for left, comment, _ in entries]
+        return [
+            (left, _one_space_comment(comment) if comment else comment)
+            for left, comment, _ in entries
+        ]
 
     starts = [len(left) + _leading_space_count(comment) for left, comment in existing_with_comments]
     aligned_comments = len(starts) >= 2 and len(set(starts)) == 1
-    spacing_pattern = len(existing_no_comment) >= 1 and len(existing_with_comments) >= 1
     fixed_spacing = (
         len(existing_with_comments) >= 1
         and len({_leading_space_count(comment) for _, comment in existing_with_comments}) == 1
     )
 
-    target_start = starts[0] if starts else None
-    longest_left = max((len(left) for left, comment in existing if comment is not None), default=0)
-    new_longest = max((len(left) for left, _, is_new in entries if is_new), default=0)
+    target_start = starts[0] if aligned_comments else None
+    new_with_comments = [(left, comment) for left, comment, is_new in entries if is_new and comment]
+
+    widened_alignment_start = None
+    if aligned_comments and target_start is not None and new_with_comments:
+        widest_new_start = max(len(left) + 1 for left, _ in new_with_comments)
+        if widest_new_start > target_start:
+            widened_alignment_start = widest_new_start
 
     rendered: list[tuple[str, str | None]] = []
     for left, comment, is_new in entries:
@@ -325,26 +332,35 @@ def _render_rule_entries(entries: list[tuple[str, str | None, bool]]) -> list[tu
         if not comment:
             rendered.append((left, ""))
             continue
+
+        if widened_alignment_start is not None:
+            rendered.append((left, _comment_at_column(left, comment, widened_alignment_start)))
+            continue
+
         if not is_new:
             rendered.append((left, comment))
             continue
 
         if aligned_comments and target_start is not None:
-            if len(left) <= longest_left:
-                rendered.append((left, (" " * max(1, target_start - len(left))) + comment.lstrip()))
-            elif len(left) == new_longest:
-                rendered.append((left, " " + comment.lstrip()))
-            else:
-                rendered.append((left, (" " * max(1, new_longest + 1 - len(left))) + comment.lstrip()))
+            rendered.append((left, _comment_at_column(left, comment, target_start)))
             continue
 
-        if spacing_pattern or fixed_spacing:
+        if fixed_spacing:
             space_count = _leading_space_count(existing_with_comments[0][1]) if existing_with_comments else 1
             rendered.append((left, (" " * max(1, space_count)) + comment.lstrip()))
             continue
 
-        rendered.append((left, " " + comment.lstrip()))
+        rendered.append((left, _one_space_comment(comment)))
+
     return rendered
+
+
+def _comment_at_column(left: str, comment: str, column: int) -> str:
+    return (" " * max(1, column - len(left))) + comment.lstrip()
+
+
+def _one_space_comment(comment: str) -> str:
+    return " " + comment.lstrip()
 
 
 def _leading_space_count(text: str) -> int:

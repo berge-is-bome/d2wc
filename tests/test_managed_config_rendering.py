@@ -122,10 +122,37 @@ def test_render_rule_entries_handles_multiple_new_commented_rules_with_longest_n
 
     rendered = _render_rule_entries(entries)
 
-    assert rendered[0] == ('  "c:a g:half_left",', "      -- existing one")
-    assert rendered[1] == ('  "c:b g:half_left",', "      -- existing two")
-    assert rendered[2] == ('  "d:personal c:verylongapplicationname g:half_left",', " -- new longest")
+    assert rendered[0] == (
+        '  "c:a g:half_left",',
+        "                                  -- existing one",
+    )
+    assert rendered[1] == (
+        '  "c:b g:half_left",',
+        "                                  -- existing two",
+    )
+    assert rendered[2] == (
+        '  "d:personal c:verylongapplicationname g:half_left",',
+        " -- new longest",
+    )
     assert rendered[3] == (
         '  "d:work c:mid g:half_left",',
         "                         -- new shorter",
     )
+
+
+def test_render_rule_entries_preserves_unaligned_comments_with_blank_lines() -> None:
+    entries = [
+        ('  "c:a g:half_left",', " -- existing one", False),
+        ("", None, False),
+        ('  "c:bbbbbbbb g:half_left",', "      -- existing two", False),
+        ('  "c:new g:half_left",', "-- new", True),
+    ]
+
+    rendered = _render_rule_entries(entries)
+
+    assert rendered == [
+        ('  "c:a g:half_left",', " -- existing one"),
+        ("", None),
+        ('  "c:bbbbbbbb g:half_left",', "      -- existing two"),
+        ('  "c:new g:half_left",', " -- new"),
+    ]
