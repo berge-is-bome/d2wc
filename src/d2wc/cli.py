@@ -1,8 +1,8 @@
 """Command-line interface for d2wc.
 
-The first implementation phase is intentionally read-only. Commands added here
-must not modify a user's real Lua configuration until the parser, validator,
-renderer, and backup safety gates exist.
+The first implementation phase is intentionally conservative. Commands that can
+write a Lua configuration must require an explicit affirmative flag and must use
+the tested safe-save core path.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from d2wc import __version__
 from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.rendering import RenderValidationError, render_source
+from d2wc.core.saving import SaveConfigError, SaveValidationError, save_rendered_config
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
 
 
@@ -64,6 +65,29 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print rendered Lua to stdout. Required because render is currently dry-run only.",
     )
     render.set_defaults(func=_cmd_render)
+
+    save = subcommands.add_parser(
+        "save",
+        help="Render, validate, back up, and save a Lua config. Requires --write.",
+    )
+    save.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to the Lua config to save.",
+    )
+    save.add_argument(
+        "--backup-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for timestamped backups. Defaults to the config directory.",
+    )
+    save.add_argument(
+        "--write",
+        action="store_true",
+        help="Actually write the rendered config after validation and backup.",
+    )
+    save.set_defaults(func=_cmd_save)
 
     return parser
 
@@ -130,6 +154,33 @@ def _cmd_render(args: argparse.Namespace) -> int:
         return 1
 
     print(result.source, end="")
+    return 0
+
+
+def _cmd_save(args: argparse.Namespace) -> int:
+    config_path: Path = args.config
+
+    if not args.write:
+        print(f"ERROR: save requires --write before any file is modified: {config_path}")
+        return 2
+
+    try:
+        result = save_rendered_config(config_path, backup_dir=args.backup_dir)
+    except SaveValidationError as exc:
+        print(f"ERROR: cannot save invalid config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+    except SaveConfigError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+
+    print(f"Config: {result.config_path}")
+    print(f"Backup: {result.backup_path}")
+    print("OK: config saved.")
     return 0
 
 
