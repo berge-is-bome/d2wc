@@ -88,6 +88,50 @@ def test_add_placement_rule_rejects_duplicate_target() -> None:
         add_placement_rule_to_source(source, "c:okular g:half_left")
 
 
+def test_add_placement_rule_keeps_unaligned_existing_comments_unmodified() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+}
+local WORKSPACE_PLACEMENT = {
+  "c:okular g:half_left", -- note a
+  "c:navigator g:half_left",      -- note b
+}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_placement_rule_to_source(source, "d:personal c:viewer g:half_left")
+    lines = _managed_block_lines(result.source, "WORKSPACE_PLACEMENT")
+    assert '  "c:okular g:half_left", -- note a' in lines
+    assert '  "c:navigator g:half_left",      -- note b' in lines
+    assert '  "d:personal c:viewer g:half_left",' in lines
+
+
+def test_add_placement_rule_with_longest_new_rule_does_not_realign_existing_comments_without_new_comment() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+}
+local WORKSPACE_PLACEMENT = {
+  "c:okular g:half_left",      -- short note
+  "c:nav g:half_left",         -- nav note
+}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_placement_rule_to_source(source, "d:personal c:verylongapplicationname g:half_left")
+    lines = _managed_block_lines(result.source, "WORKSPACE_PLACEMENT")
+    assert '  "d:personal c:verylongapplicationname g:half_left",' in lines
+    assert '  "c:okular g:half_left",      -- short note' in lines
+    assert '  "c:nav g:half_left",         -- nav note' in lines
+
+
 def test_add_placement_rule_rejects_missing_geometry_profile() -> None:
     source = _minimal_source()
 

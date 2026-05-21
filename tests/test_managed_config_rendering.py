@@ -1,6 +1,7 @@
 from d2wc.core.lua_blocks import ManagedBlock
 from d2wc.core.managed_config import (
     GeometryProfile,
+    _render_rule_entries,
     extract_managed_config,
     render_geom_block,
     render_managed_config,
@@ -52,7 +53,7 @@ def test_render_rule_list_preserves_comments_and_blank_lines() -> None:
 
     assert rendered == '''local EXCLUDE = {
   -- keep this note
-  "d:personal",     -- personal note
+  "d:personal", -- personal note
 
   "c:okular",
 }'''
@@ -109,3 +110,49 @@ def test_workspace_routes_preserves_original_comments_and_blank_lines_for_now() 
     rendered = render_managed_config(config, blocks)["WORKSPACE_ROUTES"]
 
     assert rendered == blocks["WORKSPACE_ROUTES"].text
+
+
+def test_render_rule_entries_handles_multiple_new_commented_rules_with_longest_new_rule() -> None:
+    entries = [
+        ('  "c:a g:half_left",', "      -- existing one", False),
+        ('  "c:b g:half_left",', "      -- existing two", False),
+        ('  "d:personal c:verylongapplicationname g:half_left",', "-- new longest", True),
+        ('  "d:work c:mid g:half_left",', "-- new shorter", True),
+    ]
+
+    rendered = _render_rule_entries(entries)
+
+    assert rendered[0] == (
+        '  "c:a g:half_left",',
+        "                                  -- existing one",
+    )
+    assert rendered[1] == (
+        '  "c:b g:half_left",',
+        "                                  -- existing two",
+    )
+    assert rendered[2] == (
+        '  "d:personal c:verylongapplicationname g:half_left",',
+        " -- new longest",
+    )
+    assert rendered[3] == (
+        '  "d:work c:mid g:half_left",',
+        "                         -- new shorter",
+    )
+
+
+def test_render_rule_entries_preserves_unaligned_comments_with_blank_lines() -> None:
+    entries = [
+        ('  "c:a g:half_left",', " -- existing one", False),
+        ("", None, False),
+        ('  "c:bbbbbbbb g:half_left",', "      -- existing two", False),
+        ('  "c:new g:half_left",', "-- new", True),
+    ]
+
+    rendered = _render_rule_entries(entries)
+
+    assert rendered == [
+        ('  "c:a g:half_left",', " -- existing one"),
+        ("", None),
+        ('  "c:bbbbbbbb g:half_left",', "      -- existing two"),
+        ('  "c:new g:half_left",', " -- new"),
+    ]
