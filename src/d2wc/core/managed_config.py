@@ -150,13 +150,14 @@ def render_geom_block(profiles: tuple[GeometryProfile, ...]) -> str:
 
 
 def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...], block_text: str) -> str:
-    """Render GEOM while preserving user comments and blank lines."""
+    """Render GEOM while preserving user comments, blank lines, and new profiles."""
 
     lines = block_text.splitlines()
     if len(lines) < 2:
         return block_text
 
     profile_map = {profile.name: profile for profile in profiles}
+    rendered_names: set[str] = set()
     max_left_width = max((len(_render_geom_profile_line(profile, profiles)) for profile in profiles), default=0)
 
     rendered = ["local GEOM = {"]
@@ -168,10 +169,16 @@ def render_geom_block_preserving_comments(profiles: tuple[GeometryProfile, ...],
             continue
 
         left = _render_geom_profile_line(profile_map[name], profiles)
+        rendered_names.add(name)
         if comment:
             rendered.append(_append_aligned_comment(left, comment.strip(), max_left_width))
         else:
             rendered.append(left)
+
+    for profile in profiles:
+        if profile.name not in rendered_names:
+            rendered.append(_render_geom_profile_line(profile, profiles))
+
     rendered.append("}")
     return "\n".join(rendered)
 
