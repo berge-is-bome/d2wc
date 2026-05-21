@@ -60,7 +60,7 @@ local LEFT_EDGE_CORRECTION = {}
     assert "EXCLUDE: rule must include d: or c:: g:half_left" in captured.out
 
 
-def test_cli_save_requires_write_flag_and_does_not_modify_config(tmp_path, capsys) -> None:
+def test_cli_save_without_write_previews_and_does_not_modify_config(tmp_path, capsys) -> None:
     config_path = copy_current_config(tmp_path)
     original = config_path.read_text(encoding="utf-8")
 
@@ -68,10 +68,36 @@ def test_cli_save_requires_write_flag_and_does_not_modify_config(tmp_path, capsy
 
     captured = capsys.readouterr()
 
-    assert exit_code == 2
-    assert "save requires --write" in captured.out
+    assert exit_code == 0
+    assert f"Config: {config_path}" in captured.out
+    assert "Planned backup:" in captured.out
+    assert "Preview only: no files were modified." in captured.out
+    assert "Run again with --write to save." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
+
+
+def test_cli_save_preview_uses_explicit_backup_directory_without_creating_it(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    backup_dir = tmp_path / "backups"
+
+    exit_code = main(
+        [
+            "save",
+            "--config",
+            str(config_path),
+            "--backup-dir",
+            str(backup_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert f"Planned backup: {backup_dir / 'd2wc.lua'}" not in captured.out
+    assert "Planned backup:" in captured.out
+    assert not backup_dir.exists()
 
 
 def test_cli_save_write_saves_config_and_prints_backup_path(tmp_path, capsys) -> None:
@@ -128,6 +154,29 @@ local LEFT_EDGE_CORRECTION = {}
 
     assert exit_code == 1
     assert "cannot save invalid config" in captured.out
+    assert "EXCLUDE: rule must include d: or c:: g:half_left" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
+
+
+def test_cli_save_preview_rejects_invalid_config_and_leaves_file_unchanged(tmp_path, capsys) -> None:
+    config_path = tmp_path / "invalid.lua"
+    original = '''
+local EXCLUDE = { "g:half_left" }
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = { half_left = { x = 0, y = 0, w = 10, h = 10 } }
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+    config_path.write_text(original, encoding="utf-8")
+
+    exit_code = main(["save", "--config", str(config_path)])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 1
+    assert "cannot preview invalid config" in captured.out
     assert "EXCLUDE: rule must include d: or c:: g:half_left" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
