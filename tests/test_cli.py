@@ -279,7 +279,7 @@ def test_cli_add_geom_write_updates_config_and_creates_backup(tmp_path, capsys) 
     assert backups[0].read_text(encoding="utf-8") == original
 
 
-def test_cli_add_geom_rejects_duplicate_without_replace(tmp_path, capsys) -> None:
+def test_cli_add_geom_rejects_duplicate(tmp_path, capsys) -> None:
     config_path = copy_current_config(tmp_path)
     original = config_path.read_text(encoding="utf-8")
 
@@ -306,17 +306,18 @@ def test_cli_add_geom_rejects_duplicate_without_replace(tmp_path, capsys) -> Non
 
     assert exit_code == 2
     assert "geometry profile already exists: half_left" in captured.out
-    assert "Use --replace" in captured.out
+    assert "Use modify-geom" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
 
 
-def test_cli_add_geom_replace_updates_existing_profile(tmp_path, capsys) -> None:
+def test_cli_modify_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
     config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
 
     exit_code = main(
         [
-            "add-geom",
+            "modify-geom",
             "--config",
             str(config_path),
             "--name",
@@ -329,7 +330,37 @@ def test_cli_add_geom_replace_updates_existing_profile(tmp_path, capsys) -> None
             "300",
             "--h",
             "400",
-            "--replace",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Planned GEOM modify: half_left" in captured.out
+    assert "Geometry: x=10 y=20 w=300 h=400" in captured.out
+    assert "Preview only: no files were modified." in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
+
+
+def test_cli_modify_geom_write_updates_existing_profile(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+
+    exit_code = main(
+        [
+            "modify-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "half_left",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
             "--write",
         ]
     )
@@ -338,12 +369,136 @@ def test_cli_add_geom_replace_updates_existing_profile(tmp_path, capsys) -> None
     saved = config_path.read_text(encoding="utf-8")
 
     assert exit_code == 0
-    assert "OK: GEOM profile replaced: half_left" in captured.out
+    assert "OK: GEOM profile modified: half_left" in captured.out
     assert "half_left" in saved
     assert "x = 10" in saved
     assert "y = 20" in saved
     assert "w = 300" in saved
     assert "h = 400" in saved
+
+
+def test_cli_modify_geom_rejects_missing_profile(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(
+        [
+            "modify-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "not_there",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "geometry profile not found: not_there" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
+
+
+def test_cli_delete_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "throwaway",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+            "--write",
+        ]
+    )
+    with_added = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(["delete-geom", "--config", str(config_path), "--name", "throwaway"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert "Planned GEOM delete: throwaway" in captured.out
+    assert "Preview only: no files were modified." in captured.out
+    assert config_path.read_text(encoding="utf-8") == with_added
+    assert with_added != original
+
+
+def test_cli_delete_geom_write_removes_unused_profile(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+
+    main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "throwaway",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+            "--write",
+        ]
+    )
+
+    exit_code = main(["delete-geom", "--config", str(config_path), "--name", "throwaway", "--write"])
+
+    captured = capsys.readouterr()
+    saved = config_path.read_text(encoding="utf-8")
+
+    assert exit_code == 0
+    assert "OK: GEOM profile deleted: throwaway" in captured.out
+    assert "throwaway" not in saved
+
+
+def test_cli_delete_geom_rejects_profile_used_by_placement_rule(tmp_path, capsys) -> None:
+    config_path = tmp_path / "d2wc.lua"
+    original = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+}
+local WORKSPACE_PLACEMENT = {
+  "c:okular g:half_left",
+}
+local LEFT_EDGE_CORRECTION = {}
+'''
+    config_path.write_text(original, encoding="utf-8")
+
+    exit_code = main(["delete-geom", "--config", str(config_path), "--name", "half_left", "--write"])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "still used by WORKSPACE_PLACEMENT: half_left" in captured.out
+    assert "Remove or change the WORKSPACE_PLACEMENT rule" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
 
 
 def test_cli_add_geom_rejects_invalid_profile(tmp_path, capsys) -> None:
