@@ -5,9 +5,9 @@
 Current active branch:
 
 ```text
-Branch: configurator-add-geom-proof
-Base: main at PR #3 squash merge commit 71b0f911ce0b0e631cb891ed905056eae18a1aa8
-Status: GEOM add, modify, delete, marker-tail behavior, and manual smoke checkpoint locally verified
+Branch: configurator-placement-proof
+Base: main at PR #4 squash merge commit 5b902c133fdb3fca5cfec2e709709fc37ddae6cc
+Status: WORKSPACE_PLACEMENT core and CLI checkpoint locally verified
 ```
 
 ## Latest confirmed local verification
@@ -26,59 +26,63 @@ Result:
 ```text
 src/d2wc.lua validates successfully.
 Rendered /tmp/d2wc-rendered.lua validates successfully.
-99 pytest tests passed.
+124 pytest tests passed.
 ```
 
-A later renderer verification and GEOM smoke rerun also passed after adding marker-tail behavior for `-- add more here`.
+## Current WORKSPACE_PLACEMENT edit proof
 
-## Manual GEOM smoke verification
-
-Manual smoke verification reported on 2026-05-21 using a copied temporary config.
-
-Result:
-
-```text
-add-geom preview modified nothing.
-add-geom --write added the test profile and created a backup.
-modify-geom preview modified nothing.
-modify-geom --write updated the test profile and created a backup.
-delete-geom preview modified nothing.
-delete-geom --write removed the test profile and created a backup.
-The copied config validated after each write.
-The -- add more here marker remained the final table entry after add/write testing.
-```
-
-## Current GEOM edit proof
-
-The current branch adds the first tested config-editing operation set for `GEOM` profiles.
+The current branch adds the first tested config-editing operation set for `WORKSPACE_PLACEMENT` rules.
 
 Confirmed core behavior:
 
-1. Adds a new `GEOM` profile to rendered Lua source in memory.
-2. Modifies an existing `GEOM` profile in memory.
-3. Deletes an unused `GEOM` profile in memory.
+1. Adds a new `WORKSPACE_PLACEMENT` rule to rendered Lua source in memory.
+2. Modifies an existing `WORKSPACE_PLACEMENT` rule in memory.
+3. Deletes an existing `WORKSPACE_PLACEMENT` rule in memory.
+4. Preserves existing `WORKSPACE_PLACEMENT` comments and blank lines where practical.
+5. Applies updated rule tuples while preserving managed rule-list comments.
+6. Keeps the `-- add more here` marker as the final entry in managed rule-list render paths while the marker exists.
+7. Rejects duplicate placement targets on add.
+8. Rejects missing old rules on modify.
+9. Rejects missing rules on delete.
+10. Rejects missing `GEOM` profiles on add and modify.
+11. Rejects placement rules without a `d:` or `c:` target.
+12. Rejects placement rules without a `g:` profile.
+13. Rejects placement rules that include `le:`.
+14. Matches modify and delete requests by parsed rule meaning, not token order.
+15. Renders placement rules in canonical prefix order: `d:`, then `c:`, then `g:`.
+16. Re-validates rendered output after each edit.
+
+Confirmed CLI behavior:
+
+1. `python -m d2wc add-placement --config <path> --rule "<rule>"` previews by default.
+2. `python -m d2wc modify-placement --config <path> --old-rule "<rule>" --new-rule "<rule>"` previews by default.
+3. `python -m d2wc delete-placement --config <path> --rule "<rule>"` previews by default.
+4. Each placement edit command writes only when `--write` is supplied.
+5. Writes route through the safe-save helper.
+6. Successful writes create timestamped backups.
+7. Failed edits leave the original config unchanged.
+
+This branch now exposes the placement edit proof through guarded CLI commands. GTK UI work remains deferred.
+
+## GEOM edit baseline from PR #4
+
+PR #4 added the first tested config-editing operation set for `GEOM` profiles.
+
+Confirmed GEOM behavior:
+
+1. Adds a new `GEOM` profile.
+2. Modifies an existing `GEOM` profile.
+3. Deletes an unused `GEOM` profile.
 4. Preserves existing `GEOM` comments and blank lines where practical.
 5. Appends new profiles that did not exist in the original `GEOM` block.
 6. Skips removed profiles when rendering the updated `GEOM` block.
-7. Keeps the `-- add more here` marker as the final entry in managed table render paths while the marker exists.
+7. Keeps the `-- add more here` marker as the final entry while the marker exists.
 8. Rejects duplicate profile names on add.
 9. Rejects missing profile names on modify or delete.
 10. Rejects deletion when `WORKSPACE_PLACEMENT` still references the profile.
 11. Rejects invalid profile names.
 12. Rejects profile width or height below the current minimum size.
-13. Re-validates rendered output after each edit.
-
-Confirmed CLI behavior:
-
-1. `python -m d2wc add-geom --config <path> --name <name> --x <n> --y <n> --w <n> --h <n>` previews by default.
-2. `python -m d2wc modify-geom --config <path> --name <name> --x <n> --y <n> --w <n> --h <n>` previews by default.
-3. `python -m d2wc delete-geom --config <path> --name <name>` previews by default.
-4. Each GEOM edit command writes only when `--write` is supplied.
-5. Writes route through the safe-save helper.
-6. Successful writes create timestamped backups.
-7. Failed edits leave the original config unchanged.
-
-This branch now exposes the GEOM edit proof through guarded CLI commands. GTK UI work remains deferred.
+13. Provides guarded CLI commands: `add-geom`, `modify-geom`, and `delete-geom`.
 
 ## Safe-save baseline from PR #3
 
@@ -156,10 +160,13 @@ The current Python core supports:
 12. Guarded CLI save behavior requiring `--write` before modification.
 13. In-memory `GEOM` add, modify, and delete operations.
 14. Guarded CLI GEOM add, modify, and delete commands.
-15. Marker-tail preservation for `-- add more here`.
+15. In-memory `WORKSPACE_PLACEMENT` add, modify, and delete operations.
+16. Guarded CLI WORKSPACE_PLACEMENT add, modify, and delete commands.
+17. Marker-tail preservation for `-- add more here`.
+18. Token-order-independent rule parsing and placement modify/delete matching.
 
 ## Next practical work
 
-The next practical step is to decide whether PR #4 is ready for review.
+The next practical step is to run a manual smoke test on copied temporary configs, then decide whether PR #5 is ready for review.
 
 GTK UI work should remain deferred until the config-editing operation is proven through CLI/core tests.

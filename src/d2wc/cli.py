@@ -23,6 +23,14 @@ from d2wc.core.geom_operations import (
 )
 from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.managed_config import GeometryProfile
+from d2wc.core.placement_operations import (
+    PlacementOperationError,
+    PlacementRuleExistsError,
+    PlacementRuleNotFoundError,
+    add_placement_rule_to_source,
+    delete_placement_rule_from_source,
+    modify_placement_rule_in_source,
+)
 from d2wc.core.rendering import RenderValidationError, render_source
 from d2wc.core.saving import (
     SaveConfigError,
@@ -117,14 +125,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     delete_geom.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
     delete_geom.add_argument("--name", required=True, help="GEOM profile name to delete.")
-    delete_geom.add_argument(
-        "--backup-dir",
-        type=Path,
-        default=None,
-        help="Optional directory for timestamped backups. Defaults to the config directory.",
-    )
-    delete_geom.add_argument("--write", action="store_true", help="Actually write after validation and backup.")
+    _add_common_write_arguments(delete_geom)
     delete_geom.set_defaults(func=_cmd_delete_geom)
+
+    add_placement = subcommands.add_parser(
+        "add-placement",
+        help="Preview or add one WORKSPACE_PLACEMENT rule. Writes only when --write is supplied.",
+    )
+    add_placement.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    add_placement.add_argument("--rule", required=True, help="Placement rule to add, for example c:okular g:half_left.")
+    _add_common_write_arguments(add_placement)
+    add_placement.set_defaults(func=_cmd_add_placement)
+
+    modify_placement = subcommands.add_parser(
+        "modify-placement",
+        help="Preview or modify one WORKSPACE_PLACEMENT rule. Writes only when --write is supplied.",
+    )
+    modify_placement.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    modify_placement.add_argument("--old-rule", required=True, help="Existing placement rule to modify.")
+    modify_placement.add_argument("--new-rule", required=True, help="Replacement placement rule.")
+    _add_common_write_arguments(modify_placement)
+    modify_placement.set_defaults(func=_cmd_modify_placement)
+
+    delete_placement = subcommands.add_parser(
+        "delete-placement",
+        help="Preview or delete one WORKSPACE_PLACEMENT rule. Writes only when --write is supplied.",
+    )
+    delete_placement.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    delete_placement.add_argument("--rule", required=True, help="Placement rule to delete.")
+    _add_common_write_arguments(delete_placement)
+    delete_placement.set_defaults(func=_cmd_delete_placement)
 
     return parser
 
@@ -136,6 +166,10 @@ def _add_geom_common_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument("--y", type=int, required=True, help="Window y position.")
     subparser.add_argument("--w", type=int, required=True, help="Window width.")
     subparser.add_argument("--h", type=int, required=True, help="Window height.")
+    _add_common_write_arguments(subparser)
+
+
+def _add_common_write_arguments(subparser: argparse.ArgumentParser) -> None:
     subparser.add_argument(
         "--backup-dir",
         type=Path,
@@ -284,6 +318,33 @@ def _cmd_delete_geom(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_add_placement(args: argparse.Namespace) -> int:
+    return _run_placement_edit(
+        args,
+        operation="add",
+        success_verb="added",
+        edit_callback=lambda source: add_placement_rule_to_source(source, args.rule),
+    )
+
+
+def _cmd_modify_placement(args: argparse.Namespace) -> int:
+    return _run_placement_edit(
+        args,
+        operation="modify",
+        success_verb="modified",
+        edit_callback=lambda source: modify_placement_rule_in_source(source, args.old_rule, args.new_rule),
+    )
+
+
+def _cmd_delete_placement(args: argparse.Namespace) -> int:
+    return _run_placement_edit(
+        args,
+        operation="delete",
+        success_verb="deleted",
+        edit_callback=lambda source: delete_placement_rule_from_source(source, args.rule),
+    )
+
+
 def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, edit_callback) -> int:
     config_path: Path = args.config
 
@@ -361,6 +422,86 @@ def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, 
     print(f"Config: {result.config_path}")
     print(f"Backup: {result.backup_path}")
     print(f"OK: GEOM profile {success_verb}: {profile_name}")
+    return 0
+
+
+def _run_placement_edit(args: argparse.Namespace, operation: str, success_verb: str, edit_callback) -> int:
+    config_path: Path = args.config
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        edit = edit_callback(source)
+    except FileNotFoundError:
+        print(f"ERROR: config file not found: {config_path}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not read config file {config_path}: {exc}")
+        return 2
+    except PlacementRuleExistsError as exc:
+        print(f"ERROR: {exc}")
+        print("Use modify-placement to update an existing WORKSPACE_PLACEMENT rule.")
+        return 2
+    except PlacementRuleNotFoundError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except PlacementOperationError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except RenderValidationError as exc:
+        print(f"ERROR: cannot edit invalid config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+
+    if operation == "modify":
+        rule_text = edit.new_rule
+        old_rule_text = edit.old_rule
+    else:
+        rule_text = edit.rule
+        old_rule_text = None
+
+    if not args.write:
+        try:
+            preview = preview_source_save_config(config_path, edit.source, backup_dir=args.backup_dir)
+        except SaveValidationError as exc:
+            print(f"ERROR: cannot preview invalid edited config: {config_path}")
+            for message in exc.validation.errors:
+                print(f"- {message}")
+            return 1
+        except SaveConfigError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+        except OSError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+
+        print(f"Config: {preview.config_path}")
+        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned WORKSPACE_PLACEMENT {operation}: {rule_text}")
+        if old_rule_text is not None:
+            print(f"Old rule: {old_rule_text}")
+        print(f"Rendered bytes: {preview.bytes_written}")
+        print("Preview only: no files were modified.")
+        print("Run again with --write to save.")
+        return 0
+
+    try:
+        result = save_source_config(config_path, edit.source, backup_dir=args.backup_dir, validation=edit.validation)
+    except SaveValidationError as exc:
+        print(f"ERROR: cannot save invalid edited config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+    except SaveConfigError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+
+    print(f"Config: {result.config_path}")
+    print(f"Backup: {result.backup_path}")
+    print(f"OK: WORKSPACE_PLACEMENT rule {success_verb}: {rule_text}")
     return 0
 
 
