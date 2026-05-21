@@ -208,3 +208,169 @@ def test_cli_save_write_reports_save_failure_and_leaves_file_unchanged(tmp_path,
     assert exit_code == 2
     assert "could not save config" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
+
+
+def test_cli_add_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "custom_left",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 0
+    assert f"Config: {config_path}" in captured.out
+    assert "Planned GEOM add: custom_left" in captured.out
+    assert "Geometry: x=10 y=20 w=300 h=400" in captured.out
+    assert "Preview only: no files were modified." in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
+
+
+def test_cli_add_geom_write_updates_config_and_creates_backup(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "custom_left",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+            "--write",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    saved = config_path.read_text(encoding="utf-8")
+    backups = list(tmp_path.glob("d2wc.lua.*.bak"))
+
+    assert exit_code == 0
+    assert "OK: GEOM profile added: custom_left" in captured.out
+    assert "Backup:" in captured.out
+    assert "custom_left" in saved
+    assert backups
+    assert backups[0].read_text(encoding="utf-8") == original
+
+
+def test_cli_add_geom_rejects_duplicate_without_replace(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "half_left",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+            "--write",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "geometry profile already exists: half_left" in captured.out
+    assert "Use --replace" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
+
+
+def test_cli_add_geom_replace_updates_existing_profile(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+
+    exit_code = main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "half_left",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "300",
+            "--h",
+            "400",
+            "--replace",
+            "--write",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    saved = config_path.read_text(encoding="utf-8")
+
+    assert exit_code == 0
+    assert "OK: GEOM profile replaced: half_left" in captured.out
+    assert "half_left" in saved
+    assert "x = 10" in saved
+    assert "y = 20" in saved
+    assert "w = 300" in saved
+    assert "h = 400" in saved
+
+
+def test_cli_add_geom_rejects_invalid_profile(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main(
+        [
+            "add-geom",
+            "--config",
+            str(config_path),
+            "--name",
+            "tiny",
+            "--x",
+            "10",
+            "--y",
+            "20",
+            "--w",
+            "9",
+            "--h",
+            "400",
+        ]
+    )
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "width must be at least 10" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
