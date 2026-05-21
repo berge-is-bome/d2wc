@@ -1,8 +1,8 @@
 """Safe save helpers for rendered Lua configuration.
 
-This module contains the first real write path for d2wc. It is intentionally
-core-only at this stage: tests exercise it with temporary directories, and no
-user-facing CLI save command is exposed yet.
+This module contains the first real write path for d2wc. Tests exercise it with
+temporary directories, and the CLI exposes it only through an explicit --write
+flag.
 """
 
 from __future__ import annotations
@@ -26,11 +26,21 @@ class SaveConfigError(RuntimeError):
 
 
 class SaveValidationError(SaveConfigError):
-    """Raised when staged rendered content fails validation."""
+    """Raised when rendered content fails validation."""
 
     def __init__(self, validation: ValidationResult) -> None:
         self.validation = validation
         super().__init__("rendered Lua config is not valid")
+
+
+@dataclass(frozen=True)
+class SavePreview:
+    """Preview of a safe save without writing files."""
+
+    config_path: Path
+    backup_path: Path
+    bytes_written: int
+    validation: ValidationResult
 
 
 @dataclass(frozen=True)
@@ -41,6 +51,38 @@ class SaveResult:
     backup_path: Path
     bytes_written: int
     validation: ValidationResult
+
+
+def preview_save_config(
+    config_path: Path,
+    backup_dir: Path | None = None,
+    when: datetime | None = None,
+) -> SavePreview:
+    """Render and validate a Lua config, but do not write anything."""
+
+    config_path = Path(config_path)
+    backup_dir = Path(backup_dir) if backup_dir is not None else None
+
+    try:
+        original_source = config_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise SaveConfigError(f"config file not found: {config_path}") from exc
+    except OSError as exc:
+        raise SaveConfigError(f"could not read config file {config_path}: {exc}") from exc
+
+    try:
+        rendered = render_source(original_source)
+    except RenderValidationError as exc:
+        raise SaveValidationError(exc.validation) from exc
+
+    backup_path = _next_available_path(build_backup_path(config_path, backup_dir=backup_dir, when=when))
+
+    return SavePreview(
+        config_path=config_path,
+        backup_path=backup_path,
+        bytes_written=len(rendered.source.encode("utf-8")),
+        validation=rendered.validation,
+    )
 
 
 def save_rendered_config(
@@ -62,8 +104,8 @@ def save_rendered_config(
     8. Atomically replace the target with the staged file.
     9. fsync the target directory.
 
-    Tests must use temporary directories. The CLI does not expose this as a
-    real user-config write path yet.
+    Tests must use temporary directories. The CLI requires --write before this
+    function is called from a user-facing command.
     """
 
     config_path = Path(config_path)
