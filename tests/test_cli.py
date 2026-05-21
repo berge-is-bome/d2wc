@@ -93,11 +93,14 @@ def test_cli_save_preview_uses_explicit_backup_directory_without_creating_it(tmp
     )
 
     captured = capsys.readouterr()
+    output_lines = captured.out.splitlines()
+    planned_backup_lines = [line for line in output_lines if line.startswith("Planned backup: ")]
 
     assert exit_code == 0
-    assert f"Planned backup: {backup_dir / 'd2wc.lua.'}" not in captured.out
-    assert f"Planned backup: {backup_dir / 'd2wc.lua'}" in captured.out
-    assert captured.out.count(".bak") == 1
+    assert len(planned_backup_lines) == 1
+    planned_backup = planned_backup_lines[0].removeprefix("Planned backup: ")
+    assert planned_backup.startswith(str(backup_dir / "d2wc.lua."))
+    assert planned_backup.endswith(".bak")
     assert not backup_dir.exists()
 
 
