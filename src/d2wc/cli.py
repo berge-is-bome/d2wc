@@ -260,6 +260,7 @@ def _cmd_add_geom(args: argparse.Namespace) -> int:
     return _run_geom_edit(
         args,
         operation="add",
+        success_verb="added",
         edit_callback=lambda source: add_geometry_profile_to_source(source, profile),
     )
 
@@ -269,6 +270,7 @@ def _cmd_modify_geom(args: argparse.Namespace) -> int:
     return _run_geom_edit(
         args,
         operation="modify",
+        success_verb="modified",
         edit_callback=lambda source: modify_geometry_profile_in_source(source, profile),
     )
 
@@ -277,11 +279,12 @@ def _cmd_delete_geom(args: argparse.Namespace) -> int:
     return _run_geom_edit(
         args,
         operation="delete",
+        success_verb="deleted",
         edit_callback=lambda source: delete_geometry_profile_from_source(source, args.name),
     )
 
 
-def _run_geom_edit(args: argparse.Namespace, operation: str, edit_callback) -> int:
+def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, edit_callback) -> int:
     config_path: Path = args.config
 
     try:
@@ -357,7 +360,7 @@ def _run_geom_edit(args: argparse.Namespace, operation: str, edit_callback) -> i
 
     print(f"Config: {result.config_path}")
     print(f"Backup: {result.backup_path}")
-    print(f"OK: GEOM profile {operation}d: {profile_name}")
+    print(f"OK: GEOM profile {success_verb}: {profile_name}")
     return 0
 
 
