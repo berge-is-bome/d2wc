@@ -22,8 +22,9 @@ The repository currently contains:
 8. Python package skeleton for the read-only configurator core proof.
 9. Parser, validator, renderer, settings, split-profile, backup path, duplicate-validation, and shadow-validation tests.
 10. Core safe-save helper and temporary-directory tests on the `configurator-save-proof` branch.
-11. Guarded CLI save command requiring `--write`.
-12. Development status notes in [Development Status](development-status.md).
+11. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
+12. Guarded CLI save command requiring `--write` before modifying a config file.
+13. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator is developed.
 
@@ -44,7 +45,7 @@ The implementation should follow these decisions:
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 12. Keep real user configuration writes guarded until safe save behavior is proven with temporary-directory tests.
 13. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
-14. Require an explicit affirmative flag before any CLI save writes.
+14. Make CLI save safe by default: preview without writing, and require `--write` before modification.
 
 ## Stage 0: repository preparation
 
@@ -169,14 +170,14 @@ Completed core safe-save behavior:
 7. Replace the target file with `os.replace()` only after staging, validation, and backup succeed.
 8. Fsync the target directory after replacement.
 9. Add temporary-directory tests for success and failure cases.
-10. Add guarded CLI save behavior that refuses to write unless `--write` is supplied.
+10. Add preview behavior where `save` without `--write` validates and reports the planned save without modifying files.
+11. Add guarded CLI save behavior where real writes require `--write`.
 
 Still required before normal UI save behavior:
 
-1. Add dry-run save preview behavior.
-2. Add tests proving preview does not create backups or modify the config.
-3. Keep all save tests inside temporary directories.
-4. Keep GTK UI work deferred.
+1. Use the safe-save helper from future config-editing operations.
+2. Keep all save tests inside temporary directories.
+3. Keep GTK UI work deferred.
 
 Completion criteria:
 
@@ -185,16 +186,16 @@ Completion criteria:
 3. Dry-run output can be inspected.
 4. Tests use temporary files, not the user's real config.
 5. Save success is reported only after the relevant file and directory fsync calls complete.
-6. CLI save refuses to write unless the affirmative `--write` flag is supplied.
+6. CLI save previews by default and refuses to write unless the affirmative `--write` flag is supplied.
 
 ## Stage 5: safe save proof
 
-Stage 5 is active on the `configurator-save-proof` branch.
+Stage 5 is active on the `configurator-save-proof` branch and is ready for PR review.
 
 Completed behavior:
 
 1. Accepts an explicit config path in the core helper and CLI save command.
-2. Renders to a temporary file in the target directory.
+2. Renders to a temporary file in the target directory when saving.
 3. Validates the staged rendered file.
 4. Creates a timestamped backup of the original file.
 5. Replaces the target only after staging, validation, and backup succeed.
@@ -202,23 +203,21 @@ Completed behavior:
 7. Cleans up staged temporary files on failure.
 8. Uses file and directory fsync calls to reduce power-loss risk.
 9. Adds tests using temporary directories only.
-10. Requires `--write` before CLI save modifies any file.
-11. Prints the config path, backup path, and success message after a guarded save.
-
-Next behavior to design:
-
-1. Dry-run save preview behavior.
-2. Clear preview output showing the target path and backup path that would be used.
-3. Tests proving preview does not create backups or modify files.
-4. Decision on whether preview should be `save` without `--write` or a separate subcommand.
+10. Previews by default when `save` is run without `--write`.
+11. Preview reports the config path, planned backup path, and rendered byte count.
+12. Preview creates no backup files or directories and modifies no config file.
+13. Requires `--write` before CLI save modifies any file.
+14. Prints the config path, backup path, and success message after a guarded save.
+15. Has manual smoke verification using a copied temporary config.
 
 Completion criteria:
 
 1. Safe save tests pass.
 2. Backup tests prove the original file is preserved.
 3. Validation failure prevents replacement.
-4. No test targets a user's real config directory.
-5. The CLI remains safe by default.
+4. Preview creates no backup and modifies no file.
+5. No test targets a user's real config directory.
+6. The CLI remains safe by default.
 
 ## Stage 6: first GTK configurator proof
 
@@ -503,12 +502,16 @@ Current branch:
 configurator-save-proof
 ```
 
-Next tasks on this branch:
+Current status:
 
-1. Add dry-run save preview tests first.
-2. Decide whether preview is `save` without `--write` or a separate subcommand.
-3. Ensure preview creates no backup and modifies no file.
-4. Keep tests inside temporary directories.
-5. Keep GTK UI work deferred.
+1. Safe save proof is ready for PR review.
+2. Preview and guarded write behavior are implemented.
+3. Automated tests and manual smoke verification are recorded in [Development Status](development-status.md).
+
+Likely next branch after PR #3:
+
+1. Start the first config-editing operation.
+2. Keep writes routed through the safe-save helper.
+3. Keep GTK UI work deferred until the edit operation is proven through CLI/core tests.
 
 No GTK UI should be built until safe save behavior is covered by tests.
