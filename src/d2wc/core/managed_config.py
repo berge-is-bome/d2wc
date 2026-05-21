@@ -335,7 +335,7 @@ def _render_rule_entries(entries: list[tuple[str, str | None, bool]]) -> list[tu
             elif len(left) == new_longest:
                 rendered.append((left, " " + comment.lstrip()))
             else:
-                rendered.append((left, (" " * max(1, len(new_longest) + 1 - len(left))) + comment.lstrip()))
+                rendered.append((left, (" " * max(1, new_longest + 1 - len(left))) + comment.lstrip()))
             continue
 
         if spacing_pattern or fixed_spacing:
