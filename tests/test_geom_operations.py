@@ -55,6 +55,30 @@ after
     assert validation.ok
 
 
+def test_add_geometry_profile_keeps_add_more_marker_last() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+  -- add more here
+}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_geometry_profile_to_source(
+        source,
+        GeometryProfile(name="custom_left", x=10, y=20, w=300, h=400),
+    )
+
+    geom_lines = _managed_block_lines(result.source, "GEOM")
+    assert any("custom_left" in line for line in geom_lines)
+    assert geom_lines[-2].strip() == "-- add more here"
+    assert "custom_left" in geom_lines[-3]
+
+
 def test_add_geometry_profile_rejects_duplicate() -> None:
     source = (REPO_ROOT / "src" / "d2wc.lua").read_text(encoding="utf-8")
 
@@ -172,3 +196,12 @@ def test_add_geometry_profile_rejects_too_small_profile() -> None:
             source,
             GeometryProfile(name="tiny", x=1, y=2, w=9, h=400),
         )
+
+
+def _managed_block_lines(source: str, name: str) -> list[str]:
+    lines = source.splitlines()
+    start = next(index for index, line in enumerate(lines) if line.strip() == f"local {name} = {{")
+    for end in range(start + 1, len(lines)):
+        if lines[end].strip() == "}":
+            return lines[start : end + 1]
+    raise AssertionError(f"block not found: {name}")
