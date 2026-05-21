@@ -109,7 +109,7 @@ def render_rule_list_block_preserving_comments(
         return block_text
 
     remaining_rules = list(rules if rules is not None else extract_active_rule_strings(block_text))
-    entries: list[tuple[str, str | None]] = []
+    entries: list[tuple[str, str | None, bool]] = []
     tail_marker_lines: list[str] = []
 
     for line in lines[1:-1]:
@@ -120,7 +120,7 @@ def render_rule_list_block_preserving_comments(
         active, comment = _split_lua_comment(line)
         line_rules = extract_active_rule_strings(active)
         if not line_rules:
-            entries.append((line.rstrip(), None))
+            entries.append((line.rstrip(), None, False))
             continue
 
         rule = line_rules[0]
@@ -129,20 +129,22 @@ def render_rule_list_block_preserving_comments(
 
         remaining_rules.remove(rule)
         left = f'  "{_escape_lua_string(rule)}",'
-        entries.append((left, comment.strip() if comment else ""))
+        comment_with_spacing = ""
+        if comment:
+            trailing_spaces = len(active) - len(active.rstrip(" "))
+            comment_with_spacing = (" " * trailing_spaces) + comment
+        entries.append((left, comment_with_spacing, False))
 
     for rule in remaining_rules:
         left = f'  "{_escape_lua_string(rule)}",'
-        entries.append((left, ""))
-
-    max_left_width = max((len(left) for left, comment in entries if comment is not None), default=0)
+        entries.append((left, "", True))
 
     rendered = [f"local {name} = {{"]
-    for left, comment in entries:
+    for left, comment in _render_rule_entries(entries):
         if comment is None:
             rendered.append(left)
         elif comment:
-            rendered.append(_append_aligned_comment(left, comment, max_left_width))
+            rendered.append(left + comment)
         else:
             rendered.append(left)
     rendered.extend(tail_marker_lines)
@@ -294,6 +296,59 @@ def _render_geom_profile_line(profile: GeometryProfile, all_profiles: tuple[Geom
 
 def _append_aligned_comment(left: str, comment: str, max_left_width: int) -> str:
     return left + (" " * (max_left_width - len(left) + 5)) + comment
+
+
+def _render_rule_entries(entries: list[tuple[str, str | None, bool]]) -> list[tuple[str, str | None]]:
+    existing = [(left, comment) for left, comment, is_new in entries if comment is not None and not is_new]
+    existing_with_comments = [(left, comment) for left, comment in existing if comment]
+    existing_no_comment = [(left, comment) for left, comment in existing if comment == ""]
+    if not existing:
+        return [(left, comment) for left, comment, _ in entries]
+
+    starts = [len(left) + _leading_space_count(comment) for left, comment in existing_with_comments]
+    aligned_comments = len(starts) >= 2 and len(set(starts)) == 1
+    spacing_pattern = len(existing_no_comment) >= 1 and len(existing_with_comments) >= 1
+    fixed_spacing = (
+        len(existing_with_comments) >= 1
+        and len({_leading_space_count(comment) for _, comment in existing_with_comments}) == 1
+    )
+
+    target_start = starts[0] if starts else None
+    longest_left = max((len(left) for left, comment in existing if comment is not None), default=0)
+    new_longest = max((len(left) for left, _, is_new in entries if is_new), default=0)
+
+    rendered: list[tuple[str, str | None]] = []
+    for left, comment, is_new in entries:
+        if comment is None:
+            rendered.append((left, None))
+            continue
+        if not comment:
+            rendered.append((left, ""))
+            continue
+        if not is_new:
+            rendered.append((left, comment))
+            continue
+
+        if aligned_comments and target_start is not None:
+            if len(left) <= longest_left:
+                rendered.append((left, (" " * max(1, target_start - len(left))) + comment.lstrip()))
+            elif len(left) == new_longest:
+                rendered.append((left, " " + comment.lstrip()))
+            else:
+                rendered.append((left, (" " * max(1, len(new_longest) + 1 - len(left))) + comment.lstrip()))
+            continue
+
+        if spacing_pattern or fixed_spacing:
+            space_count = _leading_space_count(existing_with_comments[0][1]) if existing_with_comments else 1
+            rendered.append((left, (" " * max(1, space_count)) + comment.lstrip()))
+            continue
+
+        rendered.append((left, " " + comment.lstrip()))
+    return rendered
+
+
+def _leading_space_count(text: str) -> int:
+    return len(text) - len(text.lstrip(" "))
 
 
 def _is_add_more_marker(line: str) -> bool:

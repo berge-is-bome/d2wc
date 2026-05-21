@@ -52,7 +52,7 @@ def test_render_rule_list_preserves_comments_and_blank_lines() -> None:
 
     assert rendered == '''local EXCLUDE = {
   -- keep this note
-  "d:personal",     -- personal note
+  "d:personal", -- personal note
 
   "c:okular",
 }'''
