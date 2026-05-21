@@ -61,7 +61,11 @@ def add_placement_rule_to_source(source: str, rule_text: str) -> PlacementEditRe
 
 
 def modify_placement_rule_in_source(source: str, old_rule_text: str, new_rule_text: str) -> PlacementModifyResult:
-    """Modify one exact WORKSPACE_PLACEMENT rule in Lua source."""
+    """Modify one WORKSPACE_PLACEMENT rule in Lua source.
+
+    Matching is based on parsed rule meaning, not token order. The rendered rule
+    is written in canonical prefix order.
+    """
 
     old_rule = _normalize_placement_rule(old_rule_text)
     new_rule = _normalize_placement_rule(new_rule_text)
@@ -79,7 +83,10 @@ def modify_placement_rule_in_source(source: str, old_rule_text: str, new_rule_te
 
 
 def delete_placement_rule_from_source(source: str, rule_text: str) -> PlacementEditResult:
-    """Delete one exact WORKSPACE_PLACEMENT rule from Lua source."""
+    """Delete one WORKSPACE_PLACEMENT rule from Lua source.
+
+    Matching is based on parsed rule meaning, not token order.
+    """
 
     normalized_rule = _normalize_placement_rule(rule_text)
     parsed, config = _parse_valid_config(source)
@@ -137,24 +144,29 @@ def _add_rule(rules: tuple[str, ...], new_rule: str) -> tuple[str, ...]:
 
 
 def _modify_rule(rules: tuple[str, ...], old_rule: str, new_rule: str) -> tuple[str, ...]:
-    if old_rule not in rules:
-        raise PlacementRuleNotFoundError(f"placement rule not found: {old_rule}")
-
+    old_signature = _rule_signature(old_rule)
     new_target = _rule_target(new_rule)
     updated: list[str] = []
+    found = False
+
     for existing_rule in rules:
-        if existing_rule == old_rule:
+        if _rule_signature(existing_rule) == old_signature:
             updated.append(new_rule)
+            found = True
             continue
         if _rule_target(existing_rule) == new_target:
             raise PlacementRuleExistsError(f"placement rule already exists for target: {_format_target(new_rule)}")
         updated.append(existing_rule)
 
+    if not found:
+        raise PlacementRuleNotFoundError(f"placement rule not found: {old_rule}")
+
     return tuple(updated)
 
 
 def _delete_rule(rules: tuple[str, ...], rule: str) -> tuple[str, ...]:
-    updated = tuple(existing_rule for existing_rule in rules if existing_rule != rule)
+    signature = _rule_signature(rule)
+    updated = tuple(existing_rule for existing_rule in rules if _rule_signature(existing_rule) != signature)
     if len(updated) == len(rules):
         raise PlacementRuleNotFoundError(f"placement rule not found: {rule}")
     return updated
@@ -187,6 +199,11 @@ def _normalize_placement_rule(rule_text: str) -> str:
         parts.append(f"c:{rule.class_name}")
     parts.append(f"g:{rule.geometry_profile}")
     return " ".join(parts)
+
+
+def _rule_signature(rule_text: str) -> tuple[str | None, str | None, str | None]:
+    rule = parse_prefixed_rule(rule_text)
+    return rule.domain, rule.class_name, rule.geometry_profile
 
 
 def _rule_target(rule_text: str) -> tuple[str | None, str | None]:
