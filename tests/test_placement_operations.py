@@ -114,6 +114,29 @@ def test_modify_placement_rule_updates_exact_rule() -> None:
     assert '"c:okular g:centered",' in result.source
 
 
+def test_modify_placement_rule_matches_noncanonical_stored_rule() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+  centered = { x = 10, y = 20, w = 300, h = 400 },
+}
+local WORKSPACE_PLACEMENT = {
+  "g:half_left c:okular",
+}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = modify_placement_rule_in_source(source, "c:okular g:half_left", "g:centered c:okular")
+
+    assert result.validation.ok
+    assert result.new_rule == "c:okular g:centered"
+    assert '"g:half_left c:okular"' not in result.source
+    assert '"c:okular g:centered",' in result.source
+
+
 def test_modify_placement_rule_rejects_missing_old_rule() -> None:
     source = _minimal_source()
 
@@ -170,6 +193,27 @@ after
     assert "remove me" not in result.source
     assert '"c:navigator g:half_left",' in result.source
     assert "-- keep me" in result.source
+
+
+def test_delete_placement_rule_matches_noncanonical_stored_rule() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {}
+local GEOM = {
+  half_left = { x = 0, y = 0, w = 100, h = 100 },
+}
+local WORKSPACE_PLACEMENT = {
+  "g:half_left c:okular",
+}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = delete_placement_rule_from_source(source, "c:okular g:half_left")
+
+    assert result.validation.ok
+    assert "g:half_left c:okular" not in result.source
+    assert "c:okular" not in result.source
 
 
 def test_delete_placement_rule_rejects_missing_rule() -> None:
