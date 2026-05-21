@@ -12,9 +12,22 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from d2wc import __version__
+from d2wc.core.geom_operations import (
+    GeometryOperationError,
+    GeometryProfileExistsError,
+    add_geometry_profile_to_source,
+)
 from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.managed_config import GeometryProfile
 from d2wc.core.rendering import RenderValidationError, render_source
-from d2wc.core.saving import SaveConfigError, SaveValidationError, preview_save_config, save_rendered_config
+from d2wc.core.saving import (
+    SaveConfigError,
+    SaveValidationError,
+    preview_save_config,
+    preview_source_save_config,
+    save_rendered_config,
+    save_source_config,
+)
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
 
 
@@ -88,6 +101,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Actually write the rendered config after validation and backup.",
     )
     save.set_defaults(func=_cmd_save)
+
+    add_geom = subcommands.add_parser(
+        "add-geom",
+        help="Preview or add one GEOM profile. Writes only when --write is supplied.",
+    )
+    add_geom.add_argument(
+        "--config",
+        type=Path,
+        required=True,
+        help="Path to the Lua config to edit.",
+    )
+    add_geom.add_argument("--name", required=True, help="GEOM profile name to add.")
+    add_geom.add_argument("--x", type=int, required=True, help="Window x position.")
+    add_geom.add_argument("--y", type=int, required=True, help="Window y position.")
+    add_geom.add_argument("--w", type=int, required=True, help="Window width.")
+    add_geom.add_argument("--h", type=int, required=True, help="Window height.")
+    add_geom.add_argument(
+        "--replace",
+        action="store_true",
+        help="Replace an existing GEOM profile with the same name.",
+    )
+    add_geom.add_argument(
+        "--backup-dir",
+        type=Path,
+        default=None,
+        help="Optional directory for timestamped backups. Defaults to the config directory.",
+    )
+    add_geom.add_argument(
+        "--write",
+        action="store_true",
+        help="Actually write the edited config after validation and backup.",
+    )
+    add_geom.set_defaults(func=_cmd_add_geom)
 
     return parser
 
@@ -199,6 +245,78 @@ def _cmd_save(args: argparse.Namespace) -> int:
     print(f"Config: {result.config_path}")
     print(f"Backup: {result.backup_path}")
     print("OK: config saved.")
+    return 0
+
+
+def _cmd_add_geom(args: argparse.Namespace) -> int:
+    config_path: Path = args.config
+    profile = GeometryProfile(name=args.name, x=args.x, y=args.y, w=args.w, h=args.h)
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        edit = add_geometry_profile_to_source(source, profile, replace=args.replace)
+    except FileNotFoundError:
+        print(f"ERROR: config file not found: {config_path}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not read config file {config_path}: {exc}")
+        return 2
+    except GeometryProfileExistsError as exc:
+        print(f"ERROR: {exc}")
+        print("Use --replace to update an existing GEOM profile.")
+        return 2
+    except GeometryOperationError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except RenderValidationError as exc:
+        print(f"ERROR: cannot edit invalid config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+
+    if not args.write:
+        try:
+            preview = preview_source_save_config(config_path, edit.source, backup_dir=args.backup_dir)
+        except SaveValidationError as exc:
+            print(f"ERROR: cannot preview invalid edited config: {config_path}")
+            for message in exc.validation.errors:
+                print(f"- {message}")
+            return 1
+        except SaveConfigError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+        except OSError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+
+        action = "replace" if edit.replaced else "add"
+        print(f"Config: {preview.config_path}")
+        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned GEOM {action}: {edit.profile.name}")
+        print(f"Geometry: x={edit.profile.x} y={edit.profile.y} w={edit.profile.w} h={edit.profile.h}")
+        print(f"Rendered bytes: {preview.bytes_written}")
+        print("Preview only: no files were modified.")
+        print("Run again with --write to save.")
+        return 0
+
+    try:
+        result = save_source_config(config_path, edit.source, backup_dir=args.backup_dir, validation=edit.validation)
+    except SaveValidationError as exc:
+        print(f"ERROR: cannot save invalid edited config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+    except SaveConfigError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+
+    action = "replaced" if edit.replaced else "added"
+    print(f"Config: {result.config_path}")
+    print(f"Backup: {result.backup_path}")
+    print(f"OK: GEOM profile {action}: {edit.profile.name}")
     return 0
 
 
