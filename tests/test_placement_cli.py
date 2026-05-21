@@ -75,7 +75,7 @@ def test_cli_add_placement_rejects_duplicate_target(tmp_path, capsys) -> None:
             "--config",
             str(config_path),
             "--rule",
-            "c:Navigator d:Work g:half_right",
+            "g:half_right C:Okular",
             "--write",
         ]
     )
@@ -83,7 +83,7 @@ def test_cli_add_placement_rejects_duplicate_target(tmp_path, capsys) -> None:
     captured = capsys.readouterr()
 
     assert exit_code == 2
-    assert "placement rule already exists for target: d:work c:navigator" in captured.out
+    assert "placement rule already exists for target: c:okular" in captured.out
     assert "Use modify-placement" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
@@ -121,17 +121,17 @@ def test_cli_modify_placement_preview_does_not_modify_config(tmp_path, capsys) -
             "--config",
             str(config_path),
             "--old-rule",
-            "d:work c:navigator g:half_right",
+            "c:okular g:half_right",
             "--new-rule",
-            "d:work c:navigator g:centered_mid",
+            "c:okular g:centered_mid",
         ]
     )
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "Planned WORKSPACE_PLACEMENT modify: d:work c:navigator g:centered_mid" in captured.out
-    assert "Old rule: d:work c:navigator g:half_right" in captured.out
+    assert "Planned WORKSPACE_PLACEMENT modify: c:okular g:centered_mid" in captured.out
+    assert "Old rule: c:okular g:half_right" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
@@ -146,9 +146,9 @@ def test_cli_modify_placement_write_updates_existing_rule(tmp_path, capsys) -> N
             "--config",
             str(config_path),
             "--old-rule",
-            "g:half_right c:navigator d:work",
+            "g:half_right c:okular",
             "--new-rule",
-            "g:centered_mid c:navigator d:work",
+            "g:centered_mid c:okular",
             "--write",
         ]
     )
@@ -157,9 +157,9 @@ def test_cli_modify_placement_write_updates_existing_rule(tmp_path, capsys) -> N
     saved = config_path.read_text(encoding="utf-8")
 
     assert exit_code == 0
-    assert "OK: WORKSPACE_PLACEMENT rule modified: d:work c:navigator g:centered_mid" in captured.out
-    assert '"d:work c:navigator g:half_right"' not in saved
-    assert '"d:work c:navigator g:centered_mid",' in saved
+    assert "OK: WORKSPACE_PLACEMENT rule modified: c:okular g:centered_mid" in captured.out
+    assert '"c:okular g:half_right"' not in saved
+    assert '"c:okular g:centered_mid",' in saved
 
 
 def test_cli_modify_placement_rejects_missing_old_rule(tmp_path, capsys) -> None:
@@ -196,14 +196,14 @@ def test_cli_delete_placement_preview_does_not_modify_config(tmp_path, capsys) -
             "--config",
             str(config_path),
             "--rule",
-            "d:work c:navigator g:half_right",
+            "c:okular g:half_right",
         ]
     )
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "Planned WORKSPACE_PLACEMENT delete: d:work c:navigator g:half_right" in captured.out
+    assert "Planned WORKSPACE_PLACEMENT delete: c:okular g:half_right" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
     assert not list(tmp_path.glob("*.bak"))
@@ -218,7 +218,7 @@ def test_cli_delete_placement_write_removes_existing_rule(tmp_path, capsys) -> N
             "--config",
             str(config_path),
             "--rule",
-            "g:half_right c:navigator d:work",
+            "g:half_right c:okular",
             "--write",
         ]
     )
@@ -227,8 +227,8 @@ def test_cli_delete_placement_write_removes_existing_rule(tmp_path, capsys) -> N
     saved = config_path.read_text(encoding="utf-8")
 
     assert exit_code == 0
-    assert "OK: WORKSPACE_PLACEMENT rule deleted: d:work c:navigator g:half_right" in captured.out
-    assert '"d:work c:navigator g:half_right"' not in saved
+    assert "OK: WORKSPACE_PLACEMENT rule deleted: c:okular g:half_right" in captured.out
+    assert '"c:okular g:half_right"' not in saved
 
 
 def test_cli_delete_placement_rejects_missing_rule(tmp_path, capsys) -> None:
