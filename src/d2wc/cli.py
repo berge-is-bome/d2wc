@@ -14,7 +14,7 @@ from pathlib import Path
 from d2wc import __version__
 from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.rendering import RenderValidationError, render_source
-from d2wc.core.saving import SaveConfigError, SaveValidationError, save_rendered_config
+from d2wc.core.saving import SaveConfigError, SaveValidationError, preview_save_config, save_rendered_config
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
 
 
@@ -68,7 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     save = subcommands.add_parser(
         "save",
-        help="Render, validate, back up, and save a Lua config. Requires --write.",
+        help="Preview or save rendered Lua config. Writes only when --write is supplied.",
     )
     save.add_argument(
         "--config",
@@ -161,8 +161,26 @@ def _cmd_save(args: argparse.Namespace) -> int:
     config_path: Path = args.config
 
     if not args.write:
-        print(f"ERROR: save requires --write before any file is modified: {config_path}")
-        return 2
+        try:
+            preview = preview_save_config(config_path, backup_dir=args.backup_dir)
+        except SaveValidationError as exc:
+            print(f"ERROR: cannot preview invalid config: {config_path}")
+            for message in exc.validation.errors:
+                print(f"- {message}")
+            return 1
+        except SaveConfigError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+        except OSError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+
+        print(f"Config: {preview.config_path}")
+        print(f"Planned backup: {preview.backup_path}")
+        print(f"Rendered bytes: {preview.bytes_written}")
+        print("Preview only: no files were modified.")
+        print("Run again with --write to save.")
+        return 0
 
     try:
         result = save_rendered_config(config_path, backup_dir=args.backup_dir)
