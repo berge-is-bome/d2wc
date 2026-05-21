@@ -46,6 +46,25 @@ def test_create_backup_does_not_overwrite_existing_backup(tmp_path: Path) -> Non
     assert backup_path.read_text(encoding="utf-8") == "current"
 
 
+def test_create_backup_fsyncs_backup_file_and_directory(tmp_path: Path, monkeypatch) -> None:
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text("original", encoding="utf-8")
+    fsync_calls: list[int] = []
+
+    def record_fsync(fd: int) -> None:
+        fsync_calls.append(fd)
+
+    monkeypatch.setattr("d2wc.core.saving.os.fsync", record_fsync)
+
+    backup_path = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+
+    assert backup_path.exists()
+    assert len(fsync_calls) >= 2
+
+
 def test_save_rendered_config_writes_rendered_output_and_creates_backup(tmp_path: Path) -> None:
     config_path = copy_current_config(tmp_path)
     original = config_path.read_text(encoding="utf-8")
@@ -64,6 +83,24 @@ def test_save_rendered_config_writes_rendered_output_and_creates_backup(tmp_path
     assert result.bytes_written == len(saved.encode("utf-8"))
     assert 'local EXCLUDE = {' in saved
     assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
+
+
+def test_save_rendered_config_fsyncs_staged_backup_and_target_directory(tmp_path: Path, monkeypatch) -> None:
+    config_path = copy_current_config(tmp_path)
+    fsync_calls: list[int] = []
+
+    def record_fsync(fd: int) -> None:
+        fsync_calls.append(fd)
+
+    monkeypatch.setattr("d2wc.core.saving.os.fsync", record_fsync)
+
+    result = save_rendered_config(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+
+    assert result.validation.ok
+    assert len(fsync_calls) >= 4
 
 
 def test_save_rendered_config_can_write_backup_to_explicit_directory(tmp_path: Path) -> None:
