@@ -21,7 +21,8 @@ The repository currently contains:
 7. Packaging documentation.
 8. Python package skeleton for the read-only configurator core proof.
 9. Parser, validator, renderer, settings, split-profile, backup path, duplicate-validation, and shadow-validation tests.
-10. Development status notes in [Development Status](development-status.md).
+10. Core safe-save helper and temporary-directory tests on the `configurator-save-proof` branch.
+11. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator is developed.
 
@@ -41,10 +42,11 @@ The implementation should follow these decisions:
 10. Support source-checkout execution because Qubes dom0 is normally offline.
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 12. Keep real user configuration writes disabled until safe save behavior is tested with temporary directories.
+13. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
 
 ## Stage 0: repository preparation
 
-Stage 0 is complete in the current draft PR.
+Stage 0 is complete.
 
 Completed outputs:
 
@@ -61,7 +63,7 @@ Completion criteria:
 
 ## Stage 1: source layout for Python development
 
-Stage 1 is complete in the current draft PR.
+Stage 1 is complete.
 
 Current structure:
 
@@ -79,6 +81,7 @@ src/
       managed_config.py
       rendering.py
       rule_grammar.py
+      saving.py
       section_validation.py
       settings.py
       shadow_validation.py
@@ -153,14 +156,26 @@ Completed renderer behavior:
 7. Align right-side comments in `GEOM` entries.
 8. Validate rendered output in the standard renderer verification path.
 
-Still required before real writes:
+Completed core safe-save behavior:
 
-1. Create a backup before saving.
-2. Write to a temporary file first.
-3. Validate rendered temporary content before replacement.
-4. Replace the target file only after successful render, validation, and backup.
-5. Add temporary-directory tests for write success and write failure.
-6. Keep real user config writes disabled until these tests pass.
+1. Render to a temporary file in the target directory.
+2. Fsync the temporary file.
+3. Validate staged rendered content before replacement.
+4. Create a non-overwriting timestamped backup before replacement.
+5. Fsync the backup file.
+6. Fsync the backup directory.
+7. Replace the target file with `os.replace()` only after staging, validation, and backup succeed.
+8. Fsync the target directory after replacement.
+9. Add temporary-directory tests for success and failure cases.
+10. Keep real user config writes disabled at the CLI level.
+
+Still required before exposing normal user save behavior:
+
+1. Decide the guarded CLI save interface.
+2. Require an affirmative write flag before any CLI command writes.
+3. Print the backup path after a successful write.
+4. Add CLI tests proving save refuses to write without the affirmative flag.
+5. Keep all save tests inside temporary directories.
 
 Completion criteria:
 
@@ -168,22 +183,31 @@ Completion criteria:
 2. Backup is created before write.
 3. Dry-run output can be inspected.
 4. Tests use temporary files, not the user's real config.
+5. Save success is reported only after the relevant file and directory fsync calls complete.
 
 ## Stage 5: safe save proof
 
-This is the next implementation stage.
+Stage 5 is active on the `configurator-save-proof` branch.
 
-Required behavior:
+Completed behavior:
 
-1. Accept an explicit config path.
-2. Render to a temporary file in the same directory or another safe staging location.
-3. Validate the staged rendered file.
-4. Create a timestamped backup of the original file.
-5. Replace the target only after staging, validation, and backup succeed.
-6. Leave the original file intact on failure.
-7. Report clear errors.
-8. Keep a dry-run preview path.
-9. Add tests using temporary directories only.
+1. Accepts an explicit config path in the core helper.
+2. Renders to a temporary file in the target directory.
+3. Validates the staged rendered file.
+4. Creates a timestamped backup of the original file.
+5. Replaces the target only after staging, validation, and backup succeed.
+6. Leaves the original file intact on validation or backup failure.
+7. Cleans up staged temporary files on failure.
+8. Uses file and directory fsync calls to reduce power-loss risk.
+9. Adds tests using temporary directories only.
+
+Next behavior to design:
+
+1. Guarded CLI save command.
+2. Dry-run or preview behavior before save.
+3. Explicit affirmative write flag.
+4. Clear success output with backup path.
+5. Clear failure output that confirms the original was left untouched where practical.
 
 Completion criteria:
 
@@ -470,20 +494,19 @@ Review is useful at these points:
 
 ## Immediate next implementation tasks
 
-After PR #2 is merged, the next branch should likely be:
+Current branch:
 
 ```text
 configurator-save-proof
 ```
 
-First tasks on that branch:
+Next tasks on this branch:
 
-1. Define the safe save contract.
-2. Add a save path that stages rendered output in a temporary file.
-3. Validate staged rendered output before replacement.
-4. Create a timestamped backup before replacement.
-5. Replace the target only after validation and backup succeed.
-6. Add failure tests that prove the original file remains intact.
-7. Keep all tests inside temporary directories.
+1. Decide the guarded CLI save interface.
+2. Add CLI save tests first.
+3. Keep save refusing to write unless an affirmative flag is supplied.
+4. Print the backup path after a successful guarded save.
+5. Keep tests inside temporary directories.
+6. Keep GTK UI work deferred.
 
 No GTK UI should be built until safe save behavior is covered by tests.
