@@ -7,7 +7,7 @@ Current active branch:
 ```text
 Branch: configurator-add-geom-proof
 Base: main at PR #3 squash merge commit 71b0f911ce0b0e631cb891ed905056eae18a1aa8
-Status: first GEOM edit checkpoint locally verified
+Status: GEOM add, modify, delete checkpoint locally verified
 ```
 
 ## Latest confirmed local verification
@@ -26,25 +26,39 @@ Result:
 ```text
 src/d2wc.lua validates successfully.
 Rendered /tmp/d2wc-rendered.lua validates successfully.
-83 pytest tests passed.
+99 pytest tests passed.
 ```
 
 ## Current GEOM edit proof
 
-The current branch adds the first in-memory config-editing operation for `GEOM` profiles.
+The current branch adds the first tested config-editing operation set for `GEOM` profiles.
 
-Confirmed behavior:
+Confirmed core behavior:
 
 1. Adds a new `GEOM` profile to rendered Lua source in memory.
-2. Preserves existing `GEOM` comments and blank lines.
-3. Appends new profiles that did not exist in the original `GEOM` block.
-4. Rejects duplicate profile names unless replacement is explicitly requested.
-5. Replaces an existing profile when requested.
-6. Rejects invalid profile names.
-7. Rejects profile width or height below the current minimum size.
-8. Re-validates rendered output after the edit.
+2. Modifies an existing `GEOM` profile in memory.
+3. Deletes an unused `GEOM` profile in memory.
+4. Preserves existing `GEOM` comments and blank lines where practical.
+5. Appends new profiles that did not exist in the original `GEOM` block.
+6. Skips removed profiles when rendering the updated `GEOM` block.
+7. Rejects duplicate profile names on add.
+8. Rejects missing profile names on modify or delete.
+9. Rejects deletion when `WORKSPACE_PLACEMENT` still references the profile.
+10. Rejects invalid profile names.
+11. Rejects profile width or height below the current minimum size.
+12. Re-validates rendered output after each edit.
 
-This branch does not yet expose a CLI command for adding a `GEOM` profile. The first slice is core-only.
+Confirmed CLI behavior:
+
+1. `python -m d2wc add-geom --config <path> --name <name> --x <n> --y <n> --w <n> --h <n>` previews by default.
+2. `python -m d2wc modify-geom --config <path> --name <name> --x <n> --y <n> --w <n> --h <n>` previews by default.
+3. `python -m d2wc delete-geom --config <path> --name <name>` previews by default.
+4. Each GEOM edit command writes only when `--write` is supplied.
+5. Writes route through the safe-save helper.
+6. Successful writes create timestamped backups.
+7. Failed edits leave the original config unchanged.
+
+This branch now exposes the GEOM edit proof through guarded CLI commands. GTK UI work remains deferred.
 
 ## Safe-save baseline from PR #3
 
@@ -120,10 +134,11 @@ The current Python core supports:
 10. Power-loss-oriented fsync ordering for staged files, backup files, backup directories, and target directories.
 11. Save preview by default.
 12. Guarded CLI save behavior requiring `--write` before modification.
-13. In-memory `GEOM` add and replace operation.
+13. In-memory `GEOM` add, modify, and delete operations.
+14. Guarded CLI GEOM add, modify, and delete commands.
 
 ## Next practical work
 
-The next practical step is to expose the GEOM add operation through a guarded CLI preview/write flow that uses the safe-save helper.
+The next practical step is to run a manual smoke test on copied temporary configs, then decide whether PR #4 is ready for review.
 
 GTK UI work should remain deferred until the config-editing operation is proven through CLI/core tests.
