@@ -7,7 +7,7 @@ Current active branch:
 ```text
 Branch: configurator-save-proof
 Base: main at PR #2 squash merge commit 903cc20f2133f359fa2280dd7fd5d7c49d17d917
-Status: save preview and guarded write checkpoint locally verified
+Status: save preview, guarded write, and manual smoke checkpoint locally verified
 ```
 
 ## What read-only core proof means
@@ -28,6 +28,27 @@ Result:
 ```text
 src/d2wc.lua validates successfully.
 78 pytest tests passed.
+```
+
+## Manual save smoke verification
+
+Manual smoke verification reported on 2026-05-21:
+
+```bash
+cp src/d2wc.lua /tmp/d2wc-save-smoke.lua
+python -m d2wc save --config /tmp/d2wc-save-smoke.lua
+python -m d2wc save --config /tmp/d2wc-save-smoke.lua --write
+python -m d2wc validate --config /tmp/d2wc-save-smoke.lua
+ls -l /tmp/d2wc-save-smoke.lua.*.bak
+```
+
+Result:
+
+```text
+Preview completed without modifying the copied config.
+Guarded write completed and created a timestamped backup.
+/tmp/d2wc-save-smoke.lua validated successfully after save.
+The backup file was compared with src/d2wc.lua and confirmed identical.
 ```
 
 ## Test command guidance
@@ -120,6 +141,6 @@ The current Python core supports:
 
 ## Next practical work
 
-The next practical step is to run a manual verification using a copied temporary config, then decide whether PR #3 is ready for review.
+The next practical step is to decide whether PR #3 is ready for review.
 
 GTK UI work should remain deferred until parser, validator, renderer, and safe save behavior are all covered by tests.
