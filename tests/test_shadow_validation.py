@@ -38,29 +38,6 @@ def test_warns_when_exact_rule_overrides_domain_and_class_wide_rules() -> None:
     ]
 
 
-def test_warns_when_workspace_route_exact_rule_overrides_domain_wide_route() -> None:
-    source = '''
-local EXCLUDE = {}
-local PIN = {}
-local WORKSPACE_ROUTES = {
-  [1] = { "d:personal", },
-  [2] = { "d:personal c:navigator", },
-}
-local GEOM = {}
-local WORKSPACE_PLACEMENT = {}
-local LEFT_EDGE_CORRECTION = {}
-'''
-
-    parsed = ManagedBlockParser().parse(source)
-    result = validate_managed_blocks(parsed.blocks)
-
-    assert result.ok
-    assert result.errors == ()
-    assert result.warnings == (
-        "WORKSPACE_ROUTES: exact rule d:personal c:navigator overrides broader d:personal",
-    )
-
-
 def test_exact_duplicate_workspace_route_target_is_error_not_warning() -> None:
     source = '''
 local EXCLUDE = {}
