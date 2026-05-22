@@ -1,3 +1,8 @@
+------------------------------------------------------------
+-- qubes devilspie2 workspace configurator
+-- version 0.1.7
+------------------------------------------------------------
+
 -- Only act on real app windows
 if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
   return
@@ -16,8 +21,9 @@ local EXCLUDE = {
 
 -- Pin rules: pin window from a domain, or, all windows from a domain, making them visible on all workspaces
 local PIN = {
-  ["dom0"]     = { ["xfce4-terminal"] = true }, -- pin xfce4-terminal from dom0
+  ["dom0"]     = { ["xfce4-terminal"] = true }, -- pin dom0 xfce4-terminal
   -- ["personal"] = true, -- pin everything from "personal"
+  -- ["personal"] = { ["okular"] = true }, -- pin okular from "personal"
 }
 
 -- Workspace by Qubes domain
@@ -41,7 +47,7 @@ else
   debug_print("_QUBES_VMNAME is nil; skipping domain-based workspace")
 end
 
--- Domain-level exclusion: act as if devilspie2 is not running
+-- Optional domain exclusion: act as if devilspie2 is not running
 if domain and EXCLUDE.domains[domain] then
   -- debug_print("excluded domain: " .. domain)
   return
@@ -55,13 +61,22 @@ end
 
 local cls = get_lower_class()
 
--- Optional class-level exclusion. If you enable it, the script will not touch workspace or geometry.
+-- Optional class exclusion. If enabled, the script will not touch workspace or geometry.
 if EXCLUDE.classes[cls] then
   -- debug_print("excluded class: " .. cls)
   return
 end
 
--- Pin windows (sticky on all workspaces) before any workspace move
+-- Assign workspace only if we have a domain
+if domain then
+  local ws = workspaceAssociation[domain]
+  if ws and ws > 0 and ws <= get_workspace_count() then
+    set_window_workspace(ws)
+  end
+end
+
+-- Pin windows (sticky on all workspaces).
+-- Pinning is done after workspace assignment, because workspace assignment removes the sticky flag.
 local should_pin = false
 if domain and PIN[domain] ~= nil then
   local rule = PIN[domain]
@@ -75,23 +90,6 @@ end
 if should_pin then
   pin_window()
   -- debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
-end
-
--- Assign workspace only if we have a domain
-if domain then
-  local ws = workspaceAssociation[domain]
-  if ws and ws > 0 and ws <= get_workspace_count() then
-    -- workspace-only exclusions, using the same EXCLUDE map
-    local skip_ws =
-      (EXCLUDE.domains[domain] == true) or
-      (EXCLUDE.classes[cls] == true)
-
-    if not skip_ws then
-      set_window_workspace(ws)
-    -- else
-      -- debug_print(("skip workspace move: dom=%s cls=%s"):format(domain, cls))
-    end
-  end
 end
 
 ------------------------------------------------------------
@@ -125,8 +123,8 @@ local RULES = {
   ["*"] = {
     groups = {
       nav_wide   = { "krusader" }, -- shared geometry
-   -- nav_wide   = { "krusader", "okular" },  -- shared geometry
       half_right = { "okular" }, -- shared geometry
+      -- nav_wide   = { "krusader", "okular" },  -- shared geometry
     },
     per_class = {
       -- ["okular"] = "half_right", -- geometry profile
@@ -136,11 +134,20 @@ local RULES = {
 
   test = {
     groups = {
-      half_left = { "some-application", "another application" }, -- shared geometry
+      half_left = { "some-application", "another-application" }, -- shared geometry
     },
     per_class = {
       -- ["some-application"] = "half_right", -- geometry profile
       -- ["some-application"] = { x = 0, y = 0, w = 1280, h = 900 }, -- numerical values
+    },
+  },
+
+  ["personal"] = {
+    groups = {
+    -- you can still group (other) applications here if you want
+    },
+    per_class = {
+    ["okular"] = "half_left",
     },
   },
 
@@ -187,7 +194,7 @@ local function resolve_geom_spec(spec)
   end
 end
 
--- Resolve geometry for domain+class, then fall back to global defaults
+-- Resolve geometry for domain+class, then global defaults
 local function find_geometry(d, class_lc)
   -- 1) domain-specific per_class
   local rd = d and RULES[d] or nil
@@ -229,5 +236,11 @@ end
 local g = find_geometry(domain, cls)
 if g then
   set_window_geometry(g.x, g.y, g.w, g.h)
+
+  if g.x == 0 then
+    -- set_window_position(g.x, g.y)
+    set_window_position2(g.x, g.y)
+  end
+
   -- debug_print(string.format("geometry: %s/%s -> %dx%d+%d+%d", tostring(domain), cls, g.w, g.h, g.x, g.y))
 end
