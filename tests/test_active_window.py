@@ -192,6 +192,7 @@ def test_format_active_window_info() -> None:
             "Relative upper-left Y:  2",
             "Width: 800",
             "Height: 600",
+            "Geometry: x=10 y=20 w=800 h=600",
             "geometry 800x600",
         ]
     )
