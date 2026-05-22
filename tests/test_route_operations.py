@@ -90,6 +90,68 @@ local LEFT_EDGE_CORRECTION = {}
     ]
 
 
+def test_add_route_rule_preserves_multiline_route_closing_comment() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = {
+    "d:personal",
+  }, -- workspace one
+
+  [3] = { "d:work", },
+  -- add more here
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 2, "d:test")
+
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", }, -- workspace one',
+        "",
+        '  [2] = { "d:test", },',
+        "",
+        '  [3] = { "d:work", },',
+        "  -- add more here",
+        "}",
+    ]
+
+
+def test_add_route_rule_preserves_standalone_comment_after_existing_route() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = { "d:personal", },
+  -- workspace one note
+
+  [3] = { "d:work", },
+  -- add more here
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 2, "d:test")
+
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", },',
+        "  -- workspace one note",
+        "",
+        '  [2] = { "d:test", },',
+        "",
+        '  [3] = { "d:work", },',
+        "  -- add more here",
+        "}",
+    ]
+
+
 def test_add_route_rule_allows_shadowed_domain_class_target() -> None:
     result = add_route_rule_to_source(_minimal_source(), 3, "d:personal c:krusader")
 
