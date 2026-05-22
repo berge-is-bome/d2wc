@@ -1,6 +1,6 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.5
+-- version 0.1.11.6
 ------------------------------------------------------------
 
 
@@ -8,25 +8,26 @@
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
 
--- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_CONFIGURATOR, LEFT_EDGE_CORRECTION
+-- EXCLUDE, PIN, WORKSPACE_ROUTES, GEOM_RULES, LEFT_EDGE_CORRECTION
 
--- Accepts:
---   "domain"            (e.g. "personal")
---   "class"             (e.g. "okular")
+-- Accepts (in order of precedence):
 --   "domain.class"      (e.g. "personal.okular")
+--   "domain"            (e.g. "personal")
+--   "class"             (e.g. "xfce4-terminal")
 
 -- Optional disambiguation:
 -- In situations where domain and class names are the same, disambiguate using prefixes:
---   "d:<domain>"        name given will only be matched to a domain
---   "c:<class>"         name given will only be matched to a class
+--   "d:<domain>"        will only be matched to a domain
+--   "c:<class>"         will only be matched to a class
 
 ------------------------------------------------------------
 -- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
-  "personal-test",       -- whole domain
-  -- "c:qubes-app-menu",    -- class everywhere
-  -- "personal.okular",     -- only this domain.class
+  -- "work.okular",         -- this domain.class
+  "personal-test",       -- domain
+  -- "<class_name>",        -- class everywhere
+  -- add more here
 }
 
 ------------------------------------------------------------
@@ -35,8 +36,9 @@ local EXCLUDE = {
 local PIN = {
   "dom0.xfce4-terminal",
   "dom0.qubes-qube-manager",
-  -- "d:personal",        -- pin everything from personal
-  -- "c:okular",          -- pin okular everywhere
+  -- "personal",                   -- pin everything from personal
+  -- "xfce4-terminal",             -- pin xfce4-terminal everywhere
+  -- add more here
 }
 
 ------------------------------------------------------------
@@ -44,53 +46,52 @@ local PIN = {
 ------------------------------------------------------------
 local WORKSPACE_ROUTES = {
   [1] = { "personal", "work.navigator", "work.krusader" },
-  -- [2] = { "test.okular", "d:business-clients", "c:okular" },
+  [2] = { "personal.navigator", "work" },
+  -- add more here
 }
 
 ------------------------------------------------------------
 -- Geometry profiles.
---
---
---
---
---
+
+-- Geometry profiles determine where something will be placed and what size it will be.
 ------------------------------------------------------------
 local GEOM = {
-  wide         = { x = 100,  y = 456,  w = 3624, h = 1389 },
-  centered_mid = { x = 960,  y = 540,  w = 1200, h = 900  },
-  half_left    = { x = 0,    y = 0,    w = 1920, h = 2115 },
-  half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
-  custom_name  = { x = 0,    y = 0,    w = 0,    h = 0    },
+  wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
+  centered_mid          = { x = 960,  y = 540,  w = 1200, h = 900  },
+  half_left             = { x = 0,    y = 0,    w = 1920, h = 2115 },
+  half_right            = { x = 1913, y = 0,    w = 1920, h = 2115 },
+  dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200,},
+  dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
+  custom_name1          = { x = 0,    y = 0,    w = 0,    h = 0    },
+  custom_name2          = { x = 0,    y = 0,    w = 0,    h = 0    },
+  -- add more here
 }
 
 ------------------------------------------------------------
--- Workspace configuration with easy tokens
+-- Geometry rules
 ------------------------------------------------------------
--- Each entry is either:
---   "profile.class"              (global)
+-- Create a geometry rule and link it to a geometry profile:
 --   "domain.profile.class"       (domain specific)
+--   "profile.domain"             (all windows from domain will have the same size and position)
+--   "profile.class"              (global)
+
 -- Class matching rules:
 --   - exact match: "okular" matches "okular"
 --   - base name:   "soffice" matches "soffice.bin" (drops suffix after first dot)
 --   - wildcard:    "soffice*" matches any "soffice.*"
---
--- Examples:
---   wide.krusader
---   wide.soffice
---   half_right.okular
---   personal.half_left.okular
---
--- Example: domain-specific override for okular in domain "personal"
---   personal.centered_mid.okular
 ------------------------------------------------------------
 local GEOM_RULES = {
   "wide.krusader",
-  "wide.soffice",            -- matches soffice and soffice.bin
+  "centered_mid.soffice",            -- matches soffice and soffice.bin
 
   "half_right.okular",
+  "half_right.kate",
 
-  "personal.half_left.okular",
-  "dom0.half_left.qubes-qube-manager"
+  "personal.half_left.okular",       -- domain-specific override for okular in domain "personal"
+
+  "dom0.half_left.qubes-qube-manager",
+  "dom0.dom0_settings_manager.xfce4-settings-manager",
+  "dom0.dom0_qubes_app_menu.qubes-app-menu",
   -- add more here
 }
 
@@ -104,9 +105,9 @@ local GEOM_RULES = {
 -- Use lowercase names; keys are matched against domain and class as detected by devilspie2.
 ------------------------------------------------------------
 local LEFT_EDGE_CORRECTION = {
-  -- ["personal.okular"] = "pos2",
-  -- ["dom0.krusader"]   = "pos1",
   ["dom0.qubes-qube-manager"] = "pos1",
+  ["personal.okular"]         = "pos2",
+  -- add more here
 }
 
 
