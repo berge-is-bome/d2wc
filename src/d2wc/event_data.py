@@ -98,16 +98,16 @@ class WindowEventData:
         )
 
 
-DEFAULT_EVENT_FIXTURE = "thunderbird"
+DEFAULT_EVENT_FIXTURE = "example"
 
 _EVENT_FIXTURES: dict[str, WindowEventData] = {
-    "thunderbird": WindowEventData(
-        domain="thunderbird-personal",
-        application_name="thunderbird-personal:net.thunderbird.Thunderbird",
-        window_name="Mozilla Thunderbird",
+    "example": WindowEventData(
+        domain="work",
+        application_name="work:org.example.App",
+        window_name="Example",
         window_type="WINDOW_TYPE_NORMAL",
-        class_instance_name="thunderbird-personal:Mail",
-        window_class="thunderbird-personal:net.thunderbird.Thunderbird",
+        class_instance_name="work:Example",
+        window_class="work:org.example.App",
         screen_geometry=EventScreenGeometry(width=3840.0, height=2160.0),
         window_geometry=EventWindowGeometry(x=474.0, y=359.0, w=3366.0, h=1801.0),
     ),
