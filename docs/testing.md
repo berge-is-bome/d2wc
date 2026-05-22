@@ -10,10 +10,17 @@ The testing goal is simple: the configurator must never damage a user's working 
 
 The latest confirmed source-checkout verification is recorded in [Development Status](development-status.md).
 
-Latest reported verification after PR #12:
+Latest reported automated verification after PR #12:
 
 ```text
 197 pytest tests passed.
+```
+
+Latest reported manual desktop verification after PR #15:
+
+```text
+The selected-window geometry proof worked from dom0.
+No config files were read or written.
 ```
 
 Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
@@ -55,11 +62,43 @@ The project should follow these principles:
 9. Test generated geometry before writing it to `GEOM`.
 10. Re-validate rendered Lua output after renderer changes.
 11. Preserve comments, blank lines, and marker-tail behavior when editing managed rule-list sections.
-12. Keep first UI proof read-only.
+12. Keep UI proofs read-only until preview and confirmation paths are tested.
 13. Keep automated GTK-entry tests independent from a live desktop session where practical.
-14. Keep automated active-window capture tests based on mocked command output where practical.
+14. Build event-data UI tests from representative Devilspie2/Lua data fixtures before wiring real event handoff.
 
-## Test levels
+## Event-data UI tests
+
+The next UI branch should test the GTK screen around representative event data, not around live target selection.
+
+Automated tests should verify:
+
+1. A Python event-data fixture can be formatted for the GTK UI.
+2. Identity fields are displayed in a stable order.
+3. Geometry fields are displayed in a stable order.
+4. Missing fields render as `unknown` or another explicit placeholder.
+5. The UI path remains read-only.
+6. The `configure` entry point still routes to the GTK launcher without requiring a live desktop session in automated tests.
+
+Representative fixture fields should include values corresponding to:
+
+```lua
+get_class_instance_name()
+get_window_property( '_QUBES_VMNAME' )
+get_screen_geometry()
+get_window_geometry()
+```
+
+Manual tests should verify:
+
+1. `python -m d2wc configure` opens the GTK event-data UI on Qubes/XFCE.
+2. `d2wc configure` opens the same UI after editable install refresh.
+3. The window displays representative identity and geometry data.
+4. The window closes cleanly.
+5. No config files are read or written.
+
+Live target-selection experiments are out of scope for the next UI branch.
+
+## Existing test levels
 
 ### Unit tests
 
@@ -78,7 +117,7 @@ Examples:
 9. Split-profile generation from screen geometry and `window_border_width`.
 10. Rule-list add, modify, and delete operations.
 11. Comment preservation and marker-tail behavior.
-12. Active-window parser helpers for `xprop` and `xwininfo` output.
+12. Event-data formatting for GTK display.
 
 These tests should not require a running desktop session.
 
@@ -97,7 +136,6 @@ Examples:
 7. Generate `half_left` and `half_right` profiles into a temporary config.
 8. Run guarded CLI edit commands against copied temporary configs.
 9. Verify that `python -m d2wc configure` routes to the GTK launcher without requiring a live GTK session in automated tests.
-10. Verify active-window capture behavior with mocked `xprop` and `xwininfo` command output.
 
 These tests should not modify the user's real `~/.config/d2wc/` files.
 
@@ -109,12 +147,10 @@ Examples:
 
 1. Launch the GTK configurator from a command.
 2. Assign the command to a keyboard shortcut.
-3. Capture active-window class.
-4. Capture active-window domain where `_QUBES_VMNAME` exists.
-5. Treat an empty `_QUBES_VMNAME` as `dom0`.
-6. Capture active-window geometry.
-7. Detect left-edge placement offset using `get_window_geometry()`.
-8. Preview generated split profiles on the active screen.
+3. Display representative event-provided domain/class data.
+4. Display representative event-provided screen geometry.
+5. Display representative event-provided window geometry.
+6. Confirm no config files are read or written.
 
 These tests may require manual confirmation at first.
 
@@ -139,211 +175,6 @@ tests/fixtures/
 
 The current script should be copied into fixtures when tests are created, rather than tests mutating `src/d2wc.lua` directly.
 
-## Parser tests
-
-Parser tests should prove that the managed Lua sections can be found and read.
-
-Required parser test cases:
-
-1. Finds `EXCLUDE`.
-2. Finds `PIN`.
-3. Finds `WORKSPACE_ROUTES`.
-4. Finds `GEOM`.
-5. Finds `WORKSPACE_PLACEMENT`.
-6. Finds `LEFT_EDGE_CORRECTION`.
-7. Preserves unmanaged Lua content outside managed blocks.
-8. Fails clearly when a required block is missing.
-9. Fails clearly when a block is malformed.
-
-## Rule grammar tests
-
-Rule grammar tests should cover prefixed tokens.
-
-Supported prefixes:
-
-1. `d:` for domain.
-2. `c:` for class.
-3. `g:` for geometry profile.
-4. `le:` for left-edge correction mode.
-
-Required valid examples:
-
-```text
-d:personal
-```
-
-```text
-c:krusader
-```
-
-```text
-d:work c:navigator
-```
-
-```text
-d:personal c:okular g:half_left
-```
-
-```text
-d:dom0 c:qubes-qube-manager le:pos1
-```
-
-Required grammar-invalid examples:
-
-```text
-"d:personal d:work c:okular g:half_left"
-```
-
-```text
-"d:personal c:okular c:krusader g:half_left"
-```
-
-```text
-"d:personal c:okular g:half_left g:half_right"
-```
-
-```text
-"d:personal c:okular le:pos1 le:pos2"
-```
-
-```text
-"d:personal c:okular x:unknown"
-```
-
-Completion criteria:
-
-1. Duplicate prefixes are rejected.
-2. Unknown prefixes are rejected.
-3. Valid rules produce structured data.
-4. Error messages are user-facing enough for the configurator.
-
-## Section validation tests
-
-Each managed section has different validation rules.
-
-### `EXCLUDE`
-
-Tests should verify:
-
-1. Rule has at least `d:` or `c:`.
-2. Rule does not require `g:`.
-3. Rule does not require `le:`.
-4. Duplicate rules are detected.
-5. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-### `PIN`
-
-Tests should verify:
-
-1. Rule has at least `d:` or `c:`.
-2. Rule does not require `g:`.
-3. Rule does not require `le:`.
-4. Duplicate rules are detected.
-5. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-### `WORKSPACE_ROUTES`
-
-Tests should verify:
-
-1. Workspace key is an integer.
-2. Workspace key is not duplicated.
-3. Route rule has at least `d:` or `c:`.
-4. Adding a rule appends to the existing workspace list instead of creating another same-number key.
-5. Comments around route rows are preserved where practical.
-6. Tail comments after `-- add more here` are preserved as tail content.
-7. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-### `GEOM`
-
-Tests should verify:
-
-1. Profile name is valid.
-2. `x`, `y`, `w`, and `h` exist.
-3. Values are integers.
-4. Width and height are positive.
-5. Duplicate profile names are detected.
-6. Generated `half_left` and `half_right` profiles are valid `GEOM` entries.
-7. Rendered `x`, `y`, `w`, and `h` columns remain readable and aligned.
-8. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-### `WORKSPACE_PLACEMENT`
-
-Tests should verify:
-
-1. Rule has at least `d:` or `c:`.
-2. Rule has exactly one `g:`.
-3. Referenced geometry profile exists.
-4. Duplicate or shadowed rules are detected where practical.
-5. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-### `LEFT_EDGE_CORRECTION`
-
-Tests should verify:
-
-1. Rule has at least `d:` or `c:`.
-2. Rule has exactly one `le:`.
-3. Correction mode is `pos1` or `pos2`.
-4. Duplicate correction rules are detected.
-5. Add, modify, and delete operations preserve comments and marker-tail behavior.
-
-## Runtime settings tests
-
-Runtime settings are not Lua rule strings, but they affect generated output and save behavior.
-
-Required tests for `window_border_width`:
-
-1. Default value exists or is derived safely.
-2. Value must be numeric.
-3. Value must be an integer.
-4. Value must be zero or positive.
-5. Negative values are rejected.
-6. Non-numeric values are rejected.
-7. Changing the value changes generated split-profile geometry predictably.
-8. Validation errors explain the problem in user-facing language.
-
-## Generated split-profile tests
-
-Generated split-profile tests should prove that `d2wc` can calculate `half_left` and `half_right` from screen geometry and `window_border_width`.
-
-Required tests:
-
-1. Generate `half_left` and `half_right` from a simple single-monitor geometry.
-2. Use `window_border_width` when calculating width and x-position values.
-3. Confirm both generated profiles have valid integer `x`, `y`, `w`, and `h` values.
-4. Confirm width and height are positive.
-5. Confirm changing `window_border_width` changes generated output.
-6. Preview both generated profiles together before writing.
-7. Reject invalid border widths before rendering.
-8. Write generated profiles only to a temporary config during tests.
-
-## Renderer tests
-
-Renderer tests should prove that generated Lua is stable and readable.
-
-Required behavior:
-
-1. Render each managed block in deterministic order where practical.
-2. Keep valid Lua syntax.
-3. Preserve unmanaged Lua program logic.
-4. Avoid duplicate workspace keys.
-5. Preserve pure note comments.
-6. Preserve blank separator lines.
-7. Align right-side comments in managed rule-list sections where supported.
-8. Align right-side comments in `GEOM` entries.
-9. Render generated `half_left` and `half_right` profiles as normal `GEOM` entries.
-10. Preserve marker-tail comments after `-- add more here` in edited sections.
-
-Test approach:
-
-1. Parse fixture.
-2. Render without changes.
-3. Write rendered output to a temporary file.
-4. Parse rendered output again.
-5. Confirm parsed model is equivalent.
-6. Validate rendered output.
-
-This is more important than byte-for-byte output matching.
-
 ## Dry-run and guarded-write tests
 
 The tool should support dry-run or preview behavior before real writes.
@@ -358,7 +189,7 @@ Existing guarded behavior includes:
 6. `PIN` edit commands preview by default and write only with `--write`.
 7. `EXCLUDE` edit commands preview by default and write only with `--write`.
 8. `LEFT_EDGE_CORRECTION` edit commands preview by default and write only with `--write`.
-9. The GTK and active-window capture proofs are read-only and do not expose any write action.
+9. GTK and desktop proof windows are read-only until a tested preview and confirmation path exists.
 
 Future UI workflows must preserve the same safety model: preview first, save only after explicit confirmation, and route writes through the tested safe-save helper.
 
@@ -398,38 +229,19 @@ Required manual proof tests:
 4. Window can be closed cleanly.
 5. Command can be assigned to a keyboard shortcut.
 6. No real user config is modified.
-7. Rule editing UI is not required for the first GTK proof.
 
-## Active-window capture tests
+## Devilspie2 event-data notes
 
-Active-window capture is desktop-specific and should be tested carefully.
+The next UI proof should use fixtures or command arguments for event data. Do not attempt to solve live target selection in that branch.
 
-Automated tests should verify parser and formatter behavior with mocked command output:
+Known behavior from PR #16 research:
 
-1. Parse active window id from `_NET_ACTIVE_WINDOW`.
-2. Treat `0` and `0x0` active-window ids as missing.
-3. Parse `WM_NAME`.
-4. Parse `WM_CLASS` into instance and class.
-5. Parse `_QUBES_VMNAME`.
-6. Treat empty `_QUBES_VMNAME` as `dom0`.
-7. Parse x, y, width, and height from `xwininfo`.
-8. Return a useful error when required capture commands fail.
-9. Format captured values for the GTK proof window.
-
-Required manual tests on Qubes/XFCE:
-
-1. Capture a normal terminal window.
-2. Capture a file manager window.
-3. Capture a browser window.
-4. Capture a dom0 tool where relevant.
-5. Read class.
-6. Read title.
-7. Read geometry.
-8. Read `_QUBES_VMNAME` where available.
-9. Treat empty `_QUBES_VMNAME` as `dom0` where relevant.
-10. Handle missing `_QUBES_VMNAME` without failure.
-11. Confirm the configurator captures the previously active window, not itself.
-12. Confirm no config files are read or written.
+1. `devilspie2 --debug` prints an initial startup dump for all currently known or processed windows.
+2. After startup, it behaves like an append-only event stream.
+3. Capturing the first debug output is not target selection.
+4. Capturing the next event after startup is unreliable because menus and launchers can generate intermediary events.
+5. Lua can call the needed Devilspie2 functions directly.
+6. `debug_print` is useful only when a proof needs to pass data to Python through stdout.
 
 ## Left-edge correction tests
 
@@ -530,11 +342,12 @@ Desktop behavior will remain manual until a suitable test environment is designe
 ## Related documents
 
 1. [Development Status](development-status.md)
-2. [UI Flow](ui-flow.md)
-3. [Runtime Architecture](runtime-architecture.md)
-4. [Implementation Plan](implementation-plan.md)
-5. [Left-Edge Correction Testing](left-edge-correction-testing.md)
-6. [Lua Design History Notes](lua-design-history.md)
+2. [Event-Data GTK UI Direction](event-data-ui-direction.md)
+3. [UI Flow](ui-flow.md)
+4. [Runtime Architecture](runtime-architecture.md)
+5. [Implementation Plan](implementation-plan.md)
+6. [Left-Edge Correction Testing](left-edge-correction-testing.md)
+7. [Lua Design History Notes](lua-design-history.md)
 
 ## Immediate test priorities
 
@@ -544,10 +357,9 @@ The next immediate test priorities are:
 
 1. Keep the full source-checkout verification path green.
 2. Keep the automated GTK entrypoint routing test green without requiring a live desktop session.
-3. Keep active-window parser and formatter tests green without requiring a live desktop session.
-4. Manually verify `python -m d2wc configure` captures the previously active window and opens the GTK window on Qubes/XFCE.
-5. Manually verify `d2wc configure` does the same after editable install.
-6. Confirm that the active-window proof performs no real config writes.
-7. Keep rule-editing UI tests deferred until those features are implemented.
+3. Add event-data formatting tests for the next GTK UI proof.
+4. Manually verify `python -m d2wc configure` opens and closes the event-data UI on Qubes/XFCE.
+5. Confirm that the event-data UI proof performs no real config writes.
+6. Keep rule-editing UI writes deferred until preview and confirmation paths are implemented.
 
-No UI save workflow should be built before the read-only active-window proof is working.
+No UI save workflow should be built before the read-only event-data UI proof is working.
