@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, and safe-save behavior.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, and the first read-only GTK launch proof.
 
 ## Current status
 
@@ -25,6 +25,8 @@ The Python core currently supports validation, render preview, safe-save behavio
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
+The first GTK proof adds a read-only window launched by `python -m d2wc configure` or `d2wc configure`. It does not read or write user config files, capture the active window, or edit rules.
+
 Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #12 was `197 passed`.
 
 ## Repository layout
@@ -38,7 +40,7 @@ docs/
   repository-layout.md           Repository structure and development conventions.
 src/
   d2wc.lua                       Current devilspie2 Lua rules script.
-  d2wc/                          Python configurator core proof.
+  d2wc/                          Python configurator core proof and GTK UI proof.
 tests/                           Python tests for the configurator core proof.
 ```
 
@@ -49,6 +51,8 @@ Install `python3-pip` with your package manager, then install the project in edi
 ```bash
 python -m pip install -e .
 ```
+
+Re-run the editable install command after switching to a branch that changes `[project.scripts]`; otherwise the generated `d2wc` console wrapper may still point at the previously installed entry point.
 
 For normal source-checkout testing:
 
@@ -71,6 +75,20 @@ python -m pytest
 The `validate` command is read-only. It parses and validates the managed Lua sections but does not modify any file.
 
 The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
+
+The first GTK proof can be launched directly from the source checkout with:
+
+```bash
+python -m d2wc configure
+```
+
+or, after refreshing the editable install:
+
+```bash
+d2wc configure
+```
+
+The GTK proof is read-only. It opens a window and closes cleanly, but does not read or write config files.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
