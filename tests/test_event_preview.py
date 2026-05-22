@@ -45,7 +45,13 @@ def test_build_event_rule_preview_rejects_spaced_class_token() -> None:
 
 
 def test_build_event_rule_preview_rejects_incomplete_geometry() -> None:
-    preview = build_event_rule_preview(event().with_overrides(window_width=None))
+    incomplete_event = WindowEventData(
+        domain="work",
+        class_instance_name="work:Example",
+        window_geometry=EventWindowGeometry(x=10.0, y=20.0, w=800.0),
+    )
+
+    preview = build_event_rule_preview(incomplete_event)
 
     assert not preview.ok
     assert preview.warning == "Window geometry is incomplete, so a GEOM preview cannot be built."
