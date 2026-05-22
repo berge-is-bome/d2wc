@@ -1,4 +1,4 @@
-"""CLI handlers for PIN and EXCLUDE rule edits."""
+"""CLI handlers for PIN, EXCLUDE, and LEFT_EDGE_CORRECTION rule edits."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import argparse
 from pathlib import Path
 from typing import Any, Callable
 
+from d2wc.cli_left_edge import add_left_edge_subcommands
 from d2wc.core.rendering import RenderValidationError
 from d2wc.core.saving import SaveConfigError, SaveValidationError, preview_source_save_config, save_source_config
 from d2wc.core.target_rule_operations import (
@@ -22,7 +23,7 @@ from d2wc.core.target_rule_operations import (
 
 
 def add_target_rule_subcommands(subcommands: Any, add_common_write_arguments: Callable[[argparse.ArgumentParser], None]) -> None:
-    """Register PIN and EXCLUDE edit commands."""
+    """Register PIN, EXCLUDE, and LEFT_EDGE_CORRECTION edit commands."""
 
     add_pin = subcommands.add_parser(
         "add-pin",
@@ -79,6 +80,8 @@ def add_target_rule_subcommands(subcommands: Any, add_common_write_arguments: Ca
     delete_exclude.add_argument("--rule", required=True, help="EXCLUDE rule to delete.")
     add_common_write_arguments(delete_exclude)
     delete_exclude.set_defaults(func=_cmd_delete_exclude)
+
+    add_left_edge_subcommands(subcommands, add_common_write_arguments)
 
 
 def _cmd_add_pin(args: argparse.Namespace) -> int:
