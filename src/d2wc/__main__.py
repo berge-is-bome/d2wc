@@ -23,6 +23,16 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _run_configure(argv: Sequence[str]) -> int:
+    try:
+        if not argv:
+            return run_configurator()
+        return run_configurator(_parse_event_data_args(argv))
+    except GtkConfiguratorImportError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _parse_event_data_args(argv: Sequence[str]):
     parser = argparse.ArgumentParser(
         prog="d2wc configure",
         description="Open the read-only GTK event-data UI proof.",
@@ -47,7 +57,7 @@ def _run_configure(argv: Sequence[str]) -> int:
     parser.add_argument("--window-height", type=float, default=None, help="Event window height.")
 
     args = parser.parse_args(list(argv))
-    event_data = get_event_fixture(args.event_fixture).with_overrides(
+    return get_event_fixture(args.event_fixture).with_overrides(
         domain=args.domain,
         application_name=args.application_name,
         window_name=args.window_name,
@@ -61,12 +71,6 @@ def _run_configure(argv: Sequence[str]) -> int:
         window_width=args.window_width,
         window_height=args.window_height,
     )
-
-    try:
-        return run_configurator(event_data)
-    except GtkConfiguratorImportError as exc:
-        print(f"ERROR: {exc}")
-        return 2
 
 
 if __name__ == "__main__":
