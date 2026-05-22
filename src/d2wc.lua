@@ -1,6 +1,6 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.4
+-- version 0.1.11.5
 ------------------------------------------------------------
 
 
@@ -8,14 +8,20 @@
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
 
--- Exclusions: anything listed here is ignored
+-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_CONFIGURATOR, LEFT_EDGE_CORRECTION
+
 -- Accepts:
 --   "domain"            (e.g. "personal")
 --   "class"             (e.g. "okular")
 --   "domain.class"      (e.g. "personal.okular")
+
 -- Optional disambiguation:
---   "d:<domain>"        force treat as domain
---   "c:<class>"         force treat as class
+-- In situations where domain and class names are the same, disambiguate using prefixes:
+--   "d:<domain>"        name given will only be matched to a domain
+--   "c:<class>"         name given will only be matched to a class
+
+------------------------------------------------------------
+-- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
   "personal-test",       -- whole domain
@@ -25,7 +31,6 @@ local EXCLUDE = {
 
 ------------------------------------------------------------
 -- Pin rules: windows listed here are made visible on all workspaces
--- Same token grammar as EXCLUDE (domain, class, domain.class, or d:/c: prefixes)
 ------------------------------------------------------------
 local PIN = {
   "dom0.xfce4-terminal",
@@ -36,10 +41,6 @@ local PIN = {
 
 ------------------------------------------------------------
 -- Workspace routes. Place applications together on a workspace.
--- Keys are workspace numbers; values are lists of:
---   "domain", "class", or "domain.class"
--- Optional disambiguation with "d:" or "c:" like above.
--- Hyphenated domain names are fine because these are plain strings.
 ------------------------------------------------------------
 local WORKSPACE_ROUTES = {
   [1] = { "personal", "work.navigator", "work.krusader" },
@@ -47,7 +48,12 @@ local WORKSPACE_ROUTES = {
 }
 
 ------------------------------------------------------------
--- Geometry profiles
+-- Geometry profiles.
+--
+--
+--
+--
+--
 ------------------------------------------------------------
 local GEOM = {
   wide         = { x = 100,  y = 456,  w = 3624, h = 1389 },
@@ -58,9 +64,8 @@ local GEOM = {
 }
 
 ------------------------------------------------------------
--- 2) Geometry rules with easy tokens
+-- Workspace configuration with easy tokens
 ------------------------------------------------------------
--- 2) GEOM_RULES
 -- Each entry is either:
 --   "profile.class"              (global)
 --   "domain.profile.class"       (domain specific)
@@ -81,20 +86,28 @@ local GEOM = {
 local GEOM_RULES = {
   "wide.krusader",
   "wide.soffice",            -- matches soffice and soffice.bin
+
   "half_right.okular",
+
   "personal.half_left.okular",
+  "dom0.half_left.qubes-qube-manager"
   -- add more here
 }
 
 ------------------------------------------------------------
--- Left-edge window position correction for windows positioned at x == 0
--- change to "pos1" or "pos2" if you see a gap between the window border and the left edge of your screen, despite x = 0
-------------------------------------------------------------
---   "none"  -> do not adjust after set_window_geometry
+-- Left-edge window position correction
+-- Map specific "domain.class" to a correction mode when the target X is 0.
+-- Values:
 --   "pos1"  -> call set_window_position(x, y)
 --   "pos2"  -> call set_window_position2(x, y)
+-- If a domain.class key is not present, no correction is applied.
+-- Use lowercase names; keys are matched against domain and class as detected by devilspie2.
 ------------------------------------------------------------
-local LEFT_EDGE_CORRECTION = "pos2"
+local LEFT_EDGE_CORRECTION = {
+  -- ["personal.okular"] = "pos2",
+  -- ["dom0.krusader"]   = "pos1",
+  ["dom0.qubes-qube-manager"] = "pos1",
+}
 
 
 
@@ -202,8 +215,7 @@ if domain then
 end
 
 ------------------------------------------------------------
--- Workspace routing
--- Precedence: exact domain.class -> domain -> class
+-- Workspace configuration
 ------------------------------------------------------------
 local function compute_workspace(d, c)
   if not d then return nil end
@@ -305,12 +317,17 @@ end
 local g = find_geometry(domain, cls)
 if g then
   set_window_geometry(g.x, g.y, g.w, g.h)
-  if g.x == 0 then
-    if LEFT_EDGE_CORRECTION == "pos1" then
+
+  -- Per-domain.class left-edge correction when target x == 0
+  if g.x == 0 and domain and cls then
+    local key = domain .. "." .. cls
+    local corr = LEFT_EDGE_CORRECTION[key]
+    if corr == "pos1" then
       set_window_position(g.x, g.y)
-    elseif LEFT_EDGE_CORRECTION == "pos2" then
+    elseif corr == "pos2" then
       set_window_position2(g.x, g.y)
     end
   end
+
   -- debug_print(string.format("geometry: %s/%s -> %dx%d+%d+%d", tostring(domain), cls, g.w, g.h, g.x, g.y))
 end
