@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the Lua rules engine plus an early read-only Python configurator core proof. The next development step is to finish the safe save and backup workflow before any real user configuration writes are allowed.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, and safe-save behavior.
 
 ## Current status
 
@@ -16,9 +16,9 @@ The active Lua script supports:
 4. Applying named geometry profiles to matching windows.
 5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
 
-The Python core proof currently supports read-only validation and dry-run rendering of the managed Lua sections.
+The Python core currently supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for `GEOM`, `WORKSPACE_PLACEMENT`, and `WORKSPACE_ROUTES`.
 
-Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The current confirmed result is that `src/d2wc.lua` validates, rendered output validates, and the full pytest suite passes with 59 tests.
+Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #9 was `153 passed`.
 
 ## Repository layout
 
@@ -27,11 +27,12 @@ docs/
   development-status.md          Current PR status, latest local verification, and next work.
   product-development-brief.md   In-depth product and UI direction.
   lua-configurables.md           User-facing explanation of the Lua configuration sections.
+  lua-design-history.md          Design context recovered from archived pre-repository Lua history.
   repository-layout.md           Repository structure and development conventions.
 src/
   d2wc.lua                       Current devilspie2 Lua rules script.
   d2wc/                          Python configurator core proof.
-tests/                           Python tests for the read-only core proof.
+tests/                           Python tests for the configurator core proof.
 ```
 
 ## Local development
@@ -60,11 +61,11 @@ python -m d2wc validate --config /tmp/d2wc-rendered.lua
 python -m pytest
 ```
 
-The `validate` command is read-only. It parses and validates the managed Lua sections but does not write or modify any file.
+The `validate` command is read-only. It parses and validates the managed Lua sections but does not modify any file.
 
-The `render` command is also read-only in this proof stage. It requires `--stdout` and prints the rendered Lua to standard output only.
+The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
 
-Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer must preserve them, and the future configurator should expose simple actions to add a user comment or insert a blank separator line.
+Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
 ## Development direction
 
@@ -78,3 +79,5 @@ Planned entry points:
 4. Optional small pointer-anchored menu after resize with `Cancel` and `Configure`.
 
 The configurator should eventually update the Lua sections `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `GEOM`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION` without requiring the user to edit Lua manually.
+
+The next likely CLI/core editing proof is `PIN` and `EXCLUDE`, because both are target-rule lists and can reuse the rule-list editing behavior proven by placement and route operations.
