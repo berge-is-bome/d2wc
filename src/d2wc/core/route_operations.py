@@ -130,7 +130,7 @@ def _render_updated_source(
     updated_config = ManagedConfig(
         exclude=config.exclude,
         pin=config.pin,
-        workspace_routes=updated_routes,
+        workspace_routes=_sort_routes(updated_routes),
         geom=config.geom,
         workspace_placement=config.workspace_placement,
         left_edge_correction=config.left_edge_correction,
@@ -192,7 +192,7 @@ def _modify_rule(
     if not placed:
         updated_routes = list(_append_rule_to_workspace(tuple(updated_routes), new_workspace, new_rule))
 
-    return tuple(updated_routes), old_workspace
+    return _sort_routes(tuple(updated_routes)), old_workspace
 
 
 def _delete_rule(routes: tuple[WorkspaceRoute, ...], rule: str) -> tuple[tuple[WorkspaceRoute, ...], int]:
@@ -215,7 +215,7 @@ def _delete_rule(routes: tuple[WorkspaceRoute, ...], rule: str) -> tuple[tuple[W
     if not found or old_workspace is None:
         raise RouteRuleNotFoundError(f"route rule not found: {rule}")
 
-    return tuple(updated_routes), old_workspace
+    return _sort_routes(tuple(updated_routes)), old_workspace
 
 
 def _append_rule_to_workspace(
@@ -233,7 +233,7 @@ def _append_rule_to_workspace(
             updated_routes.append(route)
     if not appended:
         updated_routes.append(WorkspaceRoute(workspace=workspace, rules=(rule,)))
-    return tuple(updated_routes)
+    return _sort_routes(tuple(updated_routes))
 
 
 def _ensure_target_available(routes: tuple[WorkspaceRoute, ...], new_rule: str) -> None:
@@ -252,11 +252,11 @@ def _render_workspace_routes_block_preserving_comments(
     if len(lines) < 2:
         return _render_workspace_routes_block(routes)
 
-    route_map = {route.workspace: route for route in routes}
-    rendered_workspaces: set[int] = set()
+    route_comments: dict[int, str] = {}
+    prefix_lines: list[str] = []
     tail_marker_lines: list[str] = []
+    seen_route = False
 
-    rendered = ["local WORKSPACE_ROUTES = {"]
     for line in lines[1:-1]:
         if _is_add_more_marker(line):
             tail_marker_lines.append(line.rstrip())
@@ -265,22 +265,25 @@ def _render_workspace_routes_block_preserving_comments(
         active, comment = _split_lua_comment(line)
         workspace = _workspace_key_from_line(active)
         if workspace is None:
-            rendered.append(line.rstrip())
-            continue
-        if workspace not in route_map:
+            if not seen_route and line.strip():
+                prefix_lines.append(line.rstrip())
             continue
 
-        left = _render_workspace_route_line(route_map[workspace])
-        rendered_workspaces.add(workspace)
+        seen_route = True
         if comment:
             trailing_spaces = len(active) - len(active.rstrip(" "))
-            rendered.append(left + (" " * trailing_spaces) + comment)
-        else:
-            rendered.append(left)
+            route_comments[workspace] = (" " * trailing_spaces) + comment
 
-    for route in routes:
-        if route.workspace not in rendered_workspaces:
-            rendered.append(_render_workspace_route_line(route))
+    rendered = ["local WORKSPACE_ROUTES = {"]
+    rendered.extend(prefix_lines)
+    if prefix_lines and routes:
+        rendered.append("")
+
+    for index, route in enumerate(_sort_routes(routes)):
+        if index > 0:
+            rendered.append("")
+        left = _render_workspace_route_line(route)
+        rendered.append(left + route_comments.get(route.workspace, ""))
 
     rendered.extend(tail_marker_lines)
     rendered.append("}")
@@ -289,7 +292,9 @@ def _render_workspace_routes_block_preserving_comments(
 
 def _render_workspace_routes_block(routes: tuple[WorkspaceRoute, ...]) -> str:
     lines = ["local WORKSPACE_ROUTES = {"]
-    for route in routes:
+    for index, route in enumerate(_sort_routes(routes)):
+        if index > 0:
+            lines.append("")
         lines.append(_render_workspace_route_line(route))
     lines.append("}")
     return "\n".join(lines)
@@ -298,6 +303,10 @@ def _render_workspace_routes_block(routes: tuple[WorkspaceRoute, ...]) -> str:
 def _render_workspace_route_line(route: WorkspaceRoute) -> str:
     rendered_rules = " ".join(f'"{_escape_lua_string(rule)}",' for rule in route.rules)
     return f"  [{route.workspace}] = {{ {rendered_rules} }},"
+
+
+def _sort_routes(routes: tuple[WorkspaceRoute, ...]) -> tuple[WorkspaceRoute, ...]:
+    return tuple(sorted(routes, key=lambda route: route.workspace))
 
 
 def _normalize_route_rule(rule_text: str) -> str:
