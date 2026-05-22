@@ -25,8 +25,8 @@ class ActiveWindowInfo:
     """Read-only identity snapshot for a selected X11 window.
 
     The class name is kept stable for now because the GTK proof already uses it,
-    but the Qubes/dom0 capture path now selects a window with `xwininfo -frame`
-    instead of assuming an AppVM can read another VM's active window.
+    but the current Qubes/dom0 proof only relies on `xwininfo -frame` output.
+    Frame-to-client metadata resolution will be handled in a later proof.
     """
 
     window_id: str | None = None
@@ -36,7 +36,6 @@ class ActiveWindowInfo:
     qubes_vmname: str | None = None
     geometry: WindowGeometry = WindowGeometry()
     raw_xwininfo_output: str | None = None
-    raw_xprop_output: str | None = None
     error: str | None = None
 
     @property
@@ -49,14 +48,13 @@ class ActiveWindowInfo:
 
 
 def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindowInfo:
-    """Capture a user-selected X11 window from dom0.
+    """Capture a user-selected X11 frame window from dom0.
 
     This is the Qubes-safe proof path. It runs `xwininfo -frame`, which prompts
     the user to click the target window from dom0. The raw xwininfo output is
-    kept because it is the first reliable proof artifact. The selected window id
-    is then optionally inspected with xprop for title/class/Qubes metadata.
-    Missing xprop properties are tolerated because frame/client property
-    placement can vary.
+    kept because it is the reliable proof artifact for this stage. The next
+    proof can resolve the selected frame window to the client window for
+    title/class/Qubes metadata.
     """
 
     run = runner or _run_command
@@ -73,26 +71,11 @@ def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindow
             raw_xwininfo_output=xwininfo_output,
         )
 
-    xprop_output = ""
-    try:
-        xprop_output = run(["xprop", "-id", window_id, "WM_NAME", "_NET_WM_NAME", "WM_CLASS", "_QUBES_VMNAME"])
-    except CaptureCommandError:
-        pass
-
-    wm_class_instance, wm_class = parse_wm_class(xprop_output)
-    title = parse_xprop_string(xprop_output, "_NET_WM_NAME") or parse_xprop_string(xprop_output, "WM_NAME")
-    if title is None:
-        title = parse_xwininfo_title(xwininfo_output)
-
     return ActiveWindowInfo(
         window_id=window_id,
-        title=title,
-        wm_class_instance=wm_class_instance,
-        wm_class=wm_class,
-        qubes_vmname=parse_xprop_string(xprop_output, "_QUBES_VMNAME"),
+        title=parse_xwininfo_title(xwininfo_output),
         geometry=parse_xwininfo_geometry(xwininfo_output),
         raw_xwininfo_output=xwininfo_output,
-        raw_xprop_output=xprop_output or None,
     )
 
 
@@ -168,7 +151,10 @@ def parse_xwininfo_title(output: str) -> str | None:
 
 
 def parse_xprop_string(output: str, property_name: str) -> str | None:
-    """Parse one quoted string property from xprop output."""
+    """Parse one quoted string property from xprop output.
+
+    Kept for the later frame-to-client metadata proof.
+    """
 
     pattern = rf"^{re.escape(property_name)}\([^)]*\) = \"(.*)\"$"
     for line in output.splitlines():
@@ -179,7 +165,10 @@ def parse_xprop_string(output: str, property_name: str) -> str | None:
 
 
 def parse_wm_class(output: str) -> tuple[str | None, str | None]:
-    """Parse WM_CLASS into instance and class strings."""
+    """Parse WM_CLASS into instance and class strings.
+
+    Kept for the later frame-to-client metadata proof.
+    """
 
     pattern = r'^WM_CLASS\([^)]*\) = "(.*)", "(.*)"$'
     for line in output.splitlines():
