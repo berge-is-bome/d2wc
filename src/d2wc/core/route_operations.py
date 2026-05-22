@@ -253,8 +253,10 @@ def _render_workspace_routes_block_preserving_comments(
         return _render_workspace_routes_block(routes)
 
     route_comments: dict[int, str] = {}
+    route_extra_lines: dict[int, list[str]] = {}
     prefix_lines: list[str] = []
     tail_marker_lines: list[str] = []
+    current_workspace: int | None = None
     seen_route = False
 
     for line in lines[1:-1]:
@@ -264,15 +266,33 @@ def _render_workspace_routes_block_preserving_comments(
 
         active, comment = _split_lua_comment(line)
         workspace = _workspace_key_from_line(active)
-        if workspace is None:
-            if not seen_route and line.strip():
-                prefix_lines.append(line.rstrip())
+        if workspace is not None:
+            current_workspace = workspace
+            seen_route = True
+            if comment:
+                trailing_spaces = len(active) - len(active.rstrip(" "))
+                route_comments[workspace] = (" " * trailing_spaces) + comment
             continue
 
-        seen_route = True
-        if comment:
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        if not seen_route:
+            prefix_lines.append(line.rstrip())
+            continue
+
+        if current_workspace is None:
+            continue
+
+        if _is_route_closing_comment(active, comment):
             trailing_spaces = len(active) - len(active.rstrip(" "))
-            route_comments[workspace] = (" " * trailing_spaces) + comment
+            route_comments[current_workspace] = (" " * trailing_spaces) + comment
+            current_workspace = None
+            continue
+
+        if _is_standalone_lua_comment(line):
+            route_extra_lines.setdefault(current_workspace, []).append(line.rstrip())
 
     rendered = ["local WORKSPACE_ROUTES = {"]
     rendered.extend(prefix_lines)
@@ -284,6 +304,7 @@ def _render_workspace_routes_block_preserving_comments(
             rendered.append("")
         left = _render_workspace_route_line(route)
         rendered.append(left + route_comments.get(route.workspace, ""))
+        rendered.extend(route_extra_lines.get(route.workspace, []))
 
     rendered.extend(tail_marker_lines)
     rendered.append("}")
@@ -307,6 +328,14 @@ def _render_workspace_route_line(route: WorkspaceRoute) -> str:
 
 def _sort_routes(routes: tuple[WorkspaceRoute, ...]) -> tuple[WorkspaceRoute, ...]:
     return tuple(sorted(routes, key=lambda route: route.workspace))
+
+
+def _is_route_closing_comment(active: str, comment: str) -> bool:
+    return bool(comment) and active.strip().startswith("}")
+
+
+def _is_standalone_lua_comment(line: str) -> bool:
+    return line.lstrip().startswith("--")
 
 
 def _normalize_route_rule(rule_text: str) -> str:
