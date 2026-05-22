@@ -1,6 +1,7 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.6
+-- version 0.1.11.7
+-- changes: geometry rules order updated
 ------------------------------------------------------------
 
 
@@ -59,7 +60,7 @@ local GEOM = {
   wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
   centered_mid          = { x = 960,  y = 540,  w = 1200, h = 900  },
   half_left             = { x = 0,    y = 0,    w = 1920, h = 2115 },
-  half_right            = { x = 1913, y = 0,    w = 1920, h = 2115 },
+  half_right            = { x = 1914, y = 0,    w = 1920, h = 2115 },
   dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200,},
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
   custom_name1          = { x = 0,    y = 0,    w = 0,    h = 0    },
@@ -71,9 +72,9 @@ local GEOM = {
 -- Geometry rules
 ------------------------------------------------------------
 -- Create a geometry rule and link it to a geometry profile:
---   "domain.profile.class"       (domain specific)
---   "profile.domain"             (all windows from domain will have the same size and position)
---   "profile.class"              (global)
+--   "domain.class.profile"       (domain specific)
+--   "domain.profile"             (all windows from domain)
+--   "class.profile"              (global)
 
 -- Class matching rules:
 --   - exact match: "okular" matches "okular"
@@ -81,17 +82,16 @@ local GEOM = {
 --   - wildcard:    "soffice*" matches any "soffice.*"
 ------------------------------------------------------------
 local GEOM_RULES = {
-  "wide.krusader",
-  "centered_mid.soffice",            -- matches soffice and soffice.bin
+  "krusader.wide",
+  "kate.half_right",
+  "okular.half_right",
+  "soffice.centered_mid",           -- matches soffice and soffice.bin
 
-  "half_right.okular",
-  "half_right.kate",
+  "personal.okular.half_left",      -- domain-specific override for okular in domain "personal"
 
-  "personal.half_left.okular",       -- domain-specific override for okular in domain "personal"
-
-  "dom0.half_left.qubes-qube-manager",
-  "dom0.dom0_settings_manager.xfce4-settings-manager",
-  "dom0.dom0_qubes_app_menu.qubes-app-menu",
+  "dom0.qubes-qube-manager.half_left",
+  "dom0.xfce4-settings-manager.dom0_settings_manager",
+  "dom0.qubes-app-menu.dom0_qubes_app_menu",
   -- add more here
 }
 
@@ -245,26 +245,44 @@ if domain then
 end
 
 ------------------------------------------------------------
--- Build rule maps and resolvers
+-- Build geometry rule maps and resolvers
 ------------------------------------------------------------
-local GR_DOMAIN, GR_GLOBAL = {}, {}
+-- Maps:
+--   GR_DOMAIN_CLASS[domain][class_pattern] = profile
+--   GR_DOMAIN_WIDE[domain]                 = profile
+--   GR_GLOBAL_CLASS[class_pattern]         = profile
+local GR_DOMAIN_CLASS, GR_DOMAIN_WIDE, GR_GLOBAL_CLASS = {}, {}, {}
 
 local function add_geom_rule(tok)
   local t = (tok or ""):lower()
-  -- domain.profile.class
-  local d, p, c = t:match("^([^%.]+)%.([^%.]+)%.(.+)$")
-  if d and p and c then
-    GR_DOMAIN[d] = GR_DOMAIN[d] or {}
-    GR_DOMAIN[d][c] = p
+
+  -- Split off profile from the rightmost dot
+  local stem, prof = t:match("^(.*)%.([^%.]+)$")
+  if not stem or not prof then
+    debug_print("GEOM_RULES: could not parse '" .. tostring(tok) .. "'")
     return
   end
-  -- profile.class
-  local p2, c2 = t:match("^([^%.]+)%.(.+)$")
-  if p2 and c2 then
-    GR_GLOBAL[c2] = p2
+
+  -- Disambiguators first
+  local tag, rest = stem:match("^([dc]):(.+)$")
+  if tag == "d" then
+    -- domain.profile
+    if rest ~= "" then GR_DOMAIN_WIDE[rest] = prof; return end
+  elseif tag == "c" then
+    -- class.profile
+    if rest ~= "" then GR_GLOBAL_CLASS[rest] = prof; return end
+  end
+
+  -- domain.class.profile (class may contain dots)
+  local d, c = stem:match("^([^%.]+)%.(.+)$")
+  if d and c then
+    GR_DOMAIN_CLASS[d] = GR_DOMAIN_CLASS[d] or {}
+    GR_DOMAIN_CLASS[d][c] = prof
     return
   end
-  debug_print("GEOM_RULES: could not parse '" .. tostring(tok) .. "'")
+
+  -- two-part default -> class.profile
+  GR_GLOBAL_CLASS[stem] = prof
 end
 
 for _, tok in ipairs(GEOM_RULES) do
@@ -297,14 +315,18 @@ local function pick_profile(map, actual_cls)
   return best_p
 end
 
--- Resolve geometry for domain+class using GEOM_RULES
+-- Resolve geometry with precedence:
+--   domain.class.profile -> domain.profile -> class.profile
 local function find_geometry(d, class_lc)
   local prof = nil
-  if d and GR_DOMAIN[d] then
-    prof = pick_profile(GR_DOMAIN[d], class_lc)
+  if d and GR_DOMAIN_CLASS[d] then
+    prof = pick_profile(GR_DOMAIN_CLASS[d], class_lc)
+  end
+  if not prof and d and GR_DOMAIN_WIDE[d] then
+    prof = GR_DOMAIN_WIDE[d]
   end
   if not prof then
-    prof = pick_profile(GR_GLOBAL, class_lc)
+    prof = pick_profile(GR_GLOBAL_CLASS, class_lc)
   end
   if not prof then return nil end
   local g = GEOM[prof]
