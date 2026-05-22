@@ -70,11 +70,13 @@ def capture_active_window(runner: CommandRunner | None = None) -> ActiveWindowIn
     except CaptureCommandError:
         geometry = WindowGeometry()
 
+    wm_class_instance, wm_class = parse_wm_class(window_output)
+
     return ActiveWindowInfo(
         window_id=window_id,
         title=parse_xprop_string(window_output, "WM_NAME"),
-        wm_class_instance=parse_wm_class(window_output)[0],
-        wm_class=parse_wm_class(window_output)[1],
+        wm_class_instance=wm_class_instance,
+        wm_class=wm_class,
         qubes_vmname=parse_xprop_string(window_output, "_QUBES_VMNAME"),
         geometry=geometry,
     )
@@ -109,7 +111,7 @@ def parse_active_window_id(output: str) -> str | None:
         return None
 
     window_id = match.group(1)
-    if window_id == "0":
+    if window_id in {"0", "0x0"}:
         return None
     return window_id
 
