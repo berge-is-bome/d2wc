@@ -1,14 +1,13 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.3
+-- version 0.1.11.4
 ------------------------------------------------------------
 
--- Only act on real app windows
-if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
-  return
-end
 
+
+-- USER CUSTOMIZATION
 ------------------------------------------------------------
+
 -- Exclusions: anything listed here is ignored
 -- Accepts:
 --   "domain"            (e.g. "personal")
@@ -96,6 +95,18 @@ local GEOM_RULES = {
 --   "pos2"  -> call set_window_position2(x, y)
 ------------------------------------------------------------
 local LEFT_EDGE_CORRECTION = "pos2"
+
+
+
+-- PROGRAM LOGIC
+------------------------------------------------------------
+
+-- Only act on real app windows
+-- Filters out non-normal windows like menus, splash screens, panels, and notifications so only real application windows are processed.
+------------------------------------------------------------
+if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
+  return
+end
 
 ------------------------------------------------------------
 -- Token parser and lookup builders
