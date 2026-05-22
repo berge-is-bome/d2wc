@@ -144,3 +144,24 @@ def test_cli_delete_left_edge_write_removes_rule(tmp_path, capsys) -> None:
     assert exit_code == 0
     assert f"OK: LEFT_EDGE_CORRECTION rule deleted: {TEST_LEFT_EDGE_RULE}" in captured.out
     assert f'"{TEST_LEFT_EDGE_RULE}",' not in saved
+
+
+def test_cli_left_edge_rejects_invalid_rule_and_leaves_config_unchanged(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    original = config_path.read_text(encoding="utf-8")
+
+    exit_code = main([
+        "add-left-edge",
+        "--config",
+        str(config_path),
+        "--rule",
+        "c:okular g:half_left le:pos1",
+        "--write",
+    ])
+
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "left-edge rule must not include g:" in captured.out
+    assert config_path.read_text(encoding="utf-8") == original
+    assert not list(tmp_path.glob("*.bak"))
