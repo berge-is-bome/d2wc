@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.managed_config import ManagedConfig, extract_managed_config
+from d2wc.core.rule_grammar import PrefixedRule, RuleParseError, parse_prefixed_rule
+from d2wc.core.validation import validate_managed_blocks
 from d2wc.event_data import WindowEventData
 
 
@@ -21,6 +25,22 @@ class EventRulePreview:
         """Return whether the preview has both candidate entries."""
 
         return self.geometry_profile_line is not None and self.placement_rule is not None
+
+
+@dataclass(frozen=True)
+class EventConfigAwareness:
+    """Read-only summary of whether the event target is already handled."""
+
+    status: str
+    profile_exists: bool = False
+    matching_rules: tuple[str, ...] = ()
+    warnings: tuple[str, ...] = ()
+
+    @property
+    def has_existing_handling(self) -> bool:
+        """Return whether the config already has matching handling for the target."""
+
+        return self.profile_exists or bool(self.matching_rules)
 
 
 def build_event_rule_preview(event: WindowEventData) -> EventRulePreview:
@@ -66,6 +86,45 @@ def build_event_rule_preview(event: WindowEventData) -> EventRulePreview:
     )
 
 
+def build_event_config_awareness(source: str, preview: EventRulePreview) -> EventConfigAwareness:
+    """Inspect existing config text for matching entries without changing it."""
+
+    if not preview.ok or not preview.placement_rule:
+        return EventConfigAwareness(
+            status="skipped",
+            warnings=("No safe proposal was available, so the config was not inspected for matches.",),
+        )
+
+    try:
+        candidate = parse_prefixed_rule(preview.placement_rule)
+        parse_result = ManagedBlockParser().parse(source)
+        validation = validate_managed_blocks(parse_result.blocks)
+    except (RuleParseError, ValueError) as exc:
+        return EventConfigAwareness(
+            status="error",
+            warnings=(f"Could not inspect config read-only: {exc}",),
+        )
+
+    if not validation.ok:
+        return EventConfigAwareness(
+            status="invalid-config",
+            warnings=tuple(validation.errors),
+        )
+
+    config = extract_managed_config(parse_result.blocks)
+    profile_exists = bool(
+        preview.geometry_profile_name
+        and preview.geometry_profile_name in {profile.name for profile in config.geom}
+    )
+    matching_rules = _matching_config_rules(config, candidate)
+
+    return EventConfigAwareness(
+        status="ok",
+        profile_exists=profile_exists,
+        matching_rules=matching_rules,
+    )
+
+
 def format_event_rule_preview(preview: EventRulePreview) -> str:
     """Format a read-only event-derived proposal for GTK display."""
 
@@ -88,6 +147,76 @@ def format_event_rule_preview(preview: EventRulePreview) -> str:
             "No config files are read or written from this preview.",
         ]
     )
+
+
+def format_event_config_awareness(awareness: EventConfigAwareness | None) -> str:
+    """Format the read-only existing-config awareness result."""
+
+    if awareness is None:
+        return "Config status: not inspected\nPass --config to inspect an existing d2wc.lua file read-only."
+
+    lines = [f"Config status: {awareness.status}"]
+    if awareness.warnings:
+        lines.append("Warnings:")
+        lines.extend(f"- {warning}" for warning in awareness.warnings)
+        lines.append("No config files were changed.")
+        return "\n".join(lines)
+
+    lines.append(f"Candidate GEOM profile already exists: {_yes_no(awareness.profile_exists)}")
+    if awareness.matching_rules:
+        lines.append("Existing target matches:")
+        lines.extend(f"- {rule}" for rule in awareness.matching_rules)
+    else:
+        lines.append("Existing target matches: none")
+    lines.append("No config files were changed.")
+    return "\n".join(lines)
+
+
+def proposal_clipboard_text(preview: EventRulePreview, awareness: EventConfigAwareness | None = None) -> str:
+    """Return one plain-text block suitable for copying from the GTK UI."""
+
+    parts = [format_event_rule_preview(preview)]
+    if awareness is not None:
+        parts.append(format_event_config_awareness(awareness))
+    return "\n\n".join(parts)
+
+
+def _matching_config_rules(config: ManagedConfig, candidate: PrefixedRule) -> tuple[str, ...]:
+    matches: list[str] = []
+
+    _extend_matching_rule_lines(matches, "EXCLUDE", config.exclude, candidate)
+    _extend_matching_rule_lines(matches, "PIN", config.pin, candidate)
+    for route in config.workspace_routes:
+        _extend_matching_rule_lines(matches, f"WORKSPACE_ROUTES[{route.workspace}]", route.rules, candidate)
+    _extend_matching_rule_lines(matches, "WORKSPACE_PLACEMENT", config.workspace_placement, candidate)
+    _extend_matching_rule_lines(matches, "LEFT_EDGE_CORRECTION", config.left_edge_correction, candidate)
+
+    return tuple(matches)
+
+
+def _extend_matching_rule_lines(
+    output: list[str],
+    section: str,
+    rules: tuple[str, ...],
+    candidate: PrefixedRule,
+) -> None:
+    for rule_text in rules:
+        try:
+            rule = parse_prefixed_rule(rule_text)
+        except RuleParseError:
+            continue
+        if _rule_matches_candidate_target(rule, candidate):
+            output.append(f"{section}: {rule_text}")
+
+
+def _rule_matches_candidate_target(rule: PrefixedRule, candidate: PrefixedRule) -> bool:
+    if not rule.has_target:
+        return False
+    if rule.domain is not None and rule.domain != candidate.domain:
+        return False
+    if rule.class_name is not None and rule.class_name != candidate.class_name:
+        return False
+    return True
 
 
 def _class_token_from_event(event: WindowEventData) -> str | None:
@@ -122,3 +251,7 @@ def _event_number_to_int(value: float | None) -> int:
     if value is None:
         raise TypeError("event number is missing")
     return int(round(value))
+
+
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
