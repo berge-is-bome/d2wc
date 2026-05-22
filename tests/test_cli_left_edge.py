@@ -116,3 +116,31 @@ def test_cli_modify_left_edge_preview_reports_old_rule(tmp_path, capsys) -> None
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == with_added
     assert with_added != original
+
+
+def test_cli_delete_left_edge_write_removes_rule(tmp_path, capsys) -> None:
+    config_path = copy_current_config(tmp_path)
+    main([
+        "add-left-edge",
+        "--config",
+        str(config_path),
+        "--rule",
+        TEST_LEFT_EDGE_RULE,
+        "--write",
+    ])
+
+    exit_code = main([
+        "delete-left-edge",
+        "--config",
+        str(config_path),
+        "--rule",
+        TEST_LEFT_EDGE_RULE,
+        "--write",
+    ])
+
+    captured = capsys.readouterr()
+    saved = config_path.read_text(encoding="utf-8")
+
+    assert exit_code == 0
+    assert f"OK: LEFT_EDGE_CORRECTION rule deleted: {TEST_LEFT_EDGE_RULE}" in captured.out
+    assert f'"{TEST_LEFT_EDGE_RULE}",' not in saved
