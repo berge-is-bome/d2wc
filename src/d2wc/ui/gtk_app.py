@@ -42,7 +42,7 @@ def run_configurator() -> int:
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(520, 260)
+    window.set_default_size(520, 280)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -97,8 +97,9 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
             f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
             f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
             f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
-            f"Width: { _value_or_unknown_int(geometry.width)}",
-            f"Height: { _value_or_unknown_int(geometry.height)}",
+            f"Width: {_value_or_unknown_int(geometry.width)}",
+            f"Height: {_value_or_unknown_int(geometry.height)}",
+            f"Geometry: x={_value_or_unknown_int(geometry.x)} y={_value_or_unknown_int(geometry.y)} w={_value_or_unknown_int(geometry.width)} h={_value_or_unknown_int(geometry.height)}",
             f"geometry {_value_or_unknown(geometry.size_text)}",
         ]
     )
