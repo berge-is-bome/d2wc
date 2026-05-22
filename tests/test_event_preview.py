@@ -30,10 +30,10 @@ def test_build_event_rule_preview() -> None:
     assert preview.placement_rule == "d:work c:example g:event_example"
 
 
-def test_build_event_rule_preview_without_domain() -> None:
+def test_build_event_rule_preview_for_dom0_empty_domain() -> None:
     preview = build_event_rule_preview(event().with_overrides(domain=""))
 
-    assert preview.placement_rule == "c:example g:event_example"
+    assert preview.placement_rule == "d:dom0 c:example g:event_example"
 
 
 def test_build_event_rule_preview_rejects_spaced_class_token() -> None:
@@ -147,6 +147,7 @@ local PIN = {
 local WORKSPACE_ROUTES = {
 }
 local GEOM = {
+  event_example = { x = 474, y = 359, w = 3366, h = 1801 },
 }
 local WORKSPACE_PLACEMENT = {
   "d:work c:example g:event_example",
