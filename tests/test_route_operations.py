@@ -121,6 +121,39 @@ local LEFT_EDGE_CORRECTION = {}
     ]
 
 
+def test_add_route_rule_preserves_standalone_comment_after_multiline_closing_comment() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = {
+    "d:personal",
+  }, -- workspace one
+  -- workspace one note
+
+  [3] = { "d:work", },
+  -- add more here
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 2, "d:test")
+
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", }, -- workspace one',
+        "  -- workspace one note",
+        "",
+        '  [2] = { "d:test", },',
+        "",
+        '  [3] = { "d:work", },',
+        "  -- add more here",
+        "}",
+    ]
+
+
 def test_add_route_rule_preserves_standalone_comment_after_existing_route() -> None:
     source = '''
 local EXCLUDE = {}
@@ -148,6 +181,33 @@ local LEFT_EDGE_CORRECTION = {}
         "",
         '  [3] = { "d:work", },',
         "  -- add more here",
+        "}",
+    ]
+
+
+def test_add_route_rule_keeps_comments_after_add_more_marker_in_tail() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = { "d:personal", },
+  -- add more here
+  -- keep this tail note
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 2, "d:test")
+
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", },',
+        "",
+        '  [2] = { "d:test", },',
+        "  -- add more here",
+        "  -- keep this tail note",
         "}",
     ]
 
@@ -273,3 +333,31 @@ def _managed_block_lines(source: str, name: str) -> list[str]:
         if lines[end].strip() == "}":
             return lines[start : end + 1]
     raise AssertionError(f"block not found: {name}")
+
+def test_add_route_rule_parses_route_rows_after_add_more_marker() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [1] = { "d:personal", },
+  -- add more here
+  [3] = { "d:work", },
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 2, "d:test")
+
+    assert result.validation.ok
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", },',
+        "",
+        '  [2] = { "d:test", },',
+        "",
+        '  [3] = { "d:work", },',
+        "  -- add more here",
+        "}",
+    ]
