@@ -1,19 +1,21 @@
 # d2wc Development Status
 
-## Current Branch
+## Current repository status
 
-Current repository status:
+Current repository status after PR #9:
 
 ```text
-Branch: configurator-routes-proof
-Status: WORKSPACE_ROUTES core and CLI proof complete
-Base: main after PR #5
-Next action: merge the WORKSPACE_ROUTES proof into main
+Branch: main
+Status: GEOM, WORKSPACE_PLACEMENT, and WORKSPACE_ROUTES CLI/core edit proofs are merged
+Latest merged follow-up: PR #9, route comment tail preservation
+Next likely implementation branch: configurator-pin-exclude-proof
 ```
+
+GTK UI work remains deferred until the CLI/core editing operations are sufficiently proven.
 
 ## Latest confirmed local verification
 
-Verification reported on 2026-05-22 after the `WORKSPACE_ROUTES` CLI proof and route-row layout update:
+Verification reported on 2026-05-22 after PR #9 follow-up testing:
 
 ```bash
 python -m d2wc validate --config src/d2wc.lua
@@ -27,12 +29,30 @@ Result:
 ```text
 src/d2wc.lua validates successfully.
 Rendered /tmp/d2wc-rendered.lua validates successfully.
-148 pytest tests passed.
+153 pytest tests passed.
 ```
+
+## Historical Lua script preservation
+
+The pre-repository `d2wc.lua` history has been preserved in Git and connected to `main`.
+
+A tag points to the archived history:
+
+```text
+archive/d2wc-lua-pre-repo-history
+```
+
+Inspect the preserved Lua evolution with:
+
+```bash
+git log --oneline --reverse archive/d2wc-lua-pre-repo-history -- src/d2wc.lua
+```
+
+Design context recovered from that history is recorded in [Lua Design History Notes](lua-design-history.md).
 
 ## Completed WORKSPACE_ROUTES edit proof
 
-The `configurator-routes-proof` branch adds the tested config-editing operation set for `WORKSPACE_ROUTES` rules.
+The `WORKSPACE_ROUTES` editing proof is merged.
 
 Confirmed core behavior:
 
@@ -41,19 +61,21 @@ Confirmed core behavior:
 3. Deletes an existing `WORKSPACE_ROUTES` rule in memory.
 4. Preserves existing managed Lua program logic outside the route block.
 5. Preserves route-row comments where the row still exists.
-6. Keeps the `-- add more here` marker as the final route-table entry while the marker exists.
-7. Rejects exact duplicate route targets across workspace buckets.
-8. Allows broader and narrower targets side by side, for example `d:personal` and `d:personal c:navigator`.
-9. Rejects missing old rules on modify.
-10. Rejects missing rules on delete.
-11. Rejects route rules without a `d:` or `c:` target.
-12. Rejects route rules that include `g:`.
-13. Rejects route rules that include `le:`.
-14. Matches modify and delete requests by parsed rule meaning, not token order.
-15. Renders route rules in canonical prefix order: `d:`, then `c:`.
-16. Renders workspace route rows ordered by workspace number.
-17. Inserts a blank line between workspace route rows.
-18. Re-validates rendered output after each edit.
+6. Preserves comments after multiline route closing comments.
+7. Keeps comments after the `-- add more here` marker in the marker tail.
+8. Keeps the `-- add more here` marker as tail content while the marker exists.
+9. Rejects exact duplicate route targets across workspace buckets.
+10. Allows broader and narrower targets side by side, for example `d:personal` and `d:personal c:navigator`.
+11. Rejects missing old rules on modify.
+12. Rejects missing rules on delete.
+13. Rejects route rules without a `d:` or `c:` target.
+14. Rejects route rules that include `g:`.
+15. Rejects route rules that include `le:`.
+16. Matches modify and delete requests by parsed rule meaning, not token order.
+17. Renders route rules in canonical prefix order: `d:`, then `c:`.
+18. Renders workspace route rows ordered by workspace number.
+19. Inserts a blank line between workspace route rows.
+20. Re-validates rendered output after each edit.
 
 Confirmed CLI behavior:
 
@@ -65,11 +87,9 @@ Confirmed CLI behavior:
 6. Successful writes create timestamped backups.
 7. Failed edits leave the original config unchanged.
 
-Manual route smoke testing used a copied `/tmp/d2wc-route-smoke.lua` config. The add-route preview/write path exposed the route-row layout UX issue, which was corrected before merge by ordering workspace rows and adding blank lines between route rows.
+Manual route smoke testing used a copied temporary config. Review follow-up work after PR #8 fixed route comment preservation around multiline route closing comments and marker-tail comments.
 
-GTK UI work remains deferred.
-
-## Completed WORKSPACE_PLACEMENT edit proof from PR #5
+## Completed WORKSPACE_PLACEMENT edit proof
 
 PR #5 added the tested config-editing operation set for `WORKSPACE_PLACEMENT` rules and has been merged into `main`.
 
@@ -86,9 +106,8 @@ Confirmed behavior:
 9. Duplicate placement targets are rejected.
 10. The `-- add more here` marker remains last.
 11. Manual placement smoke testing passed on a copied temporary config.
-12. The last confirmed PR #5 verification reported 124 passing tests.
 
-## Completed GEOM edit proof from PR #4
+## Completed GEOM edit proof
 
 PR #4 added the first tested config-editing operation set for `GEOM` profiles and has been merged into `main`.
 
@@ -98,7 +117,7 @@ Confirmed behavior:
 2. Modifies an existing `GEOM` profile.
 3. Deletes an unused `GEOM` profile.
 4. Preserves existing `GEOM` comments and blank lines where practical.
-5. Keeps the `-- add more here` marker as the final entry while the marker exists.
+5. Keeps the `-- add more here` marker as the final entry while it exists.
 6. Rejects duplicate profile names on add.
 7. Rejects missing profile names on modify or delete.
 8. Rejects deletion when `WORKSPACE_PLACEMENT` still references the profile.
@@ -106,7 +125,7 @@ Confirmed behavior:
 10. Preview is the default behavior and writes require `--write`.
 11. Writes route through the safe-save helper.
 
-## Completed safe-save proof from PR #3
+## Completed safe-save proof
 
 PR #3 added core safe-save behavior, save preview, and guarded save writes.
 
@@ -140,7 +159,7 @@ The current Python core supports:
 10. Guarded CLI WORKSPACE_PLACEMENT add, modify, and delete commands.
 11. In-memory `WORKSPACE_ROUTES` add, modify, and delete operations.
 12. Guarded CLI WORKSPACE_ROUTES add, modify, and delete commands.
-13. Marker-tail preservation for `-- add more here`.
+13. Marker-tail preservation for `-- add more here` in edited rule-list sections.
 14. Token-order-independent rule parsing and modify/delete matching.
 15. Exact duplicate target rejection where duplicates would make routing ambiguous.
 
@@ -170,4 +189,21 @@ python -m pytest
 
 ## Next practical work
 
-After the `WORKSPACE_ROUTES` proof is merged, the next implementation target should be selected deliberately. The most likely next CLI/core editing proof is `PIN` and `EXCLUDE`, because both are target-rule lists and can reuse the proven rule-list patterns. GTK UI work should remain deferred until the CLI/core editing operations are sufficiently proven.
+The next likely CLI/core editing proof is `PIN` and `EXCLUDE`, because both are target-rule lists and can reuse the proven rule-list patterns from `WORKSPACE_PLACEMENT` and `WORKSPACE_ROUTES`.
+
+The next branch should likely be:
+
+```text
+configurator-pin-exclude-proof
+```
+
+Expected behavior:
+
+1. Add target rules.
+2. Modify target rules.
+3. Delete target rules.
+4. Preserve comments, blank lines, and marker-tail behavior.
+5. Reject exact duplicate targets.
+6. Preserve token-order-independent matching.
+7. Preview by default and write only with `--write`.
+8. Save through the safe-save helper.
