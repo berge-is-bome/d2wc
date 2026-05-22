@@ -1,6 +1,6 @@
 ------------------------------------------------------------
--- qubes devilspie2 workspace configurator
--- version 0.1.7
+-- qdwc = qubes devilspie2 workspace configurator
+-- version 0.1.8
 ------------------------------------------------------------
 
 -- Only act on real app windows
@@ -21,9 +21,9 @@ local EXCLUDE = {
 
 -- Pin rules: pin window from a domain, or, all windows from a domain, making them visible on all workspaces
 local PIN = {
-  ["dom0"]     = { ["xfce4-terminal"] = true }, -- pin dom0 xfce4-terminal
-  -- ["personal"] = true, -- pin everything from "personal"
-  -- ["personal"] = { ["okular"] = true }, -- pin okular from "personal"
+  ["dom0"] = { ["xfce4-terminal"] = true, ["qubes-qube-manager"] = true, }, -- pinned dom0 applications
+  -- ["personal"] = true, -- pin everything from personal
+  -- ["personal"] = { ["okular"] = true },              -- pin one class from personal
 }
 
 -- Workspace by Qubes domain
@@ -35,6 +35,20 @@ local workspaceAssociation = {
   ["business-clients"] = 2,
   ["customer"] = 3,
 }
+
+-- Workspace routes. Place applications together on a workspace.
+-- Keys are workspace numbers; values are lists of "domain.class".
+-- Examples with hyphens in domain names are fine because these are strings.
+local WORKSPACE_ROUTES = {
+  [1] = { "personal", "work.navigator", "work.krusader" },
+  -- [2] = { "test.okular", "business-clients.okular" },
+}
+
+-- Left-edge window poition correction for windows that are positioned at x == 0
+-- "none" -> do not adjust after set_window_geometry
+-- "pos1" -> call set_window_position(x, y)
+-- "pos2" -> call set_window_position2(x, y)
+local LEFT_EDGE_CORRECTION = "pos2"   -- change to "pos1" or "pos2" if you see a left gap when x = 0
 
 -- Read domain; treat "" as dom0; if nil, skip workspace assignment but still allow global geometry rules
 local raw_domain = get_window_property("_QUBES_VMNAME")
@@ -89,7 +103,7 @@ end
 
 if should_pin then
   pin_window()
-  -- debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
+  debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
 end
 
 ------------------------------------------------------------
@@ -103,11 +117,11 @@ end
 -- 1_ Geometry profiles
 ------------------------------------------------------------
 local GEOM = {
-  nav_wide     = { x = 100,  y = 456,  w = 3624, h = 1389 },
+  wide         = { x = 100,  y = 456,  w = 3624, h = 1389 },
   centered_mid = { x = 960,  y = 540,  w = 1200, h = 900  },
-  code_right   = { x = 2200, y = 120,  w = 1600, h = 1400 },
-  half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
   half_left    = { x = 0,    y = 0,    w = 1920, h = 2115 },
+  half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
+  custom_name  = { x = 0,    y = 0,    w = 0,    h = 0    },
 }
 
 ------------------------------------------------------------
@@ -118,13 +132,12 @@ local GEOM = {
 --   b) a geometry table { x=..., y=..., w=..., h=... }
 -- Example: domain-specific override for okular. Use this rule to override global defaults per domain
 ------------------------------------------------------------
-
 local RULES = {
   ["*"] = {
     groups = {
-      nav_wide   = { "krusader" }, -- shared geometry
+      wide       = { "krusader" }, -- shared geometry
       half_right = { "okular" }, -- shared geometry
-      -- nav_wide   = { "krusader", "okular" },  -- shared geometry
+      -- wide       = { "krusader", "okular" },  -- shared geometry
     },
     per_class = {
       -- ["okular"] = "half_right", -- geometry profile
@@ -232,14 +245,16 @@ local function find_geometry(d, class_lc)
   return nil
 end
 
--- Apply geometry if a rule matched
+-- Apply window geometry
 local g = find_geometry(domain, cls)
 if g then
   set_window_geometry(g.x, g.y, g.w, g.h)
-
   if g.x == 0 then
-    -- set_window_position(g.x, g.y)
-    set_window_position2(g.x, g.y)
+    if LEFT_EDGE_CORRECTION == "pos1" then
+      set_window_position(g.x, g.y)
+    elseif LEFT_EDGE_CORRECTION == "pos2" then
+      set_window_position2(g.x, g.y)
+    end
   end
 
   -- debug_print(string.format("geometry: %s/%s -> %dx%d+%d+%d", tostring(domain), cls, g.w, g.h, g.x, g.y))
