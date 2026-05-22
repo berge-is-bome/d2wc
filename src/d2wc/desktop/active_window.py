@@ -104,16 +104,26 @@ def _run_command(command: Sequence[str]) -> str:
 
 
 def parse_active_window_id(output: str) -> str | None:
-    """Parse `_NET_ACTIVE_WINDOW` output from `xprop -root`."""
+    """Parse `_NET_ACTIVE_WINDOW` output from `xprop -root`.
 
-    match = re.search(r"window id #\s*(0x[0-9a-fA-F]+|0)", output)
-    if not match:
-        return None
+    Different xprop builds/desktops may print either of these forms:
 
-    window_id = match.group(1)
-    if window_id in {"0", "0x0"}:
-        return None
-    return window_id
+    1. `_NET_ACTIVE_WINDOW(WINDOW): window id # 0x12345`
+    2. `_NET_ACTIVE_WINDOW(WINDOW): 0x12345`
+    """
+
+    for pattern in (
+        r"window id #\s*(0x[0-9a-fA-F]+|0)\b",
+        r"_NET_ACTIVE_WINDOW\([^)]*\):\s*(0x[0-9a-fA-F]+|0)\b",
+    ):
+        match = re.search(pattern, output)
+        if match:
+            window_id = match.group(1)
+            if window_id in {"0", "0x0"}:
+                return None
+            return window_id
+
+    return None
 
 
 def parse_xprop_string(output: str, property_name: str) -> str | None:
