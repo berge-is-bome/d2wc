@@ -3,6 +3,17 @@ if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
   return
 end
 
+-- Exclusions: anything listed here is ignored completely
+local EXCLUDE = {
+  domains = {
+    -- ["some-domain"] = true,   -- optional domain exclusion
+  },
+  classes = {
+    -- ["some-class"] = true,     -- optional class-level exclude
+    ["qubes-app-menu"] = true,     -- optional class-level exclude
+  },
+}
+
 -- Workspace by Qubes domain
 local workspaceAssociation = {
   ["dom0"] = 1,
@@ -24,12 +35,10 @@ else
   debug_print("_QUBES_VMNAME is nil; skipping domain-based workspace")
 end
 
--- Assign workspace only if we have a domain
-if domain then
-  local ws = workspaceAssociation[domain]
-  if ws and ws > 0 and ws <= get_workspace_count() then
-    set_window_workspace(ws)
-  end
+-- Domain-level exclusion: act as if devilspie2 is not running
+if domain and EXCLUDE.domains[domain] then
+  -- debug_print("excluded domain: " .. domain)
+  return
 end
 
 -- Class helper: get WM_CLASS class part in lowercase (after the last colon)
@@ -39,6 +48,29 @@ local function get_lower_class()
 end
 
 local cls = get_lower_class()
+
+-- Optional class-level exclusion. If you enable it, the script will not touch workspace or geometry.
+if EXCLUDE.classes[cls] then
+  -- debug_print("excluded class: " .. cls)
+  return
+end
+
+-- Assign workspace only if we have a domain
+if domain then
+  local ws = workspaceAssociation[domain]
+  if ws and ws > 0 and ws <= get_workspace_count() then
+    -- workspace-only exclusions
+    local skip_ws =
+      (EXCLUDE.domains[domain] == true) or
+      (EXCLUDE.classes[cls] == true)
+
+    if not skip_ws then
+      set_window_workspace(ws)
+    -- else
+      -- debug_print(("skip workspace move: dom=%s cls=%s app=%s"):format(domain, cls, app))
+    end
+  end
+end
 
 ------------------------------------------------------------
 -- Geometry profiles and Rules
@@ -55,7 +87,7 @@ local GEOM = {
   centered_mid = { x = 960,  y = 540,  w = 1200, h = 900  },
   code_right   = { x = 2200, y = 120,  w = 1600, h = 1400 },
   half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
-  half_left    = { x = 7,    y = 0,    w = 1920, h = 2115 },
+  half_left    = { x = 0,    y = 0,    w = 1920, h = 2115 },
 }
 
 ------------------------------------------------------------
@@ -82,7 +114,7 @@ local RULES = {
 
   test = {
     groups = {
-      half_left = { "some-application", "another-application" }, -- shared geometry
+      half_left = { "some-application", "another application" }, -- shared geometry
     },
     per_class = {
       -- ["some-application"] = "half_right", -- geometry profile
@@ -134,17 +166,14 @@ local function resolve_geom_spec(spec)
 end
 
 -- Resolve geometry for domain+class, then fall back to global defaults
-
 local function find_geometry(d, class_lc)
-
--- 1) domain-specific per_class
+  -- 1) domain-specific per_class
   local rd = d and RULES[d] or nil
   if rd then
     if rd.per_class and rd.per_class[class_lc] ~= nil then
       local g = resolve_geom_spec(rd.per_class[class_lc])
       if g then return g end
     end
-
     -- 2) domain-specific groups
     if rd.groups then
       for prof, list in pairs(rd.groups) do
