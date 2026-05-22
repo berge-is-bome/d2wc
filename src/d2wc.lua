@@ -14,6 +14,12 @@ local EXCLUDE = {
   },
 }
 
+-- Pin rules: pin window from a domain, or, all windows from a domain, making them visible on all workspaces
+local PIN = {
+  ["dom0"]     = { ["xfce4-terminal"] = true }, -- pin xfce4-terminal from dom0
+  -- ["personal"] = true, -- pin everything from "personal"
+}
+
 -- Workspace by Qubes domain
 local workspaceAssociation = {
   ["dom0"] = 1,
@@ -55,11 +61,27 @@ if EXCLUDE.classes[cls] then
   return
 end
 
+-- Pin windows (sticky on all workspaces) before any workspace move
+local should_pin = false
+if domain and PIN[domain] ~= nil then
+  local rule = PIN[domain]
+  if rule == true then
+    should_pin = true
+  elseif type(rule) == "table" and rule[cls] then
+    should_pin = true
+  end
+end
+
+if should_pin then
+  pin_window()
+  -- debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
+end
+
 -- Assign workspace only if we have a domain
 if domain then
   local ws = workspaceAssociation[domain]
   if ws and ws > 0 and ws <= get_workspace_count() then
-    -- workspace-only exclusions
+    -- workspace-only exclusions, using the same EXCLUDE map
     local skip_ws =
       (EXCLUDE.domains[domain] == true) or
       (EXCLUDE.classes[cls] == true)
@@ -67,7 +89,7 @@ if domain then
     if not skip_ws then
       set_window_workspace(ws)
     -- else
-      -- debug_print(("skip workspace move: dom=%s cls=%s app=%s"):format(domain, cls, app))
+      -- debug_print(("skip workspace move: dom=%s cls=%s"):format(domain, cls))
     end
   end
 end
