@@ -4,6 +4,10 @@ from d2wc.cli import main
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+TEST_PIN_RULE = "d:dom0 c:d2wc-test-pin"
+TEST_PIN_RULE_UPDATED = "d:dom0 c:d2wc-test-pin-updated"
+TEST_EXCLUDE_RULE = "c:d2wc-test-exclude"
+TEST_EXCLUDE_RULE_UPDATED = "d:dom0 c:d2wc-test-exclude"
 
 
 def copy_current_config(tmp_path: Path) -> Path:
@@ -22,14 +26,14 @@ def test_cli_add_pin_preview_does_not_modify_config(tmp_path, capsys) -> None:
         "--config",
         str(config_path),
         "--rule",
-        "d:dom0 c:qubes-qube-manager",
+        TEST_PIN_RULE,
     ])
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
     assert f"Config: {config_path}" in captured.out
-    assert "Planned PIN add: d:dom0 c:qubes-qube-manager" in captured.out
+    assert f"Planned PIN add: {TEST_PIN_RULE}" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert "Run again with --write to save." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
@@ -45,7 +49,7 @@ def test_cli_add_pin_write_updates_config_and_creates_backup(tmp_path, capsys) -
         "--config",
         str(config_path),
         "--rule",
-        "d:dom0 c:qubes-qube-manager",
+        TEST_PIN_RULE,
         "--write",
     ])
 
@@ -54,9 +58,9 @@ def test_cli_add_pin_write_updates_config_and_creates_backup(tmp_path, capsys) -
     backups = list(tmp_path.glob("d2wc.lua.*.bak"))
 
     assert exit_code == 0
-    assert "OK: PIN rule added: d:dom0 c:qubes-qube-manager" in captured.out
+    assert f"OK: PIN rule added: {TEST_PIN_RULE}" in captured.out
     assert "Backup:" in captured.out
-    assert '"d:dom0 c:qubes-qube-manager",' in saved
+    assert f'"{TEST_PIN_RULE}",' in saved
     assert backups
     assert backups[0].read_text(encoding="utf-8") == original
 
@@ -87,34 +91,53 @@ def test_cli_modify_pin_preview_reports_old_rule(tmp_path, capsys) -> None:
     config_path = copy_current_config(tmp_path)
     original = config_path.read_text(encoding="utf-8")
 
+    main([
+        "add-pin",
+        "--config",
+        str(config_path),
+        "--rule",
+        TEST_PIN_RULE,
+        "--write",
+    ])
+    with_added = config_path.read_text(encoding="utf-8")
+
     exit_code = main([
         "modify-pin",
         "--config",
         str(config_path),
         "--old-rule",
-        "d:dom0 c:xfce4-terminal",
+        TEST_PIN_RULE,
         "--new-rule",
-        "d:dom0 c:qubes-qube-manager",
+        TEST_PIN_RULE_UPDATED,
     ])
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "Planned PIN modify: d:dom0 c:qubes-qube-manager" in captured.out
-    assert "Old rule: d:dom0 c:xfce4-terminal" in captured.out
+    assert f"Planned PIN modify: {TEST_PIN_RULE_UPDATED}" in captured.out
+    assert f"Old rule: {TEST_PIN_RULE}" in captured.out
     assert "Preview only: no files were modified." in captured.out
-    assert config_path.read_text(encoding="utf-8") == original
+    assert config_path.read_text(encoding="utf-8") == with_added
+    assert with_added != original
 
 
 def test_cli_delete_pin_write_removes_rule(tmp_path, capsys) -> None:
     config_path = copy_current_config(tmp_path)
+    main([
+        "add-pin",
+        "--config",
+        str(config_path),
+        "--rule",
+        TEST_PIN_RULE,
+        "--write",
+    ])
 
     exit_code = main([
         "delete-pin",
         "--config",
         str(config_path),
         "--rule",
-        "d:dom0 c:xfce4-terminal",
+        TEST_PIN_RULE,
         "--write",
     ])
 
@@ -122,8 +145,8 @@ def test_cli_delete_pin_write_removes_rule(tmp_path, capsys) -> None:
     saved = config_path.read_text(encoding="utf-8")
 
     assert exit_code == 0
-    assert "OK: PIN rule deleted: d:dom0 c:xfce4-terminal" in captured.out
-    assert "xfce4-terminal" not in saved
+    assert f"OK: PIN rule deleted: {TEST_PIN_RULE}" in captured.out
+    assert f'"{TEST_PIN_RULE}",' not in saved
 
 
 def test_cli_add_exclude_preview_does_not_modify_config(tmp_path, capsys) -> None:
@@ -135,13 +158,13 @@ def test_cli_add_exclude_preview_does_not_modify_config(tmp_path, capsys) -> Non
         "--config",
         str(config_path),
         "--rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
     ])
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "Planned EXCLUDE add: c:qubes-app-menu" in captured.out
+    assert f"Planned EXCLUDE add: {TEST_EXCLUDE_RULE}" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
 
@@ -155,7 +178,7 @@ def test_cli_add_exclude_write_updates_config_and_creates_backup(tmp_path, capsy
         "--config",
         str(config_path),
         "--rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
         "--write",
     ])
 
@@ -164,9 +187,9 @@ def test_cli_add_exclude_write_updates_config_and_creates_backup(tmp_path, capsy
     backups = list(tmp_path.glob("d2wc.lua.*.bak"))
 
     assert exit_code == 0
-    assert "OK: EXCLUDE rule added: c:qubes-app-menu" in captured.out
+    assert f"OK: EXCLUDE rule added: {TEST_EXCLUDE_RULE}" in captured.out
     assert "Backup:" in captured.out
-    assert '"c:qubes-app-menu",' in saved
+    assert f'"{TEST_EXCLUDE_RULE}",' in saved
     assert backups
     assert backups[0].read_text(encoding="utf-8") == original
 
@@ -179,7 +202,7 @@ def test_cli_modify_exclude_preview_reports_old_rule(tmp_path, capsys) -> None:
         "--config",
         str(config_path),
         "--rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
         "--write",
     ])
     with_added = config_path.read_text(encoding="utf-8")
@@ -189,16 +212,16 @@ def test_cli_modify_exclude_preview_reports_old_rule(tmp_path, capsys) -> None:
         "--config",
         str(config_path),
         "--old-rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
         "--new-rule",
-        "d:dom0 c:qubes-app-menu",
+        TEST_EXCLUDE_RULE_UPDATED,
     ])
 
     captured = capsys.readouterr()
 
     assert exit_code == 0
-    assert "Planned EXCLUDE modify: d:dom0 c:qubes-app-menu" in captured.out
-    assert "Old rule: c:qubes-app-menu" in captured.out
+    assert f"Planned EXCLUDE modify: {TEST_EXCLUDE_RULE_UPDATED}" in captured.out
+    assert f"Old rule: {TEST_EXCLUDE_RULE}" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == with_added
 
@@ -210,7 +233,7 @@ def test_cli_delete_exclude_write_removes_rule(tmp_path, capsys) -> None:
         "--config",
         str(config_path),
         "--rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
         "--write",
     ])
 
@@ -219,7 +242,7 @@ def test_cli_delete_exclude_write_removes_rule(tmp_path, capsys) -> None:
         "--config",
         str(config_path),
         "--rule",
-        "c:qubes-app-menu",
+        TEST_EXCLUDE_RULE,
         "--write",
     ])
 
@@ -227,8 +250,8 @@ def test_cli_delete_exclude_write_removes_rule(tmp_path, capsys) -> None:
     saved = config_path.read_text(encoding="utf-8")
 
     assert exit_code == 0
-    assert "OK: EXCLUDE rule deleted: c:qubes-app-menu" in captured.out
-    assert "qubes-app-menu" not in saved
+    assert f"OK: EXCLUDE rule deleted: {TEST_EXCLUDE_RULE}" in captured.out
+    assert f'"{TEST_EXCLUDE_RULE}",' not in saved
 
 
 def test_cli_target_rule_rejects_invalid_rule_and_leaves_config_unchanged(tmp_path, capsys) -> None:
