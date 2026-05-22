@@ -1,12 +1,13 @@
 """Minimal GTK configurator proof.
 
-This first UI proof is intentionally read-only. It exists only to prove that the
-source-checkout command path can open and close a GTK window on the target
-Qubes/XFCE desktop before any active-window capture or rule editing workflow is
-added.
+The current UI proof is intentionally read-only. It prompts for a selected X11
+window from dom0, then shows the captured snapshot so the Qubes/XFCE launch and
+window identity path can be tested before any config-writing workflow is added.
 """
 
 from __future__ import annotations
+
+from d2wc.desktop.active_window import ActiveWindowInfo, capture_selected_window
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -35,12 +36,13 @@ def _import_gtk():
 
 
 def run_configurator() -> int:
-    """Open the first read-only GTK configurator proof window."""
+    """Open the read-only GTK configurator proof window."""
 
+    window_info = capture_selected_window()
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(420, 160)
+    window.set_default_size(520, 280)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -54,13 +56,20 @@ def run_configurator() -> int:
 
     message = Gtk.Label(
         label=(
-            "GTK launch proof only.\n"
+            "Qubes/dom0 selected-window geometry proof only.\n"
             "No config files are read or written from this window yet."
         )
     )
     message.set_xalign(0)
     message.set_line_wrap(True)
     box.pack_start(message, False, False, 0)
+
+    details = Gtk.Label(label=format_active_window_info(window_info))
+    details.set_xalign(0)
+    details.set_yalign(0)
+    details.set_selectable(True)
+    details.set_line_wrap(False)
+    box.pack_start(details, True, True, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -69,3 +78,42 @@ def run_configurator() -> int:
     window.show_all()
     Gtk.main()
     return 0
+
+
+def format_active_window_info(window_info: ActiveWindowInfo) -> str:
+    """Format captured window geometry for the GTK proof window."""
+
+    if window_info.error:
+        parts = [f"Window capture failed:\n{window_info.error}"]
+        if window_info.raw_xwininfo_output:
+            parts.append("Raw xwininfo -frame output kept for debugging.")
+        return "\n\n".join(parts)
+
+    geometry = window_info.geometry
+
+    return "\n".join(
+        [
+            f"Absolute upper-left X:  {_value_or_unknown_int(geometry.x)}",
+            f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
+            f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
+            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
+            f"Width: {_value_or_unknown_int(geometry.width)}",
+            f"Height: {_value_or_unknown_int(geometry.height)}",
+            f"Geometry: x={_value_or_unknown_int(geometry.x)} y={_value_or_unknown_int(geometry.y)} w={_value_or_unknown_int(geometry.width)} h={_value_or_unknown_int(geometry.height)}",
+            f"geometry {_value_or_unknown(geometry.size_text)}",
+        ]
+    )
+
+
+def _value_or_unknown(value: str | None) -> str:
+    if value is None:
+        return "unknown"
+    if value == "":
+        return "empty"
+    return value
+
+
+def _value_or_unknown_int(value: int | None) -> str:
+    if value is None:
+        return "unknown"
+    return str(value)

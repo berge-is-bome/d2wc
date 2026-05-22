@@ -2,13 +2,13 @@
 
 ## Current repository status
 
-Current repository status for branch `configurator-gtk-proof`:
+Current repository status for branch `configurator-active-window-proof`:
 
 ```text
-Branch: configurator-gtk-proof
-Status: first read-only GTK launch proof implemented for review
-Latest merged proof: PR #12, LEFT_EDGE_CORRECTION edit proof
-Current proof branch: configurator-gtk-proof
+Branch: configurator-active-window-proof
+Status: read-only active-window capture proof implemented for review
+Latest merged proof: PR #14, first GTK configurator launch proof
+Current proof branch: configurator-active-window-proof
 ```
 
 The CLI/core edit-proof phase is complete for the six managed Lua sections:
@@ -20,7 +20,18 @@ The CLI/core edit-proof phase is complete for the six managed Lua sections:
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The first GTK proof is deliberately small. It adds a read-only window launched by `python -m d2wc configure` or `d2wc configure`. The window does not read or write config files, capture the active window, or edit rules.
+The GTK launch proof is complete and merged through PR #14. The current proof branch captures the active X11 window before the configurator window is shown and displays a read-only snapshot in the GTK window.
+
+The active-window proof captures:
+
+1. Active window id from `_NET_ACTIVE_WINDOW`.
+2. Window title from `WM_NAME`.
+3. Class instance and class from `WM_CLASS`.
+4. Qubes domain from `_QUBES_VMNAME`, where available.
+5. Empty `_QUBES_VMNAME` as `dom0`.
+6. Window geometry from `xwininfo`.
+
+The branch still performs no config reads, config writes, rule editing, runtime reloads, or restart actions.
 
 Manual Qubes/XFCE launch verification is still required before this proof should be considered complete.
 
@@ -45,7 +56,7 @@ Rendered /tmp/d2wc-rendered.lua validates successfully.
 
 Manual copied-config smoke testing also passed for the `LEFT_EDGE_CORRECTION` add, modify, and delete CLI commands before PR #12 was merged.
 
-The `configurator-gtk-proof` branch adds automated entrypoint-routing tests. Manual GTK launch testing should be run on Qubes/XFCE with:
+The `configurator-active-window-proof` branch adds automated parser and formatter tests for active-window capture. Manual GTK launch testing should be run on Qubes/XFCE with:
 
 ```bash
 python -m d2wc configure
@@ -87,6 +98,20 @@ All six managed Lua sections now have the same core editing proof pattern:
 11. Preserve `-- add more here` marker-tail behavior in edited rule-list sections.
 12. Match modify and delete requests by parsed meaning rather than token order where applicable.
 13. Reject exact duplicate targets where duplicates would make behavior ambiguous.
+
+## Completed GTK launch proof
+
+PR #14 added the first read-only GTK launch proof and has been merged into `main`.
+
+Confirmed behavior:
+
+1. `python -m d2wc configure` opens a GTK window.
+2. `d2wc configure` opens the same GTK window after refreshing the editable install.
+3. The window closes cleanly.
+4. The proof remains read-only.
+5. No config files are read or written.
+6. No active-window capture was included in PR #14.
+7. No rule editing UI was included in PR #14.
 
 ## Completed LEFT_EDGE_CORRECTION edit proof
 
@@ -250,7 +275,8 @@ The current Python core supports:
 13. Marker-tail preservation for `-- add more here` in edited rule-list sections.
 14. Token-order-independent rule parsing and modify/delete matching.
 15. Exact duplicate target rejection where duplicates would make behavior ambiguous.
-16. Read-only first GTK launch proof.
+16. Read-only GTK launch proof.
+17. Read-only active-window capture proof.
 
 ## Test command guidance
 
@@ -276,7 +302,7 @@ python -m d2wc validate --config src/d2wc.lua
 python -m pytest
 ```
 
-For the first GTK proof, also run the manual desktop check on Qubes/XFCE:
+For the active-window proof, also run the manual desktop check on Qubes/XFCE:
 
 ```bash
 python -m d2wc configure
@@ -286,26 +312,27 @@ d2wc configure
 Expected result:
 
 1. A window titled `d2wc Configurator` opens.
-2. The window states that it is a GTK launch proof only.
-3. The close button closes the window.
-4. Closing the window manager decoration also exits cleanly.
-5. No config files are read or written.
+2. The window states that it is an active-window capture proof only.
+3. The window shows the previously active window id, title, class instance, class, Qubes domain, and geometry where available.
+4. The close button closes the window.
+5. Closing the window manager decoration also exits cleanly.
+6. No config files are read or written.
 
 ## Next practical work
 
 The current branch is:
 
 ```text
-configurator-gtk-proof
+configurator-active-window-proof
 ```
 
 Scope for this branch:
 
-1. Make `python -m d2wc configure` open a GTK window.
-2. Confirm the window opens cleanly on the Qubes/XFCE target environment.
-3. Confirm the window closes cleanly.
-4. Do not perform real config writes from the first UI proof.
-5. Do not add active-window capture yet.
+1. Capture the active X11 window before the configurator window appears.
+2. Display captured identity and geometry in the GTK proof window.
+3. Treat empty `_QUBES_VMNAME` as `dom0`.
+4. Keep the proof read-only.
+5. Do not perform real config writes from the UI.
 6. Do not add rule editing UI yet.
 
-After this branch is reviewed and manually verified, the next practical branch should be the active-window capture proof. That later branch should still avoid config writes by default.
+After this branch is reviewed and manually verified, the next practical branch should start a small UI workflow around selecting or previewing a target. That later branch should still avoid config writes by default unless the preview and confirmation path is explicitly implemented and tested.

@@ -57,6 +57,7 @@ The project should follow these principles:
 11. Preserve comments, blank lines, and marker-tail behavior when editing managed rule-list sections.
 12. Keep first UI proof read-only.
 13. Keep automated GTK-entry tests independent from a live desktop session where practical.
+14. Keep automated active-window capture tests based on mocked command output where practical.
 
 ## Test levels
 
@@ -77,6 +78,7 @@ Examples:
 9. Split-profile generation from screen geometry and `window_border_width`.
 10. Rule-list add, modify, and delete operations.
 11. Comment preservation and marker-tail behavior.
+12. Active-window parser helpers for `xprop` and `xwininfo` output.
 
 These tests should not require a running desktop session.
 
@@ -95,6 +97,7 @@ Examples:
 7. Generate `half_left` and `half_right` profiles into a temporary config.
 8. Run guarded CLI edit commands against copied temporary configs.
 9. Verify that `python -m d2wc configure` routes to the GTK launcher without requiring a live GTK session in automated tests.
+10. Verify active-window capture behavior with mocked `xprop` and `xwininfo` command output.
 
 These tests should not modify the user's real `~/.config/d2wc/` files.
 
@@ -355,7 +358,7 @@ Existing guarded behavior includes:
 6. `PIN` edit commands preview by default and write only with `--write`.
 7. `EXCLUDE` edit commands preview by default and write only with `--write`.
 8. `LEFT_EDGE_CORRECTION` edit commands preview by default and write only with `--write`.
-9. The first GTK proof is read-only and does not expose any write action.
+9. The GTK and active-window capture proofs are read-only and do not expose any write action.
 
 Future UI workflows must preserve the same safety model: preview first, save only after explicit confirmation, and route writes through the tested safe-save helper.
 
@@ -378,7 +381,7 @@ No backup/write test should target the user's actual config directory.
 
 ## GTK proof tests
 
-The current development phase is the first GTK/PyGObject proof.
+The first GTK/PyGObject launch proof is merged. Ongoing GTK tests should ensure the configurator entry point remains stable.
 
 Automated tests should verify:
 
@@ -395,16 +398,25 @@ Required manual proof tests:
 4. Window can be closed cleanly.
 5. Command can be assigned to a keyboard shortcut.
 6. No real user config is modified.
-7. Active-window capture is not required for the first GTK proof.
-8. Rule editing UI is not required for the first GTK proof.
-
-The first GTK proof should remain read-only until the launch path has been manually confirmed on the target Qubes/XFCE desktop.
+7. Rule editing UI is not required for the first GTK proof.
 
 ## Active-window capture tests
 
 Active-window capture is desktop-specific and should be tested carefully.
 
-Required tests on Qubes/XFCE:
+Automated tests should verify parser and formatter behavior with mocked command output:
+
+1. Parse active window id from `_NET_ACTIVE_WINDOW`.
+2. Treat `0` and `0x0` active-window ids as missing.
+3. Parse `WM_NAME`.
+4. Parse `WM_CLASS` into instance and class.
+5. Parse `_QUBES_VMNAME`.
+6. Treat empty `_QUBES_VMNAME` as `dom0`.
+7. Parse x, y, width, and height from `xwininfo`.
+8. Return a useful error when required capture commands fail.
+9. Format captured values for the GTK proof window.
+
+Required manual tests on Qubes/XFCE:
 
 1. Capture a normal terminal window.
 2. Capture a file manager window.
@@ -416,6 +428,8 @@ Required tests on Qubes/XFCE:
 8. Read `_QUBES_VMNAME` where available.
 9. Treat empty `_QUBES_VMNAME` as `dom0` where relevant.
 10. Handle missing `_QUBES_VMNAME` without failure.
+11. Confirm the configurator captures the previously active window, not itself.
+12. Confirm no config files are read or written.
 
 ## Left-edge correction tests
 
@@ -530,9 +544,10 @@ The next immediate test priorities are:
 
 1. Keep the full source-checkout verification path green.
 2. Keep the automated GTK entrypoint routing test green without requiring a live desktop session.
-3. Manually verify `python -m d2wc configure` opens and closes a GTK window on Qubes/XFCE.
-4. Manually verify `d2wc configure` opens and closes the same GTK window after editable install.
-5. Confirm that the first GTK proof performs no real config writes.
-6. Keep active-window capture and rule-editing UI tests deferred until those features are implemented.
+3. Keep active-window parser and formatter tests green without requiring a live desktop session.
+4. Manually verify `python -m d2wc configure` captures the previously active window and opens the GTK window on Qubes/XFCE.
+5. Manually verify `d2wc configure` does the same after editable install.
+6. Confirm that the active-window proof performs no real config writes.
+7. Keep rule-editing UI tests deferred until those features are implemented.
 
-No UI save workflow should be built before the read-only GTK proof is working.
+No UI save workflow should be built before the read-only active-window proof is working.
