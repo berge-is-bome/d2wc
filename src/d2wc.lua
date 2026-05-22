@@ -1,33 +1,29 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.7
--- changes: geometry rules order updated
+-- version 0.1.12.1
+-- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
 ------------------------------------------------------------
-
 
 
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
 
--- EXCLUDE, PIN, WORKSPACE_ROUTES, GEOM_RULES, LEFT_EDGE_CORRECTION
-
--- Accepts (in order of precedence):
---   "domain.class"      (e.g. "personal.okular")
---   "domain"            (e.g. "personal")
---   "class"             (e.g. "xfce4-terminal")
-
--- Optional disambiguation:
--- In situations where domain and class names are the same, disambiguate using prefixes:
---   "d:<domain>"        will only be matched to a domain
---   "c:<class>"         will only be matched to a class
+-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION
+-- All rules use space-separated tokens with explicit prefixes:
+--   d:<domain>   c:<class>   g:<geom_profile>   le:<pos1|pos2>
+-- Order of tokens does not matter. Case-insensitive.
+--
+-- Matching precedence everywhere:  domain.class  ->  domain  ->  class
+-- Duplicates within a single rule (e.g., two g: tokens) are invalid; they are skipped with a debug message.
+-- Unknown geometry profile in g: is invalid; skipped with a debug message.
 
 ------------------------------------------------------------
 -- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
-  -- "work.okular",         -- this domain.class
-  "personal-test",       -- domain
-  -- "<class_name>",        -- class everywhere
+  -- "d:work c:okular",       -- this domain.class
+  "d:personal-test",          -- domain
+  -- "c:<class_name>",        -- class everywhere
   -- add more here
 }
 
@@ -35,78 +31,90 @@ local EXCLUDE = {
 -- Pin rules: windows listed here are made visible on all workspaces
 ------------------------------------------------------------
 local PIN = {
-  "dom0.xfce4-terminal",
-  "dom0.qubes-qube-manager",
-  -- "personal",                   -- pin everything from personal
-  -- "xfce4-terminal",             -- pin xfce4-terminal everywhere
+  "d:dom0 c:xfce4-terminal",
+  "d:dom0 c:qubes-qube-manager",
+  -- "d:personal",                   -- pin everything from personal
+  -- "c:xfce4-terminal",             -- pin xfce4-terminal everywhere
   -- add more here
 }
 
 ------------------------------------------------------------
 -- Workspace routes. Place applications together on a workspace.
+-- NOTE: Only one list per workspace key is allowed. In Lua, later duplicates overwrite earlier ones.
 ------------------------------------------------------------
 local WORKSPACE_ROUTES = {
-  [1] = { "personal", "work.navigator", "work.krusader" },
-  [2] = { "personal.navigator", "work" },
+  [1] = { "d:personal", "d:work c:navigator", "d:work c:krusader", },
+
+  [2] = { "d:personal c:navigator", "d:work", },
   -- add more here
 }
 
 ------------------------------------------------------------
 -- Geometry profiles.
-
 -- Geometry profiles determine where something will be placed and what size it will be.
 ------------------------------------------------------------
 local GEOM = {
   wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
   centered_mid          = { x = 960,  y = 540,  w = 1200, h = 900  },
   half_left             = { x = 0,    y = 0,    w = 1920, h = 2115 },
-  half_right            = { x = 1914, y = 0,    w = 1920, h = 2115 },
-  dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200,},
+  half_right            = { x = 1913, y = 0,    w = 1920, h = 2115 },
+
+  dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
+
   custom_name1          = { x = 0,    y = 0,    w = 0,    h = 0    },
   custom_name2          = { x = 0,    y = 0,    w = 0,    h = 0    },
   -- add more here
 }
 
 ------------------------------------------------------------
--- Geometry rules
+-- Workspace placement rules
 ------------------------------------------------------------
--- Create a geometry rule and link it to a geometry profile:
---   "domain.class.profile"       (domain specific)
---   "domain.profile"             (all windows from domain)
---   "class.profile"              (global)
+-- Link targets to geometry profiles using g:.
+-- At least one domain or class must be specified with a geometry profile.
 
 -- Class matching rules:
---   - exact match: "okular" matches "okular"
---   - base name:   "soffice" matches "soffice.bin" (drops suffix after first dot)
---   - wildcard:    "soffice*" matches any "soffice.*"
+-- exact match: "okular" matches "okular"
+-- base name:   "soffice" matches "soffice.bin" (drops suffix after first dot)
+-- wildcard:    "soffice*" matches any "soffice.*"
+--
+-- Examples:
+-- "c:krusader g:wide"           -- krusader will use the `wide` GEOM profile everywhere it is opened
+-- "c:soffice g:centered_mid"    -- office will use the `centered_mid` GEOM profile everywhere it is opened
+-- "c:okular g:half_right"       -- okular will use the `hlaf_right` GEOM profile everywhere it is opened
+-- "d:personal c:okular g:half_left"    -- domain-specific override for okular in domain personal
+-- "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu"    -- domain-specific override for qubes-app-menu in dom0
 ------------------------------------------------------------
-local GEOM_RULES = {
-  "krusader.wide",
-  "kate.half_right",
-  "okular.half_right",
-  "soffice.centered_mid",           -- matches soffice and soffice.bin
+local WORKSPACE_PLACEMENT = {
+  "c:krusader g:wide",
+  "c:soffice g:centered_mid",
+  "c:okular g:half_right",
+  "c:kate g:half_right",
 
-  "personal.okular.half_left",      -- domain-specific override for okular in domain "personal"
+  "d:personal c:okular g:half_left",
 
-  "dom0.qubes-qube-manager.half_left",
-  "dom0.xfce4-settings-manager.dom0_settings_manager",
-  "dom0.qubes-app-menu.dom0_qubes_app_menu",
+  "d:dom0 c:qubes-qube-manager g:half_left",
+  "d:dom0 c:xfce4-settings-manager g:dom0_settings_manager",
+  "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",
   -- add more here
 }
 
 ------------------------------------------------------------
 -- Left-edge window position correction
--- Map specific "domain.class" to a correction mode when the target X is 0.
--- Values:
---   "pos1"  -> call set_window_position(x, y)
---   "pos2"  -> call set_window_position2(x, y)
--- If a domain.class key is not present, no correction is applied.
--- Use lowercase names; keys are matched against domain and class as detected by devilspie2.
+
+-- Sometimes when a window is positioned at X = 0, the devilspie2 function set_window_geometry()
+-- does not place the window at exactly X = 0, but a few pixels off from 0.
+
+-- Map targets to a correction mode when the target X is 0, but window placement is slightly off.
+
+-- Values:  le:pos1  -> set_window_position(x, y)
+--          le:pos2  -> set_window_position2(x, y)
+
+-- At least one of d: or c: must be present.
 ------------------------------------------------------------
 local LEFT_EDGE_CORRECTION = {
-  ["dom0.qubes-qube-manager"] = "pos1",
-  ["personal.okular"]         = "pos2",
+  "d:dom0 c:qubes-qube-manager le:pos1",
+  "d:personal c:okular le:pos2",
   -- add more here
 }
 
@@ -123,28 +131,89 @@ if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
 end
 
 ------------------------------------------------------------
--- Token parser and lookup builders
+-- Helpers
 ------------------------------------------------------------
-local function parse_token(token)
-  local t = (token or ""):lower()
-  local tag, rest = t:match("^([dc]):(.+)$")
-  if tag == "d" then return "domain", rest end
-  if tag == "c" then return "class",  rest end
-  local d, c = t:match("^([^%.]+)%.(.+)$")
-  if d and c then return "exact", d .. "." .. c end
-  return "domain", t
+local function lc(s) return (s or ""):lower() end
+
+-- Split a rule string into prefixed tokens and validate duplicates.
+-- Returns { d=..., c=..., g=..., le=... }, is_valid
+local function parse_prefixed_rule(rule_str)
+  local seen = {}
+  local out = {}
+  for token in lc(rule_str):gmatch("%S+") do
+    local k, v = token:match("^([a-z]+):(.*)$")
+    if not k or v == "" then
+      debug_print("parse: invalid token '" .. tostring(token) .. "' in '" .. tostring(rule_str) .. "'")
+      return {}, false
+    end
+    if k ~= "d" and k ~= "c" and k ~= "g" and k ~= "le" then
+      debug_print("parse: unknown prefix '" .. k .. "' in '" .. tostring(rule_str) .. "'")
+      return {}, false
+    end
+    if seen[k] then
+      debug_print("parse: duplicate '" .. k .. ":' in '" .. tostring(rule_str) .. "'; skipping rule")
+      return {}, false
+    end
+    seen[k] = true
+    out[k] = v
+  end
+  return out, true
+end
+
+-- Class matching rank: exact > wildcard prefix > base-name
+local function class_match_rank(rule_cls, actual_cls)
+  if rule_cls == actual_cls then return 3 end
+  if rule_cls:sub(-1) == "*" then
+    local pref = rule_cls:sub(1, -2)
+    if actual_cls:sub(1, #pref) == pref then return 2 end
+  end
+  local base = actual_cls:gsub("%..*$", "")
+  if rule_cls == base then return 1 end
+  return 0
+end
+
+local function pick_profile(map, actual_cls)
+  if not map then return nil end
+  local best_p, best_r = nil, 0
+  for rule_cls, prof in pairs(map) do
+    local r = class_match_rank(rule_cls, actual_cls)
+    if r > best_r then best_r, best_p = r, prof end
+  end
+  return best_p
 end
 
 ------------------------------------------------------------
 -- Build lookups for EXCLUDE
 ------------------------------------------------------------
 local EX_EXACT, EX_DOMAIN, EX_CLASS = {}, {}, {}
-for _, tok in ipairs(EXCLUDE) do
-  if tok ~= nil and tok ~= "" then
-    local kind, val = parse_token(tok)
-    if     kind == "exact"  then EX_EXACT[val]   = true
-    elseif kind == "domain" then EX_DOMAIN[val]  = true
-    elseif kind == "class"  then EX_CLASS[val]   = true
+
+for _, rule in ipairs(EXCLUDE) do
+  if rule and rule ~= "" then
+    local R, ok = parse_prefixed_rule(rule)
+    if ok then
+      local d, c = R.d, R.c
+      if d and c then
+        local key = d .. "." .. c
+        if EX_EXACT[key] then
+          debug_print("EXCLUDE: duplicate exact '" .. key .. "'")
+        else
+          EX_EXACT[key] = true
+        end
+      elseif d then
+        if EX_DOMAIN[d] then
+          debug_print("EXCLUDE: duplicate domain '" .. d .. "'")
+        else
+          EX_DOMAIN[d] = true
+        end
+      elseif c then
+        if EX_CLASS[c] then
+          debug_print("EXCLUDE: duplicate class '" .. c .. "'")
+        else
+          EX_CLASS[c] = true
+        end
+      else
+        debug_print("EXCLUDE: rule needs d: or c: -> '" .. rule .. "'")
+      end
     end
   end
 end
@@ -153,27 +222,72 @@ end
 -- Build lookups for PIN
 ------------------------------------------------------------
 local PIN_EXACT, PIN_DOMAIN, PIN_CLASS = {}, {}, {}
-for _, tok in ipairs(PIN) do
-  if tok ~= nil and tok ~= "" then
-    local kind, val = parse_token(tok)
-    if     kind == "exact"  then PIN_EXACT[val]   = true
-    elseif kind == "domain" then PIN_DOMAIN[val]  = true
-    elseif kind == "class"  then PIN_CLASS[val]   = true
+
+for _, rule in ipairs(PIN) do
+  if rule and rule ~= "" then
+    local R, ok = parse_prefixed_rule(rule)
+    if ok then
+      local d, c = R.d, R.c
+      if d and c then
+        local key = d .. "." .. c
+        if PIN_EXACT[key] then
+          debug_print("PIN: duplicate exact '" .. key .. "'")
+        else
+          PIN_EXACT[key] = true
+        end
+      elseif d then
+        if PIN_DOMAIN[d] then
+          debug_print("PIN: duplicate domain '" .. d .. "'")
+        else
+          PIN_DOMAIN[d] = true
+        end
+      elseif c then
+        if PIN_CLASS[c] then
+          debug_print("PIN: duplicate class '" .. c .. "'")
+        else
+          PIN_CLASS[c] = true
+        end
+      else
+        debug_print("PIN: rule needs d: or c: -> '" .. rule .. "'")
+      end
     end
   end
 end
 
 ------------------------------------------------------------
 -- Build lookups for WORKSPACE_ROUTES
+-- NOTE: Only one list per workspace key is allowed.
 ------------------------------------------------------------
 local WS_EXACT, WS_DOMAIN, WS_CLASS = {}, {}, {}
+
 for wsnum, list in pairs(WORKSPACE_ROUTES) do
-  for _, tok in ipairs(list) do
-    if tok ~= nil and tok ~= "" then
-      local kind, val = parse_token(tok)
-      if     kind == "exact"  then WS_EXACT[val]  = wsnum
-      elseif kind == "domain" then WS_DOMAIN[val] = wsnum
-      elseif kind == "class"  then WS_CLASS[val]  = wsnum
+  for _, rule in ipairs(list) do
+    if rule and rule ~= "" then
+      local R, ok = parse_prefixed_rule(rule)
+      if ok then
+        local d, c = R.d, R.c
+        if d and c then
+          local key = d .. "." .. c
+          if WS_EXACT[key] then
+            debug_print("WORKSPACE_ROUTES[" .. wsnum .. "]: duplicate exact '" .. key .. "'")
+          else
+            WS_EXACT[key] = wsnum
+          end
+        elseif d then
+          if WS_DOMAIN[d] then
+            debug_print("WORKSPACE_ROUTES[" .. wsnum .. "]: duplicate domain '" .. d .. "'")
+          else
+            WS_DOMAIN[d] = wsnum
+          end
+        elseif c then
+          if WS_CLASS[c] then
+            debug_print("WORKSPACE_ROUTES[" .. wsnum .. "]: duplicate class '" .. c .. "'")
+          else
+            WS_CLASS[c] = wsnum
+          end
+        else
+          debug_print("WORKSPACE_ROUTES[" .. wsnum .. "]: rule needs d: and/or c: -> '" .. rule .. "'")
+        end
       end
     end
   end
@@ -206,7 +320,6 @@ local cls = get_lower_class()
 ------------------------------------------------------------
 -- Apply exclusions
 ------------------------------------------------------------
--- Optional domain/class/domain.class exclusion. If enabled, the script will not touch workspace or geometry.
 if domain then
   local key = domain .. "." .. cls
   if EX_EXACT[key] or EX_DOMAIN[domain] or EX_CLASS[cls] then
@@ -216,7 +329,8 @@ if domain then
 end
 
 ------------------------------------------------------------
--- Workspace configuration
+-- Workspace routing
+-- Precedence: exact domain.class -> domain -> class
 ------------------------------------------------------------
 local function compute_workspace(d, c)
   if not d then return nil end
@@ -233,7 +347,7 @@ if domain then
 end
 
 ------------------------------------------------------------
--- Pin windows (sticky on all workspaces).
+-- Pin windows
 -- Pinning is done after workspace assignment, because workspace assignment removes the sticky flag.
 ------------------------------------------------------------
 if domain then
@@ -246,77 +360,52 @@ end
 
 ------------------------------------------------------------
 -- Build geometry rule maps and resolvers
-------------------------------------------------------------
 -- Maps:
 --   GR_DOMAIN_CLASS[domain][class_pattern] = profile
 --   GR_DOMAIN_WIDE[domain]                 = profile
 --   GR_GLOBAL_CLASS[class_pattern]         = profile
+------------------------------------------------------------
 local GR_DOMAIN_CLASS, GR_DOMAIN_WIDE, GR_GLOBAL_CLASS = {}, {}, {}
 
-local function add_geom_rule(tok)
-  local t = (tok or ""):lower()
-
-  -- Split off profile from the rightmost dot
-  local stem, prof = t:match("^(.*)%.([^%.]+)$")
-  if not stem or not prof then
-    debug_print("GEOM_RULES: could not parse '" .. tostring(tok) .. "'")
-    return
-  end
-
-  -- Disambiguators first
-  local tag, rest = stem:match("^([dc]):(.+)$")
-  if tag == "d" then
-    -- domain.profile
-    if rest ~= "" then GR_DOMAIN_WIDE[rest] = prof; return end
-  elseif tag == "c" then
-    -- class.profile
-    if rest ~= "" then GR_GLOBAL_CLASS[rest] = prof; return end
-  end
-
-  -- domain.class.profile (class may contain dots)
-  local d, c = stem:match("^([^%.]+)%.(.+)$")
-  if d and c then
-    GR_DOMAIN_CLASS[d] = GR_DOMAIN_CLASS[d] or {}
-    GR_DOMAIN_CLASS[d][c] = prof
-    return
-  end
-
-  -- two-part default -> class.profile
-  GR_GLOBAL_CLASS[stem] = prof
-end
-
-for _, tok in ipairs(GEOM_RULES) do
-  add_geom_rule(tok)
-end
-
-local function class_match_rank(rule_cls, actual_cls)
-  -- exact match
-  if rule_cls == actual_cls then return 3 end
-  -- wildcard prefix, e.g. "soffice*"
-  if rule_cls:sub(-1) == "*" then
-    local pref = rule_cls:sub(1, -2)
-    if actual_cls:sub(1, #pref) == pref then return 2 end
-  end
-  -- base-name match: "soffice" vs "soffice.bin"
-  local base = actual_cls:gsub("%..*$", "")
-  if rule_cls == base then return 1 end
-  return 0
-end
-
-local function pick_profile(map, actual_cls)
-  if not map then return nil end
-  local best_p, best_r = nil, 0
-  for rule_cls, prof in pairs(map) do
-    local r = class_match_rank(rule_cls, actual_cls)
-    if r > best_r then
-      best_r, best_p = r, prof
+for _, rule in ipairs(WORKSPACE_PLACEMENT) do
+  if rule and rule ~= "" then
+    local R, ok = parse_prefixed_rule(rule)
+    if ok then
+      local d, c, prof = R.d, R.c, R.g
+      if not prof then
+        debug_print("WORKSPACE_PLACEMENT: missing g: in '" .. rule .. "'")
+      elseif not GEOM[prof] then
+        debug_print("WORKSPACE_PLACEMENT: unknown profile '" .. prof .. "' in '" .. rule .. "'")
+      elseif not d and not c then
+        debug_print("WORKSPACE_PLACEMENT: rule needs d: or c: -> '" .. rule .. "'")
+      else
+        if d and c then
+          GR_DOMAIN_CLASS[d] = GR_DOMAIN_CLASS[d] or {}
+          if GR_DOMAIN_CLASS[d][c] then
+            debug_print("WORKSPACE_PLACEMENT: duplicate domain.class '" .. d .. "." .. c .. "'")
+          else
+            GR_DOMAIN_CLASS[d][c] = prof
+          end
+        elseif d then
+          if GR_DOMAIN_WIDE[d] then
+            debug_print("WORKSPACE_PLACEMENT: duplicate domain '" .. d .. "'")
+          else
+            GR_DOMAIN_WIDE[d] = prof
+          end
+        elseif c then
+          if GR_GLOBAL_CLASS[c] then
+            debug_print("WORKSPACE_PLACEMENT: duplicate class '" .. c .. "'")
+          else
+            GR_GLOBAL_CLASS[c] = prof
+          end
+        end
+      end
     end
   end
-  return best_p
 end
 
--- Resolve geometry with precedence:
---   domain.class.profile -> domain.profile -> class.profile
+-- Resolve geometry for domain+class using WORKSPACE_PLACEMENT with precedence:
+--   domain.class -> domain -> class
 local function find_geometry(d, class_lc)
   local prof = nil
   if d and GR_DOMAIN_CLASS[d] then
@@ -331,20 +420,63 @@ local function find_geometry(d, class_lc)
   if not prof then return nil end
   local g = GEOM[prof]
   if not g then
-    debug_print("GEOM_RULES: unknown profile '" .. tostring(prof) .. "'")
+    debug_print("WORKSPACE_PLACEMENT: unknown profile '" .. tostring(prof) .. "'")
   end
   return g
 end
 
+------------------------------------------------------------
+-- Build left edge correction lookups
+-- Precedence: domain.class -> domain -> class
+------------------------------------------------------------
+local LEC_EXACT, LEC_DOMAIN, LEC_CLASS = {}, {}, {}
+
+for _, rule in ipairs(LEFT_EDGE_CORRECTION) do
+  if rule and rule ~= "" then
+    local R, ok = parse_prefixed_rule(rule)
+    if ok then
+      local d, c, mode = R.d, R.c, R.le
+      if not mode or (mode ~= "pos1" and mode ~= "pos2") then
+        debug_print("LEFT_EDGE_CORRECTION: missing or invalid le: in '" .. rule .. "'")
+      elseif not d and not c then
+        debug_print("LEFT_EDGE_CORRECTION: rule needs d: or c: -> '" .. rule .. "'")
+      else
+        if d and c then
+          local key = d .. "." .. c
+          if LEC_EXACT[key] then
+            debug_print("LEFT_EDGE_CORRECTION: duplicate exact '" .. key .. "'")
+          else
+            LEC_EXACT[key] = mode
+          end
+        elseif d then
+          if LEC_DOMAIN[d] then
+            debug_print("LEFT_EDGE_CORRECTION: duplicate domain '" .. d .. "'")
+          else
+            LEC_DOMAIN[d] = mode
+          end
+        elseif c then
+          if LEC_CLASS[c] then
+            debug_print("LEFT_EDGE_CORRECTION: duplicate class '" .. c .. "'")
+          else
+            LEC_CLASS[c] = mode
+          end
+        end
+      end
+    end
+  end
+end
+
+------------------------------------------------------------
 -- Apply window geometry
+------------------------------------------------------------
 local g = find_geometry(domain, cls)
 if g then
   set_window_geometry(g.x, g.y, g.w, g.h)
 
-  -- Per-domain.class left-edge correction when target x == 0
+  -- Per target left-edge correction when target x == 0
   if g.x == 0 and domain and cls then
     local key = domain .. "." .. cls
-    local corr = LEFT_EDGE_CORRECTION[key]
+    local corr = LEC_EXACT[key] or LEC_DOMAIN[domain] or LEC_CLASS[cls]
     if corr == "pos1" then
       set_window_position(g.x, g.y)
     elseif corr == "pos2" then
