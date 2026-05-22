@@ -75,11 +75,25 @@ xwininfo: Window id: 0x3e00007 "Terminal"
 
   Absolute upper-left X:  10
   Absolute upper-left Y:  20
+  Relative upper-left X:  1
+  Relative upper-left Y:  2
   Width: 800
   Height: 600
 """
 
-    assert parse_xwininfo_geometry(output) == WindowGeometry(x=10, y=20, width=800, height=600)
+    assert parse_xwininfo_geometry(output) == WindowGeometry(
+        x=10,
+        y=20,
+        relative_x=1,
+        relative_y=2,
+        width=800,
+        height=600,
+    )
+
+
+def test_window_geometry_size_text() -> None:
+    assert WindowGeometry(width=800, height=600).size_text == "800x600"
+    assert WindowGeometry(width=800).size_text is None
 
 
 def test_capture_selected_window_with_mocked_command() -> None:
@@ -88,6 +102,8 @@ xwininfo: Window id: 0x3e00007 "Terminal"
 
   Absolute upper-left X:  10
   Absolute upper-left Y:  20
+  Relative upper-left X:  1
+  Relative upper-left Y:  2
   Width: 800
   Height: 600
 """
@@ -106,7 +122,14 @@ xwininfo: Window id: 0x3e00007 "Terminal"
     assert info.wm_class is None
     assert info.qubes_vmname is None
     assert info.domain is None
-    assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
+    assert info.geometry == WindowGeometry(
+        x=10,
+        y=20,
+        relative_x=1,
+        relative_y=2,
+        width=800,
+        height=600,
+    )
     assert info.raw_xwininfo_output == xwininfo_output
     assert info.error is None
 
@@ -148,21 +171,30 @@ def test_format_active_window_info() -> None:
     info = ActiveWindowInfo(
         window_id="0x3e00007",
         title="Terminal",
-        geometry=WindowGeometry(x=10, y=20, width=800, height=600),
+        geometry=WindowGeometry(
+            x=10,
+            y=20,
+            relative_x=1,
+            relative_y=2,
+            width=800,
+            height=600,
+        ),
         raw_xwininfo_output="xwininfo raw output",
     )
 
     text = format_active_window_info(info)
 
-    assert "Window ID: 0x3e00007" in text
-    assert "Title: Terminal" in text
-    assert "Class instance: unknown" in text
-    assert "Class: unknown" in text
-    assert "Qubes domain: unknown" in text
-    assert "Geometry: x=10 y=20 w=800 h=600" in text
-    assert "Raw xwininfo -frame output:" in text
-    assert "xwininfo raw output" in text
-    assert "Raw xprop output" not in text
+    assert text == "\n".join(
+        [
+            "Absolute upper-left X:  10",
+            "Absolute upper-left Y:  20",
+            "Relative upper-left X:  1",
+            "Relative upper-left Y:  2",
+            "Width: 800",
+            "Height: 600",
+            "geometry 800x600",
+        ]
+    )
 
 
 def test_format_active_window_info_reports_errors() -> None:
@@ -181,5 +213,4 @@ def test_format_active_window_info_reports_errors_with_raw_xwininfo() -> None:
 
     assert "Window capture failed:" in text
     assert "Could not determine selected window" in text
-    assert "Raw xwininfo -frame output:" in text
-    assert "unexpected xwininfo output" in text
+    assert "Raw xwininfo -frame output kept for debugging." in text
