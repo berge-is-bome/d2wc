@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from d2wc import __version__
+from d2wc.cli_target_rules import add_target_rule_subcommands
 from d2wc.core.geom_operations import (
     GeometryOperationError,
     GeometryProfileExistsError,
@@ -193,6 +194,8 @@ def build_parser() -> argparse.ArgumentParser:
     delete_route.add_argument("--rule", required=True, help="Route rule to delete.")
     _add_common_write_arguments(delete_route)
     delete_route.set_defaults(func=_cmd_delete_route)
+
+    add_target_rule_subcommands(subcommands, _add_common_write_arguments)
 
     return parser
 
