@@ -1,217 +1,146 @@
+from pathlib import Path
+
 from d2wc.desktop.active_window import (
     ActiveWindowInfo,
-    CaptureCommandError,
+    ScreenGeometry,
     WindowGeometry,
-    capture_active_window,
-    capture_selected_window,
-    parse_active_window_id,
-    parse_wm_class,
-    parse_xprop_string,
-    parse_xwininfo_geometry,
-    parse_xwininfo_title,
-    parse_xwininfo_window_id,
+    format_probe_number,
+    parse_devilspie2_probe_output,
+    parse_screen_geometry,
+    parse_window_geometry,
+    run_devilspie2_probe,
 )
 from d2wc.ui.gtk_app import format_active_window_info
 
 
-def test_parse_active_window_id() -> None:
-    output = '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x3e00007\n'
-
-    assert parse_active_window_id(output) == "0x3e00007"
-
-
-def test_parse_active_window_id_supports_compact_xprop_output() -> None:
-    output = '_NET_ACTIVE_WINDOW(WINDOW): 0x3e00007\n'
-
-    assert parse_active_window_id(output) == "0x3e00007"
-
-
-def test_parse_active_window_id_returns_none_for_zero() -> None:
-    output = '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0\n'
-
-    assert parse_active_window_id(output) is None
-
-
-def test_parse_xwininfo_window_id() -> None:
-    output = 'xwininfo: Window id: 0x3e00007 "Terminal"\n'
-
-    assert parse_xwininfo_window_id(output) == "0x3e00007"
-
-
-def test_parse_xwininfo_title() -> None:
-    output = 'xwininfo: Window id: 0x3e00007 "Terminal"\n'
-
-    assert parse_xwininfo_title(output) == "Terminal"
-
-
-def test_parse_xwininfo_title_for_no_name() -> None:
-    output = 'xwininfo: Window id: 0x3e00007 (has no name)\n'
-
-    assert parse_xwininfo_title(output) == "has no name"
-
-
-def test_parse_xprop_string() -> None:
-    output = 'WM_NAME(STRING) = "Terminal"\n_QUBES_VMNAME(STRING) = "work"\n'
-
-    assert parse_xprop_string(output, "WM_NAME") == "Terminal"
-    assert parse_xprop_string(output, "_QUBES_VMNAME") == "work"
-
-
-def test_parse_xprop_string_preserves_empty_qubes_vmname() -> None:
-    output = '_QUBES_VMNAME(STRING) = ""\n'
-
-    assert parse_xprop_string(output, "_QUBES_VMNAME") == ""
-
-
-def test_parse_wm_class() -> None:
-    output = 'WM_CLASS(STRING) = "Navigator", "firefox"\n'
-
-    assert parse_wm_class(output) == ("Navigator", "firefox")
-
-
-def test_parse_xwininfo_geometry() -> None:
-    output = """
-xwininfo: Window id: 0x3e00007 "Terminal"
-
-  Absolute upper-left X:  10
-  Absolute upper-left Y:  20
-  Relative upper-left X:  1
-  Relative upper-left Y:  2
-  Width: 800
-  Height: 600
+THUNDERBIRD_PROBE = """Domain: thunderbird-personal
+Application name: thunderbird-personal:net.thunderbird.Thunderbird
+Window name: Mozilla Thunderbird
+Window Type: WINDOW_TYPE_NORMAL
+Class instance name: thunderbird-personal:Mail
+Window class: thunderbird-personal:net.thunderbird.Thunderbird
+Screen Geometry: x = 3840.0 y = 2160.0
+Window geometry:  x = 474.0 y = 359.0 w = 3366.0 h = 1801.0
 """
 
-    assert parse_xwininfo_geometry(output) == WindowGeometry(
-        x=10,
-        y=20,
-        relative_x=1,
-        relative_y=2,
-        width=800,
-        height=600,
+TOR_BROWSER_PROBE = """Domain: disp3979
+Application name: disp3979:Tor Browser
+Window name: Tor Browser
+Window Type: WINDOW_TYPE_NORMAL
+Class instance name: disp3979:Navigator
+Window class: disp3979:Tor Browser
+Screen Geometry: x = 3840.0 y = 2160.0
+Window geometry:  x = 0.0 y = 46.0 w = 2122.0 h = 1578.0
+"""
+
+
+def test_parse_devilspie2_probe_output() -> None:
+    info = parse_devilspie2_probe_output(THUNDERBIRD_PROBE)
+
+    assert info.domain == "thunderbird-personal"
+    assert info.normalized_domain == "thunderbird-personal"
+    assert info.application_name == "thunderbird-personal:net.thunderbird.Thunderbird"
+    assert info.window_name == "Mozilla Thunderbird"
+    assert info.window_type == "WINDOW_TYPE_NORMAL"
+    assert info.class_instance_name == "thunderbird-personal:Mail"
+    assert info.window_class == "thunderbird-personal:net.thunderbird.Thunderbird"
+    assert info.screen_geometry == ScreenGeometry(x=3840.0, y=2160.0)
+    assert info.geometry == WindowGeometry(x=474.0, y=359.0, width=3366.0, height=1801.0)
+    assert info.raw_devilspie2_output == THUNDERBIRD_PROBE
+
+
+def test_parse_devilspie2_probe_output_with_spaces_in_values() -> None:
+    info = parse_devilspie2_probe_output(TOR_BROWSER_PROBE)
+
+    assert info.domain == "disp3979"
+    assert info.application_name == "disp3979:Tor Browser"
+    assert info.window_name == "Tor Browser"
+    assert info.class_instance_name == "disp3979:Navigator"
+    assert info.window_class == "disp3979:Tor Browser"
+    assert info.geometry == WindowGeometry(x=0.0, y=46.0, width=2122.0, height=1578.0)
+
+
+def test_empty_domain_normalizes_to_dom0() -> None:
+    info = ActiveWindowInfo(domain="")
+
+    assert info.normalized_domain == "dom0"
+
+
+def test_parse_screen_geometry() -> None:
+    assert parse_screen_geometry("x = 3840.0 y = 2160.0") == ScreenGeometry(x=3840.0, y=2160.0)
+    assert parse_screen_geometry(None) == ScreenGeometry()
+
+
+def test_parse_window_geometry() -> None:
+    assert parse_window_geometry("x = 474.0 y = 359.0 w = 3366.0 h = 1801.0") == WindowGeometry(
+        x=474.0,
+        y=359.0,
+        width=3366.0,
+        height=1801.0,
     )
+    assert parse_window_geometry(None) == WindowGeometry()
 
 
 def test_window_geometry_size_text() -> None:
-    assert WindowGeometry(width=800, height=600).size_text == "800x600"
-    assert WindowGeometry(width=800).size_text is None
+    assert WindowGeometry(width=800.0, height=600.0).size_text == "800x600"
+    assert WindowGeometry(width=800.5, height=600.25).size_text == "800.5x600.25"
+    assert WindowGeometry(width=800.0).size_text is None
 
 
-def test_capture_selected_window_with_mocked_command() -> None:
-    xwininfo_output = """
-xwininfo: Window id: 0x3e00007 "Terminal"
-
-  Absolute upper-left X:  10
-  Absolute upper-left Y:  20
-  Relative upper-left X:  1
-  Relative upper-left Y:  2
-  Width: 800
-  Height: 600
-"""
-    outputs = {
-        ("xwininfo", "-frame"): xwininfo_output,
-    }
-
-    def runner(command):
-        return outputs[tuple(command)]
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.window_id == "0x3e00007"
-    assert info.title == "Terminal"
-    assert info.wm_class_instance is None
-    assert info.wm_class is None
-    assert info.qubes_vmname is None
-    assert info.domain is None
-    assert info.geometry == WindowGeometry(
-        x=10,
-        y=20,
-        relative_x=1,
-        relative_y=2,
-        width=800,
-        height=600,
-    )
-    assert info.raw_xwininfo_output == xwininfo_output
-    assert info.error is None
-
-
-def test_capture_selected_window_reports_command_error() -> None:
-    def runner(_command):
-        raise CaptureCommandError("xwininfo failed")
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.error == "xwininfo failed"
-
-
-def test_capture_selected_window_keeps_raw_xwininfo_when_id_parse_fails() -> None:
-    def runner(_command):
-        return "unexpected xwininfo output"
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.error == "Could not determine selected window id from xwininfo output."
-    assert info.raw_xwininfo_output == "unexpected xwininfo output"
-
-
-def test_capture_active_window_uses_selected_window_capture_path() -> None:
-    outputs = {
-        ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Terminal"\n',
-    }
-
-    def runner(command):
-        return outputs[tuple(command)]
-
-    info = capture_active_window(runner=runner)
-
-    assert info.window_id == "0x3e00007"
-    assert info.title == "Terminal"
+def test_format_probe_number() -> None:
+    assert format_probe_number(800.0) == "800"
+    assert format_probe_number(800.5) == "800.5"
+    assert format_probe_number(None) == "unknown"
 
 
 def test_format_active_window_info() -> None:
-    info = ActiveWindowInfo(
-        window_id="0x3e00007",
-        title="Terminal",
-        geometry=WindowGeometry(
-            x=10,
-            y=20,
-            relative_x=1,
-            relative_y=2,
-            width=800,
-            height=600,
-        ),
-        raw_xwininfo_output="xwininfo raw output",
-    )
+    info = parse_devilspie2_probe_output(THUNDERBIRD_PROBE)
 
     text = format_active_window_info(info)
 
     assert text == "\n".join(
         [
-            "Absolute upper-left X:  10",
-            "Absolute upper-left Y:  20",
-            "Relative upper-left X:  1",
-            "Relative upper-left Y:  2",
-            "Width: 800",
-            "Height: 600",
-            "Geometry: x=10 y=20 w=800 h=600",
-            "geometry 800x600",
+            "Domain: thunderbird-personal",
+            "Application name: thunderbird-personal:net.thunderbird.Thunderbird",
+            "Window name: Mozilla Thunderbird",
+            "Window Type: WINDOW_TYPE_NORMAL",
+            "Class instance name: thunderbird-personal:Mail",
+            "Window class: thunderbird-personal:net.thunderbird.Thunderbird",
+            "Screen Geometry: x = 3840 y = 2160",
+            "Window geometry: x = 474 y = 359 w = 3366 h = 1801",
+            "geometry 3366x1801",
         ]
     )
 
 
 def test_format_active_window_info_reports_errors() -> None:
-    info = ActiveWindowInfo(error="Could not determine selected window")
+    info = ActiveWindowInfo(error="Timed out waiting for a Devilspie2 normal-window probe report.")
 
-    assert format_active_window_info(info) == "Window capture failed:\nCould not determine selected window"
+    assert format_active_window_info(info) == (
+        "Window probe failed:\nTimed out waiting for a Devilspie2 normal-window probe report."
+    )
 
 
-def test_format_active_window_info_reports_errors_with_raw_xwininfo() -> None:
+def test_format_active_window_info_reports_errors_with_raw_output() -> None:
     info = ActiveWindowInfo(
-        error="Could not determine selected window",
-        raw_xwininfo_output="unexpected xwininfo output",
+        error="Timed out waiting for a Devilspie2 normal-window probe report.",
+        raw_devilspie2_output="partial output",
     )
 
     text = format_active_window_info(info)
 
-    assert "Window capture failed:" in text
-    assert "Could not determine selected window" in text
-    assert "Raw xwininfo -frame output kept for debugging." in text
+    assert "Window probe failed:" in text
+    assert "Timed out waiting" in text
+    assert "Raw Devilspie2 output:" in text
+    assert "partial output" in text
+
+
+def test_run_devilspie2_probe_reports_missing_binary(monkeypatch, tmp_path: Path) -> None:
+    def fake_popen(*_args, **_kwargs):
+        raise FileNotFoundError
+
+    monkeypatch.setattr("d2wc.desktop.active_window.subprocess.Popen", fake_popen)
+
+    info = run_devilspie2_probe(config_home=tmp_path, timeout_seconds=0.01)
+
+    assert info.error == "Required command not found: devilspie2"
