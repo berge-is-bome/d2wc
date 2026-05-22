@@ -1,210 +1,156 @@
-"""Read-only X11 window capture helpers for Qubes/dom0 desktops."""
+"""Read-only Devilspie2 window probe helpers for Qubes/dom0 desktops."""
 
 from __future__ import annotations
 
-import re
+import os
+import select
 import subprocess
-from collections.abc import Callable, Sequence
+import tempfile
+import time
 from dataclasses import dataclass
+from pathlib import Path
 
-CommandRunner = Callable[[Sequence[str]], str]
 
+PROBE_BEGIN = "D2WC_CLASS_PROBE_BEGIN"
+PROBE_END = "D2WC_CLASS_PROBE_END"
 
-@dataclass(frozen=True)
-class WindowGeometry:
-    """Window geometry reported by xwininfo."""
+PROBE_LUA = """local function safe(v)
+  if v == nil then return "" end
+  return tostring(v)
+end
 
-    x: int | None = None
-    y: int | None = None
-    relative_x: int | None = None
-    relative_y: int | None = None
-    width: int | None = None
-    height: int | None = None
+local class_instance_name = get_class_instance_name()
 
-    @property
-    def size_text(self) -> str | None:
-        """Return WIDTHxHEIGHT text when both dimensions are known."""
-
-        if self.width is None or self.height is None:
-            return None
-        return f"{self.width}x{self.height}"
+debug_print("D2WC_CLASS_PROBE_BEGIN")
+debug_print( "Class instance name: " .. safe(class_instance_name) );
+debug_print("D2WC_CLASS_PROBE_END")
+"""
 
 
 @dataclass(frozen=True)
 class ActiveWindowInfo:
-    """Read-only identity snapshot for a selected X11 window.
+    """Read-only Devilspie2 class-instance snapshot from one window event."""
 
-    The class name is kept stable for now because the GTK proof already uses it,
-    but the current Qubes/dom0 proof only relies on `xwininfo -frame` output.
-    Frame-to-client metadata resolution will be handled in a later proof.
-    """
-
-    window_id: str | None = None
-    title: str | None = None
-    wm_class_instance: str | None = None
-    wm_class: str | None = None
-    qubes_vmname: str | None = None
-    geometry: WindowGeometry = WindowGeometry()
-    raw_xwininfo_output: str | None = None
+    class_instance_name: str | None = None
+    raw_devilspie2_output: str | None = None
     error: str | None = None
 
-    @property
-    def domain(self) -> str | None:
-        """Return the Qubes domain, treating an empty VM name as dom0."""
 
-        if self.qubes_vmname == "":
-            return "dom0"
-        return self.qubes_vmname
+def capture_selected_window(timeout_seconds: float = 45.0) -> ActiveWindowInfo:
+    """Capture one Devilspie2 class-instance report.
 
-
-def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindowInfo:
-    """Capture a user-selected X11 frame window from dom0.
-
-    This is the Qubes-safe proof path. It runs `xwininfo -frame`, which prompts
-    the user to click the target window from dom0. The raw xwininfo output is
-    kept because it is the reliable proof artifact for this stage. The next
-    proof can resolve the selected frame window to the client window for
-    title/class/Qubes metadata.
+    This function writes a temporary `debug.lua`, runs `devilspie2 --debug`
+    against that temporary config home, waits for one bounded class-instance
+    report, then terminates Devilspie2. It does not read or write the user's real
+    d2wc or Devilspie2 configuration.
     """
 
-    run = runner or _run_command
+    try:
+        with tempfile.TemporaryDirectory(prefix="d2wc-devilspie2-probe-") as tmpdir:
+            config_home = Path(tmpdir)
+            script_dir = config_home / "devilspie2"
+            script_dir.mkdir(parents=True, exist_ok=True)
+            (script_dir / "debug.lua").write_text(PROBE_LUA, encoding="utf-8")
+            return run_devilspie2_probe(config_home=config_home, timeout_seconds=timeout_seconds)
+    except OSError as exc:
+        return ActiveWindowInfo(error=f"Could not create temporary Devilspie2 probe config: {exc}")
+
+
+def capture_active_window(timeout_seconds: float = 45.0) -> ActiveWindowInfo:
+    """Backward-compatible wrapper for the current Devilspie2 probe proof."""
+
+    return capture_selected_window(timeout_seconds=timeout_seconds)
+
+
+def run_devilspie2_probe(config_home: Path, timeout_seconds: float = 45.0) -> ActiveWindowInfo:
+    """Run Devilspie2 against a temporary config home and parse one class report."""
+
+    env = os.environ.copy()
+    env["XDG_CONFIG_HOME"] = str(config_home)
 
     try:
-        xwininfo_output = run(["xwininfo", "-frame"])
-    except CaptureCommandError as exc:
-        return ActiveWindowInfo(error=str(exc))
-
-    window_id = parse_xwininfo_window_id(xwininfo_output)
-    if window_id is None:
-        return ActiveWindowInfo(
-            error="Could not determine selected window id from xwininfo output.",
-            raw_xwininfo_output=xwininfo_output,
+        process = subprocess.Popen(
+            ["devilspie2", "--debug"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            env=env,
         )
+    except FileNotFoundError:
+        return ActiveWindowInfo(error="Required command not found: devilspie2")
+    except OSError as exc:
+        return ActiveWindowInfo(error=f"Could not start devilspie2 --debug: {exc}")
+
+    output_lines: list[str] = []
+    probe_lines: list[str] = []
+    in_probe = False
+    deadline = time.monotonic() + timeout_seconds
+
+    try:
+        while time.monotonic() < deadline:
+            if process.poll() is not None:
+                break
+
+            if process.stdout is None:
+                break
+
+            readable, _, _ = select.select([process.stdout], [], [], 0.1)
+            if not readable:
+                continue
+
+            line = process.stdout.readline()
+            if line == "":
+                continue
+
+            clean_line = line.rstrip("\n")
+            output_lines.append(clean_line)
+
+            if clean_line == PROBE_BEGIN:
+                in_probe = True
+                probe_lines = []
+                continue
+
+            if clean_line == PROBE_END and in_probe:
+                return parse_devilspie2_probe_output("\n".join(probe_lines))
+
+            if in_probe:
+                probe_lines.append(clean_line)
+
+        raw_output = "\n".join(output_lines)
+        return ActiveWindowInfo(
+            raw_devilspie2_output=raw_output or None,
+            error="Timed out waiting for a Devilspie2 class-instance probe report.",
+        )
+    finally:
+        _terminate_process(process)
+
+
+def _terminate_process(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=2)
+
+
+def parse_devilspie2_probe_output(output: str) -> ActiveWindowInfo:
+    """Parse the bounded output produced by the d2wc Devilspie2 class probe."""
 
     return ActiveWindowInfo(
-        window_id=window_id,
-        title=parse_xwininfo_title(xwininfo_output),
-        geometry=parse_xwininfo_geometry(xwininfo_output),
-        raw_xwininfo_output=xwininfo_output,
+        class_instance_name=parse_colon_field(output, "Class instance name"),
+        raw_devilspie2_output=output,
     )
 
 
-def capture_active_window(runner: CommandRunner | None = None) -> ActiveWindowInfo:
-    """Backward-compatible wrapper for the current selected-window proof."""
+def parse_colon_field(output: str, field_name: str) -> str | None:
+    """Parse one `Name: value` field from Devilspie2 debug output."""
 
-    return capture_selected_window(runner=runner)
-
-
-class CaptureCommandError(RuntimeError):
-    """Raised when a window capture command fails."""
-
-
-def _run_command(command: Sequence[str]) -> str:
-    try:
-        result = subprocess.run(
-            list(command),
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except FileNotFoundError as exc:
-        raise CaptureCommandError(f"Required command not found: {command[0]}") from exc
-    except subprocess.CalledProcessError as exc:
-        message = (exc.stderr or exc.stdout or str(exc)).strip()
-        raise CaptureCommandError(f"Command failed: {' '.join(command)}: {message}") from exc
-
-    return result.stdout
-
-
-def parse_active_window_id(output: str) -> str | None:
-    """Parse `_NET_ACTIVE_WINDOW` output from `xprop -root`.
-
-    Kept for tests and possible later use, but the current Qubes/dom0 proof uses
-    `xwininfo -frame` selection instead.
-    """
-
-    for pattern in (
-        r"window id #\s*(0x[0-9a-fA-F]+|0)\b",
-        r"_NET_ACTIVE_WINDOW\([^)]*\):\s*(0x[0-9a-fA-F]+|0)\b",
-    ):
-        match = re.search(pattern, output)
-        if match:
-            window_id = match.group(1)
-            if window_id in {"0", "0x0"}:
-                return None
-            return window_id
-
-    return None
-
-
-def parse_xwininfo_window_id(output: str) -> str | None:
-    """Parse the selected window id from xwininfo output."""
-
-    match = re.search(r"xwininfo:\s+Window id:\s+(0x[0-9a-fA-F]+)", output)
-    if match:
-        return match.group(1)
-    return None
-
-
-def parse_xwininfo_title(output: str) -> str | None:
-    """Parse the selected window title from the first xwininfo line."""
-
-    quoted = re.search(r'xwininfo:\s+Window id:\s+0x[0-9a-fA-F]+\s+"(.*)"', output)
-    if quoted:
-        return quoted.group(1)
-
-    no_name = re.search(r"xwininfo:\s+Window id:\s+0x[0-9a-fA-F]+\s+\((has no name)\)", output)
-    if no_name:
-        return no_name.group(1)
-
-    return None
-
-
-def parse_xprop_string(output: str, property_name: str) -> str | None:
-    """Parse one quoted string property from xprop output.
-
-    Kept for the later frame-to-client metadata proof.
-    """
-
-    pattern = rf"^{re.escape(property_name)}\([^)]*\) = \"(.*)\"$"
+    prefix = f"{field_name}:"
     for line in output.splitlines():
-        match = re.match(pattern, line)
-        if match:
-            return match.group(1)
-    return None
-
-
-def parse_wm_class(output: str) -> tuple[str | None, str | None]:
-    """Parse WM_CLASS into instance and class strings.
-
-    Kept for the later frame-to-client metadata proof.
-    """
-
-    pattern = r'^WM_CLASS\([^)]*\) = "(.*)", "(.*)"$'
-    for line in output.splitlines():
-        match = re.match(pattern, line)
-        if match:
-            return match.group(1), match.group(2)
-    return None, None
-
-
-def parse_xwininfo_geometry(output: str) -> WindowGeometry:
-    """Parse geometry fields from xwininfo output."""
-
-    return WindowGeometry(
-        x=_parse_xwininfo_int(output, "Absolute upper-left X"),
-        y=_parse_xwininfo_int(output, "Absolute upper-left Y"),
-        relative_x=_parse_xwininfo_int(output, "Relative upper-left X"),
-        relative_y=_parse_xwininfo_int(output, "Relative upper-left Y"),
-        width=_parse_xwininfo_int(output, "Width"),
-        height=_parse_xwininfo_int(output, "Height"),
-    )
-
-
-def _parse_xwininfo_int(output: str, label: str) -> int | None:
-    pattern = rf"^\s*{re.escape(label)}:\s*(-?\d+)\s*$"
-    for line in output.splitlines():
-        match = re.match(pattern, line)
-        if match:
-            return int(match.group(1))
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
     return None

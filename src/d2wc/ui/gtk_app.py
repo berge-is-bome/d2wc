@@ -1,8 +1,8 @@
 """Minimal GTK configurator proof.
 
-The current UI proof is intentionally read-only. It prompts for a selected X11
-window from dom0, then shows the captured snapshot so the Qubes/XFCE launch and
-window identity path can be tested before any config-writing workflow is added.
+The current UI proof is intentionally read-only. It runs a temporary Devilspie2
+probe from dom0, then shows the captured class-instance value so the event data
+path can be tested before any config-writing workflow is added.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def run_configurator() -> int:
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(520, 280)
+    window.set_default_size(560, 220)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -56,7 +56,8 @@ def run_configurator() -> int:
 
     message = Gtk.Label(
         label=(
-            "Qubes/dom0 selected-window geometry proof only.\n"
+            "Devilspie2 class-instance proof only.\n"
+            "Open or focus a window while this command is running.\n"
             "No config files are read or written from this window yet."
         )
     )
@@ -81,28 +82,16 @@ def run_configurator() -> int:
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
-    """Format captured window geometry for the GTK proof window."""
+    """Format captured Devilspie2 class-instance information."""
 
     if window_info.error:
-        parts = [f"Window capture failed:\n{window_info.error}"]
-        if window_info.raw_xwininfo_output:
-            parts.append("Raw xwininfo -frame output kept for debugging.")
+        parts = [f"Window probe failed:\n{window_info.error}"]
+        if window_info.raw_devilspie2_output:
+            parts.append("Raw Devilspie2 output:")
+            parts.append(window_info.raw_devilspie2_output.rstrip())
         return "\n\n".join(parts)
 
-    geometry = window_info.geometry
-
-    return "\n".join(
-        [
-            f"Absolute upper-left X:  {_value_or_unknown_int(geometry.x)}",
-            f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
-            f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
-            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
-            f"Width: {_value_or_unknown_int(geometry.width)}",
-            f"Height: {_value_or_unknown_int(geometry.height)}",
-            f"Geometry: x={_value_or_unknown_int(geometry.x)} y={_value_or_unknown_int(geometry.y)} w={_value_or_unknown_int(geometry.width)} h={_value_or_unknown_int(geometry.height)}",
-            f"geometry {_value_or_unknown(geometry.size_text)}",
-        ]
-    )
+    return f"Class instance name: {_value_or_unknown(window_info.class_instance_name)}"
 
 
 def _value_or_unknown(value: str | None) -> str:
@@ -111,9 +100,3 @@ def _value_or_unknown(value: str | None) -> str:
     if value == "":
         return "empty"
     return value
-
-
-def _value_or_unknown_int(value: int | None) -> str:
-    if value is None:
-        return "unknown"
-    return str(value)
