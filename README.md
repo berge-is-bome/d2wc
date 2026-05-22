@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, the read-only GTK launch proof, and a read-only active-window capture proof.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, the read-only GTK launch proof, and a read-only Qubes/dom0 selected-window capture proof.
 
 ## Current status
 
@@ -25,7 +25,7 @@ The Python core currently supports validation, render preview, safe-save behavio
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The GTK proof opens a read-only window launched by `python -m d2wc configure` or `d2wc configure`. It captures the active X11 window before the configurator window is shown and displays the captured title, class, Qubes domain, and geometry. It does not read or write user config files or edit rules.
+The GTK proof opens a read-only window launched by `python -m d2wc configure` or `d2wc configure`. On Qubes, it must run from dom0. It prompts for a selected X11 window with `xwininfo -frame`, then displays the captured title, class, Qubes domain, and geometry where available. It does not read or write user config files or edit rules.
 
 Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #12 was `197 passed`.
 
@@ -88,26 +88,27 @@ or, after refreshing the editable install:
 d2wc configure
 ```
 
-The GTK proof is read-only. It captures and displays active-window details, opens a window, and closes cleanly, but does not read or write config files.
+The GTK proof is read-only. On Qubes, it must run from dom0 so it can use `xwininfo -frame` against visible windows. It prompts the user to click/select a target window, opens a GTK window with the captured details, and closes cleanly. It does not read or write config files.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
 ## Development direction
 
-The CLI/core editing proof phase is complete for the managed Lua sections. The current development phase is active-window capture from the GTK configurator.
+The CLI/core editing proof phase is complete for the managed Lua sections. The current development phase is selected-window capture from the GTK configurator.
 
 The immediate goal is intentionally small:
 
-1. `python -m d2wc configure` captures the active X11 window before the configurator appears.
-2. The GTK window displays the captured title, class, Qubes domain, and geometry.
-3. The window opens cleanly on the Qubes/XFCE target environment.
-4. The window closes cleanly.
-5. No config writes happen from this UI proof.
-6. Rule editing UI remains a later stage.
+1. `python -m d2wc configure` runs from dom0 on Qubes.
+2. The command prompts for a selected X11 window with `xwininfo -frame`.
+3. The GTK window displays the selected window title, class, Qubes domain, and geometry where available.
+4. The window opens cleanly on the Qubes/XFCE target environment.
+5. The window closes cleanly.
+6. No config writes happen from this UI proof.
+7. Rule editing UI remains a later stage.
 
 Planned longer-term entry points remain:
 
-1. Command or keyboard shortcut to open the configurator for the active window.
+1. Command or keyboard shortcut to open the configurator for a selected window.
 2. Optional system tray menu for setup or troubleshooting.
 3. Optional direct `Configure` flow after a user resizes a window and releases the primary mouse button.
 4. Optional small pointer-anchored menu after resize with `Cancel` and `Configure`.
