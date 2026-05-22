@@ -258,10 +258,19 @@ def _render_workspace_routes_block_preserving_comments(
     tail_marker_lines: list[str] = []
     current_workspace: int | None = None
     seen_route = False
+    tail_started = False
 
     for line in lines[1:-1]:
         if _is_add_more_marker(line):
             tail_marker_lines.append(line.rstrip())
+            current_workspace = None
+            tail_started = True
+            continue
+
+        stripped = line.strip()
+        if tail_started:
+            if stripped:
+                tail_marker_lines.append(line.rstrip())
             continue
 
         active, comment = _split_lua_comment(line)
@@ -274,7 +283,6 @@ def _render_workspace_routes_block_preserving_comments(
                 route_comments[workspace] = (" " * trailing_spaces) + comment
             continue
 
-        stripped = line.strip()
         if not stripped:
             continue
 
@@ -288,7 +296,6 @@ def _render_workspace_routes_block_preserving_comments(
         if _is_route_closing_comment(active, comment):
             trailing_spaces = len(active) - len(active.rstrip(" "))
             route_comments[current_workspace] = (" " * trailing_spaces) + comment
-            current_workspace = None
             continue
 
         if _is_standalone_lua_comment(line):
