@@ -169,6 +169,8 @@ def _delete_rule(section: TargetSection, rules: tuple[str, ...], rule: str) -> t
 
 
 def _normalize_target_rule(section: TargetSection, rule_text: str) -> str:
+    if not rule_text.strip():
+        raise TargetRuleOperationError(f"{section} rule must include d: or c:: {rule_text}")
     try:
         rule = parse_prefixed_rule(rule_text)
     except RuleParseError as exc:
