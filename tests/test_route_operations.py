@@ -61,6 +61,35 @@ local LEFT_EDGE_CORRECTION = {}
     assert route_lines[-2].strip() == "-- add more here"
 
 
+def test_add_route_rule_orders_workspace_rows_and_inserts_blank_lines() -> None:
+    source = '''
+local EXCLUDE = {}
+local PIN = {}
+local WORKSPACE_ROUTES = {
+  [3] = { "d:work", },
+
+  [4] = { "d:test", },
+  -- add more here
+}
+local GEOM = {}
+local WORKSPACE_PLACEMENT = {}
+local LEFT_EDGE_CORRECTION = {}
+'''
+
+    result = add_route_rule_to_source(source, 1, "d:personal")
+
+    assert _managed_block_lines(result.source, "WORKSPACE_ROUTES") == [
+        "local WORKSPACE_ROUTES = {",
+        '  [1] = { "d:personal", },',
+        "",
+        '  [3] = { "d:work", },',
+        "",
+        '  [4] = { "d:test", },',
+        "  -- add more here",
+        "}",
+    ]
+
+
 def test_add_route_rule_allows_shadowed_domain_class_target() -> None:
     result = add_route_rule_to_source(_minimal_source(), 3, "d:personal c:krusader")
 
