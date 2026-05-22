@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records the Devilspie2 functions used by `d2wc` to inspect a window before any rule-generation or rule-editing workflow is built.
+This document records the Devilspie2 functions planned for `d2wc` window inspection before any rule-generation or rule-editing workflow is built.
 
 Devilspie2 is the source of truth for this project because the runtime Lua rules use Devilspie2 APIs directly. External tools such as `xwininfo` are useful for manual diagnostics, but the configurator should prefer Devilspie2 probe data where possible.
 
@@ -24,9 +24,47 @@ Devilspie2 prints probe output when a matching window is created or processed. S
 
 The `d2wc` proof branch uses a temporary Devilspie2 config directory instead of the user's real `~/.config/devilspie2/` directory. That keeps the proof read-only with respect to the user's existing Devilspie2 setup.
 
-## Probe script
+## Current proof script
 
-The important probe functions are:
+The current proof deliberately tests only one Devilspie2 function first:
+
+```lua
+local class_instance_name = get_class_instance_name()
+
+debug_print("D2WC_CLASS_PROBE_BEGIN")
+debug_print( "Class instance name: " .. safe(class_instance_name) );
+debug_print("D2WC_CLASS_PROBE_END")
+```
+
+The Lua function is called directly into a local variable. `debug_print` is used only to get the value out of the Devilspie2 process and into the Python/GTK proof.
+
+Expected proof output shape:
+
+```text
+Class instance name: thunderbird-personal:Mail
+```
+
+## Planned next probe functions
+
+After `get_class_instance_name()` is proven end-to-end, add the remaining probe functions one at a time:
+
+```lua
+get_window_property( '_QUBES_VMNAME' )
+get_screen_geometry()
+get_window_geometry()
+```
+
+Keep the exact call form for the Qubes property:
+
+```lua
+get_window_property( '_QUBES_VMNAME' )
+```
+
+The spaces around `'_QUBES_VMNAME'` are intentionally documented here because this is the known working form used during manual testing.
+
+## Full manual reference probe
+
+The broader manual probe used during design discussion was:
 
 ```lua
 debug_print( "Domain: " .. get_window_property( '_QUBES_VMNAME' ) );
@@ -41,13 +79,7 @@ x, y, w, h = get_window_geometry();
 print( "Window geometry:  x = " ..x.." y = "..y.." w = "..w.." h = "..h );
 ```
 
-Keep the exact call form for the Qubes property:
-
-```lua
-get_window_property( '_QUBES_VMNAME' )
-```
-
-The spaces around `'_QUBES_VMNAME'` are intentionally documented here because this is the known working form used during manual testing.
+Do not add all of these to the application proof at once. Keep the application path small and test one additional function at a time.
 
 ## Sample output
 
@@ -79,51 +111,6 @@ Window geometry:  x = 0.0 y = 46.0 w = 2122.0 h = 1578.0
 
 ## Field notes
 
-### `get_window_property( '_QUBES_VMNAME' )`
-
-Returns the Qubes VM name where available.
-
-Observed behavior:
-
-1. Non-empty value means the VM/domain name.
-2. Empty value means a dom0 window.
-
-This is useful for deciding whether a captured window belongs to dom0. The VM/domain name is also usually present as the first string before `:` in values such as `get_application_name()`, but `_QUBES_VMNAME` is still the clearer dom0 test.
-
-### `get_application_name()`
-
-Returns an application identifier that may include the Qubes VM prefix.
-
-Example:
-
-```text
-thunderbird-personal:net.thunderbird.Thunderbird
-```
-
-The first string before `:` is often the VM/domain. The value after `:` may be a dotted application identifier.
-
-### `get_window_name()`
-
-Returns the user-facing window title.
-
-Example:
-
-```text
-Mozilla Thunderbird
-```
-
-### `get_window_type()`
-
-Returns the Devilspie2 window type.
-
-The current Lua runtime rules only act on:
-
-```text
-WINDOW_TYPE_NORMAL
-```
-
-The probe should keep the same filter so non-normal windows such as panels, menus, splash screens, and notifications do not drive rule generation.
-
 ### `get_class_instance_name()`
 
 Returns the class instance name. This is historically the closest match to the `c:` rule token used in `d2wc.lua`.
@@ -138,23 +125,18 @@ thunderbird-personal:Mail
 disp3979:Navigator
 ```
 
-The current Lua class matching logic lowercases class values and supports matching dotted segments. This is why values such as `net.thunderbird.Thunderbird` can be matched by shorter tokens such as `thunderbird`.
+The current proof captures only this field.
 
-### `get_window_class()`
+### `get_window_property( '_QUBES_VMNAME' )`
 
-Returns the window class.
+Returns the Qubes VM name where available.
 
-Examples:
+Observed behavior:
 
-```text
-thunderbird-personal:net.thunderbird.Thunderbird
-```
+1. Non-empty value means the VM/domain name.
+2. Empty value means a dom0 window.
 
-```text
-disp3979:Tor Browser
-```
-
-Some applications are easier to identify through `get_window_class()` or `get_application_name()` than through `get_class_instance_name()`.
+This is useful for deciding whether a captured window belongs to dom0. The VM/domain name is also usually present as the first string before `:` in values such as `get_application_name()`, but `_QUBES_VMNAME` is still the clearer dom0 test.
 
 ### `get_screen_geometry()`
 
@@ -164,12 +146,6 @@ Example:
 
 ```text
 Screen Geometry: x = 3840.0 y = 2160.0
-```
-
-In the current proof this maps to a size string such as:
-
-```text
-screen 3840x2160
 ```
 
 ### `get_window_geometry()`
@@ -182,14 +158,20 @@ Example:
 Window geometry:  x = 474.0 y = 359.0 w = 3366.0 h = 1801.0
 ```
 
-In the proof display this maps to:
+The uppercase `Geometry:` line should mean the x/y/w/h rectangle of the probed window. The lowercase `geometry` line should mean the width-by-height size string.
 
-```text
-Geometry: x=474 y=359 w=3366 h=1801
-geometry 3366x1801
+## Additional useful Devilspie2 functions
+
+These are useful, but not part of the current proof path:
+
+```lua
+get_application_name()
+get_window_name()
+get_window_type()
+get_window_class()
 ```
 
-The uppercase `Geometry:` line is the x/y/w/h rectangle of the probed window. The lowercase `geometry` line is the width-by-height size string.
+Some applications are easier to identify through `get_window_class()` or `get_application_name()` than through `get_class_instance_name()`.
 
 ## Known future issue: spaces in class-like values
 
@@ -208,9 +190,9 @@ The current `d2wc.lua` prefixed grammar splits rules on whitespace, so a token s
 The current proof should:
 
 1. Use Devilspie2 as the source of truth.
-2. Capture one `WINDOW_TYPE_NORMAL` report.
-3. Display the parsed probe fields in GTK.
+2. Capture one event-reported `get_class_instance_name()` value.
+3. Display that single value in GTK.
 4. Avoid reading or writing the user's real config files.
 5. Avoid rule editing or save workflows.
 
-Rule generation, class-value selection, space-handling in rule tokens, and persistent config writes are later stages.
+Rule generation, class-value selection, additional probe functions, space-handling in rule tokens, and persistent config writes are later stages.
