@@ -25,8 +25,9 @@ The repository currently contains:
 11. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
 12. Guarded CLI save command requiring `--write` before modifying a config file.
 13. Guarded `GEOM` add, modify, and delete commands.
-14. Guarded `WORKSPACE_PLACEMENT` add, modify, and delete commands on the `configurator-placement-proof` branch.
-15. Development status notes in [Development Status](development-status.md).
+14. Guarded `WORKSPACE_PLACEMENT` add, modify, and delete commands.
+15. Guarded `WORKSPACE_ROUTES` add, modify, and delete commands on the `configurator-routes-proof` branch.
+16. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator is developed.
 
@@ -47,7 +48,7 @@ The implementation should follow these decisions:
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 12. Keep real user configuration writes guarded until safe save behavior is proven with temporary-directory tests.
 13. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
-14. Make CLI save safe by default: preview without writing, and require `--write` before modification.
+14. Make CLI save and edit operations safe by default: preview without writing, and require `--write` before modification.
 15. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
 
 ## Stage 0: repository preparation
@@ -60,12 +61,6 @@ Completed outputs:
 2. Current Lua script in `src/d2wc.lua`.
 3. Core planning documentation.
 4. Clear branch and PR for the initial structure and core proof.
-
-Completion criteria:
-
-1. The PR contains the Lua script and planning docs.
-2. The docs agree on GTK-first, Python-first, command/shortcut-first direction.
-3. The PR remains reviewable and mergeable.
 
 ## Stage 1: source layout for Python development
 
@@ -88,6 +83,7 @@ src/
       managed_config.py
       placement_operations.py
       rendering.py
+      route_operations.py
       rule_grammar.py
       saving.py
       section_validation.py
@@ -143,6 +139,7 @@ Completed validation:
 10. Shadowed-rule detection where currently practical.
 11. Useful user-facing error messages.
 12. Token-order-independent parsing for prefixed rules.
+13. Exact duplicate route target detection for `WORKSPACE_ROUTES`.
 
 Completion criteria:
 
@@ -165,7 +162,9 @@ Completed renderer behavior:
 7. Align right-side comments in `GEOM` entries.
 8. Keep `-- add more here` as the final managed table entry while that marker exists.
 9. Apply updated rule tuples while preserving comments in rule-list sections.
-10. Validate rendered output in the standard renderer verification path.
+10. Render `WORKSPACE_ROUTES` workspace rows ordered by workspace number.
+11. Insert blank lines between `WORKSPACE_ROUTES` workspace rows.
+12. Validate rendered output in the standard renderer verification path.
 
 Completed core safe-save behavior:
 
@@ -181,21 +180,6 @@ Completed core safe-save behavior:
 10. Add preview behavior where `save` without `--write` validates and reports the planned save without modifying files.
 11. Add guarded CLI save behavior where real writes require `--write`.
 12. Support safe preview and write of supplied edited Lua source.
-
-Still required before normal UI save behavior:
-
-1. Use the safe-save helper from all future config-editing operations.
-2. Keep all save tests inside temporary directories.
-3. Keep GTK UI work deferred.
-
-Completion criteria:
-
-1. Parse and render the current file without changing semantics.
-2. Backup is created before write.
-3. Dry-run output can be inspected.
-4. Tests use temporary files, not the user's real config.
-5. Save success is reported only after the relevant file and directory fsync calls complete.
-6. CLI save previews by default and refuses to write unless the affirmative `--write` flag is supplied.
 
 ## Stage 5: safe save proof
 
@@ -213,22 +197,9 @@ Completed behavior:
 8. Uses file and directory fsync calls to reduce power-loss risk.
 9. Adds tests using temporary directories only.
 10. Previews by default when `save` is run without `--write`.
-11. Preview reports the config path, planned backup path, and rendered byte count.
-12. Preview creates no backup files or directories and modifies no config file.
-13. Requires `--write` before CLI save modifies any file.
-14. Prints the config path, backup path, and success message after a guarded save.
-15. Has manual verification using a copied temporary config.
+11. Requires `--write` before CLI save modifies any file.
 
-Completion criteria:
-
-1. Safe save tests pass.
-2. Backup tests prove the original file is preserved.
-3. Validation failure prevents replacement.
-4. Preview creates no backup and modifies no file.
-5. No test targets a user's real config directory.
-6. The CLI remains safe by default.
-
-## Stage 6: first config-editing operation proof
+## Stage 6: GEOM editing proof
 
 Stage 6 is complete and merged through PR #4.
 
@@ -246,17 +217,9 @@ Completed behavior:
 10. Preview by default and write only with `--write`.
 11. Save through the safe-save helper.
 
-Completion criteria:
-
-1. Core tests pass.
-2. CLI tests pass.
-3. Manual verification passes on copied temporary configs.
-4. Backups are created for writes.
-5. GTK UI work remains deferred.
-
 ## Stage 7: placement rule editing proof
 
-Stage 7 is active on the `configurator-placement-proof` branch and is ready for PR review after final documentation updates.
+Stage 7 is complete and merged through PR #5.
 
 Completed behavior:
 
@@ -278,16 +241,58 @@ Completed behavior:
 16. Preview by default and write only with `--write`.
 17. Save through the safe-save helper.
 
+## Stage 8: workspace route editing proof
+
+Stage 8 is complete on the `configurator-routes-proof` branch and ready to merge.
+
+Completed behavior:
+
+1. Add a new `WORKSPACE_ROUTES` rule in memory.
+2. Modify an existing `WORKSPACE_ROUTES` rule in memory.
+3. Delete an existing `WORKSPACE_ROUTES` rule in memory.
+4. Preserve managed Lua program logic outside the route block.
+5. Preserve route-row comments where the row still exists.
+6. Keep `-- add more here` as the final route-table marker while it exists.
+7. Reject exact duplicate route targets across workspace buckets.
+8. Allow broader and narrower targets side by side, for example `d:personal` and `d:personal c:navigator`.
+9. Reject route rules without a `d:` or `c:` target.
+10. Reject route rules containing `g:`.
+11. Reject route rules containing `le:`.
+12. Match modify and delete requests by parsed rule meaning, not token order.
+13. Render edited route rules in canonical prefix order: `d:`, then `c:`.
+14. Render workspace rows ordered by workspace number.
+15. Insert blank lines between workspace rows.
+16. Expose guarded CLI commands: `add-route`, `modify-route`, and `delete-route`.
+17. Preview by default and write only with `--write`.
+18. Save through the safe-save helper.
+
 Completion criteria:
 
 1. Core tests pass.
 2. CLI tests pass.
-3. Manual verification passes on copied temporary configs.
-4. Token order does not matter for add, modify, or delete input.
+3. Renderer verification path passes.
+4. Manual verification uses a copied temporary config.
 5. Backups are created for writes.
 6. GTK UI work remains deferred.
 
-## Stage 8: first GTK configurator proof
+## Stage 9: next target-rule editing proof
+
+The next likely CLI/core editing proof is `PIN` and `EXCLUDE` because both are target-rule lists and can reuse the rule-list editing pattern already proven by placement and routes.
+
+Required behavior:
+
+1. Add a target rule.
+2. Modify a target rule.
+3. Delete a target rule.
+4. Preserve comments, blank lines, and marker-tail behavior.
+5. Reject exact duplicate targets.
+6. Preserve token-order-independent matching.
+7. Preview by default and write only with `--write`.
+8. Save through the safe-save helper.
+
+GTK UI work should remain deferred until the current CLI/core editing proofs have been reviewed and merged.
+
+## Stage 10: first GTK configurator proof
 
 Build the smallest GTK configurator window.
 
@@ -306,7 +311,7 @@ Completion criteria:
 3. The command can be assigned to a desktop keyboard shortcut.
 4. No permanent config changes happen yet.
 
-## Stage 9: active-window capture proof
+## Stage 11: active-window capture proof
 
 Add active-window identity capture.
 
@@ -334,7 +339,7 @@ Completion criteria:
 3. Treats empty `_QUBES_VMNAME` as `dom0` where relevant.
 4. Refuses or ignores non-normal windows where detectable.
 
-## Stage 10: geometry capture workflow
+## Stage 12: geometry capture workflow
 
 Implement the first UI-facing geometry workflow.
 
@@ -355,17 +360,14 @@ Completion criteria:
 3. Backup is created.
 4. Validation runs before save.
 
-## Stage 11: placement rule workflow
+## Stage 13: placement rule workflow
 
 Implement the UI-facing `WORKSPACE_PLACEMENT` workflow.
 
 Required behavior:
 
 1. Let the user select an existing geometry profile.
-2. Let the user choose rule scope:
-   1. Domain and class.
-   2. Class everywhere.
-   3. Domain generally.
+2. Let the user choose rule scope.
 3. Preview the generated rule.
 4. Warn about duplicate or shadowed rules.
 5. Save after confirmation.
@@ -377,9 +379,9 @@ Completion criteria:
 2. Reopening the application allows the Lua script to place the window.
 3. The configurator shows existing matching placement rules.
 
-## Stage 12: workspace route creation
+## Stage 14: workspace route creation workflow
 
-Implement `WORKSPACE_ROUTES` creation.
+Implement the UI-facing `WORKSPACE_ROUTES` workflow.
 
 Required behavior:
 
@@ -387,7 +389,8 @@ Required behavior:
 2. Let the user choose target workspace.
 3. Let the user choose rule scope.
 4. Append to an existing workspace list instead of creating duplicate workspace keys.
-5. Preview and save.
+5. Keep route rows ordered by workspace number.
+6. Preview and save.
 
 Completion criteria:
 
@@ -395,7 +398,7 @@ Completion criteria:
 2. Duplicate workspace table keys are prevented.
 3. Matching windows route correctly after reload/restart.
 
-## Stage 13: pin and exclude rules
+## Stage 15: pin and exclude workflows
 
 Implement simple `PIN` and `EXCLUDE` workflows.
 
@@ -412,7 +415,7 @@ Completion criteria:
 2. Exclude rules short-circuit behavior as expected.
 3. Existing matching rules are shown before saving.
 
-## Stage 14: generated split profiles
+## Stage 16: generated split profiles
 
 Implement generated `half_left` and `half_right` profile support.
 
@@ -432,7 +435,7 @@ Completion criteria:
 3. Generated profile changes are previewed before save.
 4. Validation rejects invalid border widths.
 
-## Stage 15: reload or restart managed runtime
+## Stage 17: reload or restart managed runtime
 
 Implement a safe reload/restart path.
 
@@ -454,7 +457,7 @@ Completion criteria:
 1. Saved rules can be activated without manual process hunting.
 2. Failure leaves the saved file intact and reports the problem clearly.
 
-## Stage 16: left-edge correction test action
+## Stage 18: left-edge correction test action
 
 Implement the configurator-assisted left-edge test.
 
@@ -473,7 +476,7 @@ Completion criteria:
 2. The configurator can identify which correction mode works.
 3. The saved rule uses the prefixed grammar.
 
-## Stage 17: post-resize monitoring proof
+## Stage 19: post-resize monitoring proof
 
 Begin Phase 2 automation.
 
@@ -490,7 +493,7 @@ Completion criteria:
 1. Resize completion is detected reliably in Qubes/XFCE testing.
 2. Automated `d2wc` placements do not trigger false positives, or suppression design is ready.
 
-## Stage 18: post-resize configurator entry
+## Stage 20: post-resize configurator entry
 
 Add user-facing post-resize behavior.
 
@@ -508,7 +511,7 @@ Completion criteria:
 2. Pointer menu defaults to safe cancellation.
 3. Mouse-button swapping is handled or documented.
 
-## Stage 19: packaging proof
+## Stage 21: packaging proof
 
 Create the first local package proof.
 
@@ -527,7 +530,7 @@ Completion criteria:
 2. A Qubes/dom0 offline workflow is documented.
 3. The package does not overwrite user-managed Lua rules.
 
-## Stage 20: future Qt/KDE front end
+## Stage 22: future Qt/KDE front end
 
 This is not part of the first implementation, but the architecture should keep it possible.
 
@@ -538,12 +541,6 @@ Required design discipline from the beginning:
 3. UI actions are represented as operations on the core model.
 4. GTK-specific code stays under a GTK UI layer.
 5. A future Qt UI can reuse the same backend.
-
-Completion criteria for this stage later:
-
-1. Qt proof opens the same core model.
-2. Qt UI can preview and save the same managed Lua changes.
-3. KDE-oriented behavior is documented separately if needed.
 
 ## Review checkpoints
 
@@ -569,25 +566,26 @@ Review is useful at these points:
 Current branch:
 
 ```text
-configurator-placement-proof
+configurator-routes-proof
 ```
 
 Current status:
 
-1. `WORKSPACE_PLACEMENT` core add, modify, and delete operations are implemented.
-2. Guarded CLI commands are implemented: `add-placement`, `modify-placement`, and `delete-placement`.
-3. Placement commands preview by default and write only with `--write`.
+1. `WORKSPACE_ROUTES` core add, modify, and delete operations are implemented.
+2. Guarded CLI commands are implemented: `add-route`, `modify-route`, and `delete-route`.
+3. Route commands preview by default and write only with `--write`.
 4. Writes route through the safe-save helper.
-5. Automated verification has passed with 124 tests.
-6. Manual verification on a copied temporary config has passed.
-7. PR #5 is the current placement proof PR.
+5. Route rows render ordered by workspace number with blank lines between rows.
+6. Automated verification has passed.
+7. Manual route smoke testing used a copied temporary config and led to the route-row layout correction.
+8. The branch is ready to merge after final review.
 
-Likely next branch after PR #5:
+Likely next branch after this merge:
 
-1. Start `WORKSPACE_ROUTES` add, modify, and delete operations.
+1. Start `PIN` and `EXCLUDE` target-rule add, modify, and delete operations.
 2. Keep writes routed through the safe-save helper.
-3. Preserve `-- add more here` as the final table marker while it exists.
+3. Preserve comments, blank lines, and `-- add more here` marker-tail behavior.
 4. Keep token-order-independent rule handling.
-5. Keep GTK UI work deferred until the route operation is proven through CLI/core tests.
+5. Keep GTK UI work deferred until the target-rule operations are proven through CLI/core tests.
 
 No GTK UI should be built until the current CLI/core editing proofs have been reviewed and merged.
