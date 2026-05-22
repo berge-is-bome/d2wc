@@ -82,7 +82,7 @@ xwininfo: Window id: 0x3e00007 "Terminal"
     assert parse_xwininfo_geometry(output) == WindowGeometry(x=10, y=20, width=800, height=600)
 
 
-def test_capture_selected_window_with_mocked_commands() -> None:
+def test_capture_selected_window_with_mocked_command() -> None:
     xwininfo_output = """
 xwininfo: Window id: 0x3e00007 "Terminal"
 
@@ -91,18 +91,8 @@ xwininfo: Window id: 0x3e00007 "Terminal"
   Width: 800
   Height: 600
 """
-    xprop_output = 'WM_NAME(STRING) = "Terminal"\n_NET_WM_NAME(UTF8_STRING) = "Terminal"\nWM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n_QUBES_VMNAME(STRING) = "work"\n'
     outputs = {
         ("xwininfo", "-frame"): xwininfo_output,
-        (
-            "xprop",
-            "-id",
-            "0x3e00007",
-            "WM_NAME",
-            "_NET_WM_NAME",
-            "WM_CLASS",
-            "_QUBES_VMNAME",
-        ): xprop_output,
     }
 
     def runner(command):
@@ -112,88 +102,13 @@ xwininfo: Window id: 0x3e00007 "Terminal"
 
     assert info.window_id == "0x3e00007"
     assert info.title == "Terminal"
-    assert info.wm_class_instance == "xfce4-terminal"
-    assert info.wm_class == "Xfce4-terminal"
-    assert info.qubes_vmname == "work"
-    assert info.domain == "work"
+    assert info.wm_class_instance is None
+    assert info.wm_class is None
+    assert info.qubes_vmname is None
+    assert info.domain is None
     assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
     assert info.raw_xwininfo_output == xwininfo_output
-    assert info.raw_xprop_output == xprop_output
     assert info.error is None
-
-
-def test_capture_selected_window_uses_xwininfo_title_when_xprop_title_is_missing() -> None:
-    outputs = {
-        ("xwininfo", "-frame"): """
-xwininfo: Window id: 0x3e00007 "Terminal from xwininfo"
-
-  Absolute upper-left X:  10
-  Absolute upper-left Y:  20
-  Width: 800
-  Height: 600
-""",
-        (
-            "xprop",
-            "-id",
-            "0x3e00007",
-            "WM_NAME",
-            "_NET_WM_NAME",
-            "WM_CLASS",
-            "_QUBES_VMNAME",
-        ): 'WM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n',
-    }
-
-    def runner(command):
-        return outputs[tuple(command)]
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.title == "Terminal from xwininfo"
-
-
-def test_capture_selected_window_tolerates_missing_xprop() -> None:
-    def runner(command):
-        if tuple(command) == ("xwininfo", "-frame"):
-            return """
-xwininfo: Window id: 0x3e00007 "Terminal"
-
-  Absolute upper-left X:  10
-  Absolute upper-left Y:  20
-  Width: 800
-  Height: 600
-"""
-        raise CaptureCommandError("xprop failed")
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.window_id == "0x3e00007"
-    assert info.title == "Terminal"
-    assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
-    assert info.raw_xprop_output is None
-    assert info.error is None
-
-
-def test_capture_selected_window_treats_empty_qubes_vmname_as_dom0() -> None:
-    outputs = {
-        ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Qubes Manager"\n',
-        (
-            "xprop",
-            "-id",
-            "0x3e00007",
-            "WM_NAME",
-            "_NET_WM_NAME",
-            "WM_CLASS",
-            "_QUBES_VMNAME",
-        ): 'WM_NAME(STRING) = "Qubes Manager"\nWM_CLASS(STRING) = "qubes-qube-manager", "Qubes-qube-manager"\n_QUBES_VMNAME(STRING) = ""\n',
-    }
-
-    def runner(command):
-        return outputs[tuple(command)]
-
-    info = capture_selected_window(runner=runner)
-
-    assert info.qubes_vmname == ""
-    assert info.domain == "dom0"
 
 
 def test_capture_selected_window_reports_command_error() -> None:
@@ -218,15 +133,6 @@ def test_capture_selected_window_keeps_raw_xwininfo_when_id_parse_fails() -> Non
 def test_capture_active_window_uses_selected_window_capture_path() -> None:
     outputs = {
         ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Terminal"\n',
-        (
-            "xprop",
-            "-id",
-            "0x3e00007",
-            "WM_NAME",
-            "_NET_WM_NAME",
-            "WM_CLASS",
-            "_QUBES_VMNAME",
-        ): "",
     }
 
     def runner(command):
@@ -242,26 +148,21 @@ def test_format_active_window_info() -> None:
     info = ActiveWindowInfo(
         window_id="0x3e00007",
         title="Terminal",
-        wm_class_instance="xfce4-terminal",
-        wm_class="Xfce4-terminal",
-        qubes_vmname="work",
         geometry=WindowGeometry(x=10, y=20, width=800, height=600),
         raw_xwininfo_output="xwininfo raw output",
-        raw_xprop_output="xprop raw output",
     )
 
     text = format_active_window_info(info)
 
     assert "Window ID: 0x3e00007" in text
     assert "Title: Terminal" in text
-    assert "Class instance: xfce4-terminal" in text
-    assert "Class: Xfce4-terminal" in text
-    assert "Qubes domain: work" in text
+    assert "Class instance: unknown" in text
+    assert "Class: unknown" in text
+    assert "Qubes domain: unknown" in text
     assert "Geometry: x=10 y=20 w=800 h=600" in text
     assert "Raw xwininfo -frame output:" in text
     assert "xwininfo raw output" in text
-    assert "Raw xprop output for selected window id:" in text
-    assert "xprop raw output" in text
+    assert "Raw xprop output" not in text
 
 
 def test_format_active_window_info_reports_errors() -> None:
