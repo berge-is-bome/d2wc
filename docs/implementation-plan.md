@@ -26,12 +26,16 @@ The repository currently contains:
 12. Core safe-save helper and temporary-directory tests.
 13. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
 14. Guarded CLI save command requiring `--write` before modifying a config file.
-15. Guarded `GEOM` add, modify, and delete commands.
-16. Guarded `WORKSPACE_PLACEMENT` add, modify, and delete commands.
-17. Guarded `WORKSPACE_ROUTES` add, modify, and delete commands.
-18. Development status notes in [Development Status](development-status.md).
+15. Guarded add, modify, and delete commands for every managed Lua section:
+    1. `GEOM`
+    2. `WORKSPACE_PLACEMENT`
+    3. `WORKSPACE_ROUTES`
+    4. `PIN`
+    5. `EXCLUDE`
+    6. `LEFT_EDGE_CORRECTION`
+16. Development status notes in [Development Status](development-status.md).
 
-The Lua script remains the execution layer while the configurator is developed.
+The Lua script remains the execution layer while the configurator UI is developed.
 
 ## Guiding decisions
 
@@ -53,7 +57,7 @@ The implementation should follow these decisions:
 14. Make CLI save and edit operations safe by default: preview without writing, and require `--write` before modification.
 15. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
 16. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
-17. Document historical design context in the repository instead of relying on old conversations.
+17. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
 
 ## Completed stages
 
@@ -117,7 +121,7 @@ Completed validation includes:
 10. Shadowed-rule detection where currently practical.
 11. Useful user-facing error messages.
 12. Token-order-independent parsing for prefixed rules.
-13. Exact duplicate target detection for route, placement, and related rule lists.
+13. Exact duplicate target detection for route, placement, target-rule, and left-edge rule lists.
 
 ### Stage 4: renderer and safe file writer
 
@@ -222,36 +226,48 @@ Completed behavior:
 19. Preview by default and write only with `--write`.
 20. Save through the safe-save helper.
 
-Latest reported local verification after PR #9 was `153 passed`.
+### Stage 9: PIN and EXCLUDE target-rule editing proof
 
-## Stage 9: PIN and EXCLUDE target-rule editing proof
+Complete and merged through PR #11.
 
-The next likely CLI/core editing proof is `PIN` and `EXCLUDE` because both are target-rule lists and can reuse the rule-list editing pattern already proven by placement and routes.
+Completed behavior:
 
-Required behavior:
+1. Add a new `PIN` rule in memory.
+2. Modify an existing `PIN` rule in memory.
+3. Delete an existing `PIN` rule in memory.
+4. Add a new `EXCLUDE` rule in memory.
+5. Modify an existing `EXCLUDE` rule in memory.
+6. Delete an existing `EXCLUDE` rule in memory.
+7. Preserve comments, blank lines, and marker-tail behavior.
+8. Reject exact duplicate targets.
+9. Preserve token-order-independent matching.
+10. Preview by default and write only with `--write`.
+11. Save through the safe-save helper.
+12. Expose guarded CLI commands: `add-pin`, `modify-pin`, `delete-pin`, `add-exclude`, `modify-exclude`, and `delete-exclude`.
 
-1. Add a target rule.
-2. Modify a target rule.
-3. Delete a target rule.
+### Stage 10: LEFT_EDGE_CORRECTION editing proof
+
+Complete and merged through PR #12.
+
+Completed behavior:
+
+1. Add a new `LEFT_EDGE_CORRECTION` rule in memory.
+2. Modify an existing `LEFT_EDGE_CORRECTION` rule in memory.
+3. Delete an existing `LEFT_EDGE_CORRECTION` rule in memory.
 4. Preserve comments, blank lines, and marker-tail behavior.
-5. Reject exact duplicate targets.
+5. Reject exact duplicate left-edge targets.
 6. Preserve token-order-independent matching.
-7. Preview by default and write only with `--write`.
-8. Save through the safe-save helper.
-9. Preserve Qubes-first runtime assumptions.
-10. Avoid broadening dotted/wildcard matching semantics unless that is explicitly chosen and tested.
+7. Reject missing target prefixes.
+8. Reject missing `le:` mode.
+9. Reject invalid `le:` modes before rendering.
+10. Reject `g:` tokens.
+11. Preview by default and write only with `--write`.
+12. Save through the safe-save helper.
+13. Expose guarded CLI commands: `add-left-edge`, `modify-left-edge`, and `delete-left-edge`.
 
-Expected branch:
+## Future implementation stages
 
-```text
-configurator-pin-exclude-proof
-```
-
-GTK UI work should remain deferred until the current CLI/core editing proofs have been reviewed and merged.
-
-## Later implementation stages
-
-### Stage 10: first GTK configurator proof
+### Stage 11: first GTK configurator proof
 
 Build the smallest GTK configurator window.
 
@@ -259,11 +275,26 @@ Required behavior:
 
 1. Open from `python -m d2wc configure`.
 2. Show a main window.
-3. Load the managed Lua config from a test path or explicit argument.
-4. Show basic parsed sections or a simple status summary.
-5. Close cleanly.
+3. Confirm the window opens cleanly on the Qubes/XFCE target environment.
+4. Confirm the window closes cleanly.
+5. Keep the first proof read-only.
+6. Do not add active-window capture yet.
+7. Do not add rule editing UI yet.
+8. Do not write any user config from the first UI proof.
 
-### Stage 11: active-window capture proof
+Purpose:
+
+1. Prove the GTK/PyGObject dependency path.
+2. Prove the source-checkout launch path.
+3. Prove that the basic UI can run in the target Qubes/XFCE environment before workflows are built on top of it.
+
+Expected branch:
+
+```text
+configurator-gtk-proof
+```
+
+### Stage 12: active-window capture proof
 
 Add active-window identity capture.
 
@@ -274,13 +305,16 @@ Required data:
 3. Application class.
 4. Class instance where available.
 5. Qubes domain from `_QUBES_VMNAME`, if available.
-6. Workspace number where available.
-7. Current geometry.
-8. Screen geometry where available.
+6. Empty `_QUBES_VMNAME` treated as `dom0`.
+7. Workspace number where available.
+8. Current geometry.
+9. Screen geometry where available.
 
-### Stage 12: geometry capture workflow
+This stage should still avoid writing config changes by default. Its main goal is to prove that the configurator can identify the selected window correctly.
 
-Implement the first UI-facing geometry workflow.
+### Stage 13: geometry capture workflow
+
+Implement the first UI-facing config workflow.
 
 Required behavior:
 
@@ -292,56 +326,136 @@ Required behavior:
 6. Save only after confirmation.
 7. Use the tested `GEOM` core operations and safe-save helper.
 
-### Stage 13: placement rule workflow
+### Stage 14: placement rule workflow
 
 Implement the UI-facing `WORKSPACE_PLACEMENT` workflow.
 
-### Stage 14: workspace route creation workflow
+Required behavior:
+
+1. Select an existing `GEOM` profile.
+2. Apply that profile to a domain, class, or domain/class target.
+3. Preview the generated `WORKSPACE_PLACEMENT` rule.
+4. Save only after confirmation.
+5. Use the tested placement core operations and safe-save helper.
+
+### Stage 15: workspace route creation workflow
 
 Implement the UI-facing `WORKSPACE_ROUTES` workflow.
 
-### Stage 15: pin and exclude workflows
+Required behavior:
 
-Implement UI-facing `PIN` and `EXCLUDE` workflows after the CLI/core proof is complete.
+1. Select the target workspace.
+2. Route a domain, class, or domain/class target.
+3. Preview the generated route.
+4. Save only after confirmation.
+5. Use the tested route core operations and safe-save helper.
 
-### Stage 16: generated split profiles
+### Stage 16: pin and exclude workflows
 
-Implement generated `half_left` and `half_right` profile support.
+Implement UI-facing `PIN` and `EXCLUDE` workflows.
 
-### Stage 17: reload or restart managed runtime
+Required behavior:
 
-Implement a safe reload/restart path that avoids killing unrelated `devilspie2` processes.
+1. Add or remove pin rules for the selected target.
+2. Add or remove exclude rules for the selected target.
+3. Show matching existing rules before saving.
+4. Preview generated changes.
+5. Save only after confirmation.
+6. Use the tested target-rule core operations and safe-save helper.
 
-### Stage 18: left-edge correction test action
+### Stage 17: left-edge correction workflow
 
-Implement the configurator-assisted left-edge test.
+Implement a troubleshooting-oriented `LEFT_EDGE_CORRECTION` workflow.
 
-### Stage 19: post-resize monitoring proof
+Required behavior:
+
+1. Keep this workflow out of the main first-run path.
+2. Test placement at `x = 0`.
+3. Try `le:pos1`.
+4. Try `le:pos2`.
+5. Show the measured result.
+6. Save a correction rule only after confirmation.
+7. Use the tested left-edge core operations and safe-save helper.
+
+### Stage 18: generated split profiles
+
+Implement generated split-profile support.
+
+Required behavior:
+
+1. Generate common profiles such as `half_left` and `half_right`.
+2. Use screen geometry and `window_border_width`.
+3. Preview generated `GEOM` entries before writing.
+4. Avoid overwriting user profiles without confirmation.
+5. Use the tested `GEOM` core operations and safe-save helper.
+
+### Stage 19: reload or restart managed runtime
+
+Implement a safe reload or restart path that applies changed Lua config.
+
+Required behavior:
+
+1. Avoid killing unrelated `devilspie2` processes.
+2. Detect the managed process where practical.
+3. Provide a manual restart option before automation.
+4. Show what will be restarted before doing it.
+5. Keep this separate from config rendering and saving.
+
+### Stage 20: post-resize monitoring proof
 
 Begin Phase 2 automation by detecting active-window geometry changes and quiet periods.
 
-### Stage 20: post-resize configurator entry
+Required behavior:
+
+1. Detect geometry changes for the active window.
+2. Detect a quiet period after resizing stops.
+3. Apply a threshold to avoid noise.
+4. Log the final geometry first.
+5. Do not open the configurator automatically yet.
+6. Do not save rules from this proof.
+
+### Stage 21: post-resize configurator entry
 
 Add user-facing post-resize behavior.
 
-### Stage 21: packaging proof
+Required behavior:
 
-Create the first local package proof, with Fedora RPM first and Qubes/dom0 offline workflow documented.
+1. Offer a configure action after a meaningful resize.
+2. Avoid interrupting normal desktop use.
+3. Provide a cancellation path.
+4. Suppress repeat prompts for the same resize action.
+5. Reuse the manual configurator workflows.
 
-### Stage 22: future Qt/KDE front end
+### Stage 22: packaging proof
+
+Create the first local package proof.
+
+Required behavior:
+
+1. Fedora RPM first.
+2. Qubes/dom0 offline installation route documented.
+3. Source-checkout workflow remains supported.
+4. User config is not overwritten on upgrade.
+5. User config is preserved on uninstall.
+6. Debian packaging remains a later target.
+
+### Stage 23: future Qt/KDE front end
 
 Keep the architecture UI-toolkit-neutral enough that a future Qt front end can reuse the same backend.
+
+This is a later goal, not part of the current GTK-first proof path.
 
 ## Review checkpoints
 
 Review is useful at these points:
 
-1. Before enabling any new real user config writes.
-2. Before committing to GTK after the first UI proof.
-3. Before adding reload/restart behavior.
-4. Before adding post-resize automation.
-5. Before building the first RPM.
-6. Before expanding behavior beyond the Qubes-first target.
+1. Before enabling any new UI-driven real user config writes.
+2. Before committing to GTK beyond the first UI proof.
+3. Before adding active-window capture.
+4. Before adding reload/restart behavior.
+5. Before adding post-resize automation.
+6. Before building the first RPM.
+7. Before expanding behavior beyond the Qubes-first target.
 
 ## Related documents
 
@@ -358,14 +472,14 @@ Review is useful at these points:
 Current branch recommendation:
 
 ```text
-configurator-pin-exclude-proof
+configurator-gtk-proof
 ```
 
 Likely next tasks:
 
-1. Add `PIN` add, modify, and delete operations.
-2. Add `EXCLUDE` add, modify, and delete operations.
-3. Keep writes routed through the safe-save helper.
-4. Preserve comments, blank lines, and `-- add more here` marker-tail behavior.
-5. Keep token-order-independent rule handling.
-6. Keep GTK UI work deferred until the target-rule operations are proven through CLI/core tests.
+1. Add the minimal GTK dependency/import path.
+2. Replace the current `configure` placeholder with a small GTK window.
+3. Keep the UI proof read-only.
+4. Add a basic launch test where practical.
+5. Manually verify the window opens and closes on Qubes/XFCE.
+6. Keep active-window capture and rule editing UI deferred to later branches.

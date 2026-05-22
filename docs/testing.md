@@ -10,10 +10,10 @@ The testing goal is simple: the configurator must never damage a user's working 
 
 The latest confirmed source-checkout verification is recorded in [Development Status](development-status.md).
 
-Latest reported verification after PR #9:
+Latest reported verification after PR #12:
 
 ```text
-153 pytest tests passed.
+197 pytest tests passed.
 ```
 
 Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
@@ -55,6 +55,7 @@ The project should follow these principles:
 9. Test generated geometry before writing it to `GEOM`.
 10. Re-validate rendered Lua output after renderer changes.
 11. Preserve comments, blank lines, and marker-tail behavior when editing managed rule-list sections.
+12. Keep first UI proof read-only.
 
 ## Test levels
 
@@ -223,6 +224,7 @@ Tests should verify:
 2. Rule does not require `g:`.
 3. Rule does not require `le:`.
 4. Duplicate rules are detected.
+5. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ### `PIN`
 
@@ -232,6 +234,7 @@ Tests should verify:
 2. Rule does not require `g:`.
 3. Rule does not require `le:`.
 4. Duplicate rules are detected.
+5. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ### `WORKSPACE_ROUTES`
 
@@ -243,6 +246,7 @@ Tests should verify:
 4. Adding a rule appends to the existing workspace list instead of creating another same-number key.
 5. Comments around route rows are preserved where practical.
 6. Tail comments after `-- add more here` are preserved as tail content.
+7. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ### `GEOM`
 
@@ -255,6 +259,7 @@ Tests should verify:
 5. Duplicate profile names are detected.
 6. Generated `half_left` and `half_right` profiles are valid `GEOM` entries.
 7. Rendered `x`, `y`, `w`, and `h` columns remain readable and aligned.
+8. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ### `WORKSPACE_PLACEMENT`
 
@@ -264,6 +269,7 @@ Tests should verify:
 2. Rule has exactly one `g:`.
 3. Referenced geometry profile exists.
 4. Duplicate or shadowed rules are detected where practical.
+5. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ### `LEFT_EDGE_CORRECTION`
 
@@ -273,6 +279,7 @@ Tests should verify:
 2. Rule has exactly one `le:`.
 3. Correction mode is `pos1` or `pos2`.
 4. Duplicate correction rules are detected.
+5. Add, modify, and delete operations preserve comments and marker-tail behavior.
 
 ## Runtime settings tests
 
@@ -343,8 +350,11 @@ Existing guarded behavior includes:
 3. `GEOM` edit commands preview by default and write only with `--write`.
 4. `WORKSPACE_PLACEMENT` edit commands preview by default and write only with `--write`.
 5. `WORKSPACE_ROUTES` edit commands preview by default and write only with `--write`.
+6. `PIN` edit commands preview by default and write only with `--write`.
+7. `EXCLUDE` edit commands preview by default and write only with `--write`.
+8. `LEFT_EDGE_CORRECTION` edit commands preview by default and write only with `--write`.
 
-The next guarded edit commands should follow the same pattern for `PIN` and `EXCLUDE`.
+Future UI workflows must preserve the same safety model: preview first, save only after explicit confirmation, and route writes through the tested safe-save helper.
 
 ## Backup and write tests
 
@@ -365,7 +375,7 @@ No backup/write test should target the user's actual config directory.
 
 ## GTK proof tests
 
-The first UI proof should be GTK/PyGObject.
+The next development phase is the first GTK/PyGObject proof.
 
 Required manual proof tests:
 
@@ -373,11 +383,11 @@ Required manual proof tests:
 2. Window opens on Qubes/XFCE.
 3. Window can be closed cleanly.
 4. Command can be assigned to a keyboard shortcut.
-5. Configurator can load a test Lua file.
-6. Configurator can show parsed configuration summary.
-7. No real user config is modified.
+5. No real user config is modified.
+6. Active-window capture is not required for the first GTK proof.
+7. Rule editing UI is not required for the first GTK proof.
 
-GTK proof should happen after parser, validator, renderer, safe save behavior, and current target-rule edit proofs are proven, not before.
+The first GTK proof should happen after parser, validator, renderer, safe save behavior, and all current CLI/core edit proofs are proven.
 
 ## Active-window capture tests
 
@@ -456,6 +466,7 @@ The following gates must pass before the configurator can write to a real user c
 9. User explicitly selects a real config file or initializes one.
 10. Backup location is writable.
 11. Save preview is shown.
+12. For UI workflows, the preview and confirmation path must be tested before any real config write is enabled.
 
 ## Suggested test tooling
 
@@ -502,15 +513,14 @@ Desktop behavior will remain manual until a suitable test environment is designe
 
 ## Immediate test priorities
 
-The current core proof has already covered parser, grammar, validation, renderer, settings, split-profile, backup path, safe save, CLI, duplicate-validation, shadow-validation, placement edit, route edit, and route comment preservation tests.
+The current core proof has already covered parser, grammar, validation, renderer, settings, split-profile, backup path, safe save, CLI, duplicate-validation, shadow-validation, and add/modify/delete operations for all six managed Lua sections.
 
 The next immediate test priorities are:
 
-1. `PIN` add, modify, and delete operation tests.
-2. `EXCLUDE` add, modify, and delete operation tests.
-3. Rule-list comment preservation tests for `PIN` and `EXCLUDE`.
-4. Marker-tail preservation tests for `PIN` and `EXCLUDE`.
-5. Guarded CLI preview/write tests for `PIN` and `EXCLUDE`.
-6. Continue using copied temporary configs for manual smoke testing.
+1. Keep the full source-checkout verification path green.
+2. Add the smallest practical GTK launch test if it can run reliably in the development environment.
+3. Manually verify `python -m d2wc configure` opens and closes a GTK window on Qubes/XFCE.
+4. Confirm that the first GTK proof performs no real config writes.
+5. Keep active-window capture and rule-editing UI tests deferred until those features are implemented.
 
-No UI save workflow should be built before the target-rule operations are proven through CLI/core tests.
+No UI save workflow should be built before the read-only GTK proof is working.

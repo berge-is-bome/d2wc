@@ -2,20 +2,29 @@
 
 ## Current repository status
 
-Current repository status after PR #9:
+Current repository status after PR #12:
 
 ```text
 Branch: main
-Status: GEOM, WORKSPACE_PLACEMENT, and WORKSPACE_ROUTES CLI/core edit proofs are merged
-Latest merged follow-up: PR #9, route comment tail preservation
-Next likely implementation branch: configurator-pin-exclude-proof
+Status: all managed Lua sections now have CLI/core edit proofs merged
+Latest merged proof: PR #12, LEFT_EDGE_CORRECTION edit proof
+Next likely implementation branch: configurator-gtk-proof
 ```
 
-GTK UI work remains deferred until the CLI/core editing operations are sufficiently proven.
+The CLI/core edit-proof phase is complete for the six managed Lua sections:
+
+1. `GEOM`
+2. `WORKSPACE_PLACEMENT`
+3. `WORKSPACE_ROUTES`
+4. `PIN`
+5. `EXCLUDE`
+6. `LEFT_EDGE_CORRECTION`
+
+GTK UI work is now the next practical development phase. The first GTK branch should stay deliberately small and should not introduce real config writes from the UI.
 
 ## Latest confirmed local verification
 
-Verification reported on 2026-05-22 after PR #9 follow-up testing:
+Verification reported on 2026-05-22 after PR #12 follow-up testing:
 
 ```bash
 python -m d2wc validate --config src/d2wc.lua
@@ -29,8 +38,10 @@ Result:
 ```text
 src/d2wc.lua validates successfully.
 Rendered /tmp/d2wc-rendered.lua validates successfully.
-153 pytest tests passed.
+197 pytest tests passed.
 ```
+
+Manual copied-config smoke testing also passed for the `LEFT_EDGE_CORRECTION` add, modify, and delete CLI commands before PR #12 was merged.
 
 ## Historical Lua script preservation
 
@@ -50,18 +61,92 @@ git log --oneline --reverse archive/d2wc-lua-pre-repo-history -- src/d2wc.lua
 
 Design context recovered from that history is recorded in [Lua Design History Notes](lua-design-history.md).
 
+## Completed managed-section edit proofs
+
+All six managed Lua sections now have the same core editing proof pattern:
+
+1. Add one managed entry or rule.
+2. Modify one managed entry or rule.
+3. Delete one managed entry or rule.
+4. Preview by default.
+5. Write only when `--write` is supplied.
+6. Route writes through the safe-save helper.
+7. Create timestamped backups on successful writes.
+8. Re-validate rendered output after edits.
+9. Leave the original config unchanged after failed edits.
+10. Preserve comments and blank lines where practical.
+11. Preserve `-- add more here` marker-tail behavior in edited rule-list sections.
+12. Match modify and delete requests by parsed meaning rather than token order where applicable.
+13. Reject exact duplicate targets where duplicates would make behavior ambiguous.
+
+## Completed LEFT_EDGE_CORRECTION edit proof
+
+PR #12 added the tested config-editing operation set for `LEFT_EDGE_CORRECTION` rules and has been merged into `main`.
+
+Confirmed behavior:
+
+1. Adds a new `LEFT_EDGE_CORRECTION` rule in memory.
+2. Modifies an existing `LEFT_EDGE_CORRECTION` rule in memory.
+3. Deletes an existing `LEFT_EDGE_CORRECTION` rule in memory.
+4. Preserves comments and blank lines where practical.
+5. Keeps `-- add more here` as the final rule-list marker while it exists.
+6. Rejects duplicate left-edge targets on add.
+7. Rejects missing old rules on modify.
+8. Rejects missing rules on delete.
+9. Rejects left-edge rules without a `d:` or `c:` target.
+10. Rejects left-edge rules without `le:`.
+11. Rejects left-edge rules containing `g:`.
+12. Rejects invalid left-edge modes such as `le:pos3` before rendering.
+13. Matches modify and delete requests by parsed rule meaning, not token order.
+14. Renders edited rules in canonical prefix order: `d:`, then `c:`, then `le:`.
+15. Exposes guarded CLI commands: `add-left-edge`, `modify-left-edge`, and `delete-left-edge`.
+16. Preview is the default behavior.
+17. Writes require `--write`.
+18. Writes route through the safe-save helper.
+
+Manual left-edge smoke testing used a copied temporary config, not the repository `src/d2wc.lua`.
+
+## Completed PIN and EXCLUDE edit proof
+
+PR #11 added the tested config-editing operation set for `PIN` and `EXCLUDE` rules and has been merged into `main`.
+
+Confirmed behavior:
+
+1. Adds a new `PIN` rule in memory.
+2. Modifies an existing `PIN` rule in memory.
+3. Deletes an existing `PIN` rule in memory.
+4. Adds a new `EXCLUDE` rule in memory.
+5. Modifies an existing `EXCLUDE` rule in memory.
+6. Deletes an existing `EXCLUDE` rule in memory.
+7. Preserves comments and blank lines where practical.
+8. Keeps `-- add more here` as the final rule-list marker while it exists.
+9. Rejects duplicate targets on add.
+10. Rejects missing old rules on modify.
+11. Rejects missing rules on delete.
+12. Rejects rules without a `d:` or `c:` target.
+13. Rejects rules containing `g:`.
+14. Rejects rules containing `le:`.
+15. Matches modify and delete requests by parsed rule meaning, not token order.
+16. Renders edited rules in canonical prefix order: `d:`, then `c:`.
+17. Exposes guarded CLI commands: `add-pin`, `modify-pin`, `delete-pin`, `add-exclude`, `modify-exclude`, and `delete-exclude`.
+18. Preview is the default behavior.
+19. Writes require `--write`.
+20. Writes route through the safe-save helper.
+
+Manual PIN and EXCLUDE smoke testing used a copied temporary config, not the repository `src/d2wc.lua`.
+
 ## Completed WORKSPACE_ROUTES edit proof
 
-The `WORKSPACE_ROUTES` editing proof is merged.
+The `WORKSPACE_ROUTES` editing proof is merged through PR #7, PR #8, and PR #9 follow-up work.
 
-Confirmed core behavior:
+Confirmed behavior:
 
 1. Adds a new `WORKSPACE_ROUTES` rule to rendered Lua source in memory.
 2. Modifies an existing `WORKSPACE_ROUTES` rule in memory.
 3. Deletes an existing `WORKSPACE_ROUTES` rule in memory.
 4. Preserves existing managed Lua program logic outside the route block.
 5. Preserves route-row comments where the row still exists.
-6. Preserves comments after multiline route closing comments.
+6. Preserves standalone comments after multiline route closing comments.
 7. Keeps comments after the `-- add more here` marker in the marker tail.
 8. Keeps the `-- add more here` marker as tail content while the marker exists.
 9. Rejects exact duplicate route targets across workspace buckets.
@@ -76,16 +161,10 @@ Confirmed core behavior:
 18. Renders workspace route rows ordered by workspace number.
 19. Inserts a blank line between workspace route rows.
 20. Re-validates rendered output after each edit.
-
-Confirmed CLI behavior:
-
-1. `python -m d2wc add-route --config <path> --workspace <n> --rule "<rule>"` previews by default.
-2. `python -m d2wc modify-route --config <path> --old-rule "<rule>" --new-workspace <n> --new-rule "<rule>"` previews by default.
-3. `python -m d2wc delete-route --config <path> --rule "<rule>"` previews by default.
-4. Each route edit command writes only when `--write` is supplied.
-5. Writes route through the safe-save helper.
-6. Successful writes create timestamped backups.
-7. Failed edits leave the original config unchanged.
+21. Exposes guarded CLI commands: `add-route`, `modify-route`, and `delete-route`.
+22. Preview is the default behavior.
+23. Writes require `--write`.
+24. Writes route through the safe-save helper.
 
 Manual route smoke testing used a copied temporary config. Review follow-up work after PR #8 fixed route comment preservation around multiline route closing comments and marker-tail comments.
 
@@ -153,15 +232,15 @@ The current Python core supports:
 4. Power-loss-oriented safe-save behavior.
 5. Save preview by default.
 6. Guarded CLI save behavior requiring `--write` before modification.
-7. In-memory `GEOM` add, modify, and delete operations.
-8. Guarded CLI GEOM add, modify, and delete commands.
-9. In-memory `WORKSPACE_PLACEMENT` add, modify, and delete operations.
-10. Guarded CLI WORKSPACE_PLACEMENT add, modify, and delete commands.
-11. In-memory `WORKSPACE_ROUTES` add, modify, and delete operations.
-12. Guarded CLI WORKSPACE_ROUTES add, modify, and delete commands.
+7. In-memory and guarded CLI add, modify, and delete operations for `GEOM`.
+8. In-memory and guarded CLI add, modify, and delete operations for `WORKSPACE_PLACEMENT`.
+9. In-memory and guarded CLI add, modify, and delete operations for `WORKSPACE_ROUTES`.
+10. In-memory and guarded CLI add, modify, and delete operations for `PIN`.
+11. In-memory and guarded CLI add, modify, and delete operations for `EXCLUDE`.
+12. In-memory and guarded CLI add, modify, and delete operations for `LEFT_EDGE_CORRECTION`.
 13. Marker-tail preservation for `-- add more here` in edited rule-list sections.
 14. Token-order-independent rule parsing and modify/delete matching.
-15. Exact duplicate target rejection where duplicates would make routing ambiguous.
+15. Exact duplicate target rejection where duplicates would make behavior ambiguous.
 
 ## Test command guidance
 
@@ -189,21 +268,19 @@ python -m pytest
 
 ## Next practical work
 
-The next likely CLI/core editing proof is `PIN` and `EXCLUDE`, because both are target-rule lists and can reuse the proven rule-list patterns from `WORKSPACE_PLACEMENT` and `WORKSPACE_ROUTES`.
-
-The next branch should likely be:
+The next practical development branch should likely be:
 
 ```text
-configurator-pin-exclude-proof
+configurator-gtk-proof
 ```
 
-Expected behavior:
+Scope for that branch should stay small:
 
-1. Add target rules.
-2. Modify target rules.
-3. Delete target rules.
-4. Preserve comments, blank lines, and marker-tail behavior.
-5. Reject exact duplicate targets.
-6. Preserve token-order-independent matching.
-7. Preview by default and write only with `--write`.
-8. Save through the safe-save helper.
+1. Make `python -m d2wc configure` open a GTK window.
+2. Confirm the window opens cleanly on the Qubes/XFCE target environment.
+3. Confirm the window closes cleanly.
+4. Do not perform real config writes from the first UI proof.
+5. Do not add active-window capture yet.
+6. Do not add rule editing UI yet.
+
+The purpose of the next branch is to prove the UI toolkit and source-checkout launch path before building workflows on top of it.

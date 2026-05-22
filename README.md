@@ -16,9 +16,16 @@ The active Lua script supports:
 4. Applying named geometry profiles to matching windows.
 5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
 
-The Python core currently supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for `GEOM`, `WORKSPACE_PLACEMENT`, and `WORKSPACE_ROUTES`.
+The Python core currently supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for all managed Lua sections:
 
-Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #9 was `153 passed`.
+1. `GEOM`
+2. `WORKSPACE_PLACEMENT`
+3. `WORKSPACE_ROUTES`
+4. `PIN`
+5. `EXCLUDE`
+6. `LEFT_EDGE_CORRECTION`
+
+Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #12 was `197 passed`.
 
 ## Repository layout
 
@@ -69,15 +76,21 @@ Comments and blank separator lines inside the managed Lua sections are treated a
 
 ## Development direction
 
-The goal is a minimal configurator that hides as much manual rule-writing as possible while still allowing the user to review and edit the result before it is written to the Lua script.
+The CLI/core editing proof phase is complete for the managed Lua sections. The next development phase is the first GTK configurator proof.
 
-Planned entry points:
+The immediate goal is intentionally small:
+
+1. `python -m d2wc configure` opens a GTK window.
+2. The window opens cleanly on the Qubes/XFCE target environment.
+3. The window closes cleanly.
+4. No config writes happen from the first UI proof.
+5. Active-window capture and rule editing UI remain later stages.
+
+Planned longer-term entry points remain:
 
 1. Command or keyboard shortcut to open the configurator for the active window.
 2. Optional system tray menu for setup or troubleshooting.
 3. Optional direct `Configure` flow after a user resizes a window and releases the primary mouse button.
 4. Optional small pointer-anchored menu after resize with `Cancel` and `Configure`.
 
-The configurator should eventually update the Lua sections `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `GEOM`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION` without requiring the user to edit Lua manually.
-
-The next likely CLI/core editing proof is `PIN` and `EXCLUDE`, because both are target-rule lists and can reuse the rule-list editing behavior proven by placement and route operations.
+The ordered future roadmap is maintained in [`docs/implementation-plan.md`](docs/implementation-plan.md).
