@@ -52,6 +52,8 @@ Install `python3-pip` with your package manager, then install the project in edi
 python -m pip install -e .
 ```
 
+Re-run the editable install command after switching to a branch that changes `[project.scripts]`; otherwise the generated `d2wc` console wrapper may still point at the previously installed entry point.
+
 For normal source-checkout testing:
 
 ```bash
@@ -74,13 +76,13 @@ The `validate` command is read-only. It parses and validates the managed Lua sec
 
 The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
 
-The first GTK proof can be launched with:
+The first GTK proof can be launched directly from the source checkout with:
 
 ```bash
 python -m d2wc configure
 ```
 
-or, after editable install:
+or, after refreshing the editable install:
 
 ```bash
 d2wc configure
