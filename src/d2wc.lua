@@ -1,6 +1,6 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.10
+-- version 0.1.11.2
 ------------------------------------------------------------
 
 -- Only act on real app windows
@@ -35,12 +35,6 @@ local PIN = {
   -- "c:okular",          -- pin okular everywhere
 }
 
--- Left-edge window position correction for windows positioned at x == 0
---   "none"  -> do not adjust after set_window_geometry
---   "pos1"  -> call set_window_position(x, y)
---   "pos2"  -> call set_window_position2(x, y)
-local LEFT_EDGE_CORRECTION = "pos2" -- change to "pos1" or "pos2" if you see a gap between the window border and the left edge of your screen, despite x = 0
-
 ------------------------------------------------------------
 -- Workspace routes. Place applications together on a workspace.
 -- Keys are workspace numbers; values are lists of:
@@ -54,45 +48,109 @@ local WORKSPACE_ROUTES = {
 }
 
 ------------------------------------------------------------
+-- Geometry profiles
+------------------------------------------------------------
+local GEOM = {
+  wide         = { x = 100,  y = 456,  w = 3624, h = 1389 },
+  centered_mid = { x = 960,  y = 540,  w = 1200, h = 900  },
+  half_left    = { x = 0,    y = 0,    w = 1920, h = 2115 },
+  half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
+  custom_name  = { x = 0,    y = 0,    w = 0,    h = 0    },
+}
+
+------------------------------------------------------------
+-- 2) Geometry rules with easy tokens
+------------------------------------------------------------
+-- 2) GEOM_RULES
+-- Each entry is either:
+--   "profile.class"              (global)
+--   "domain.profile.class"       (domain specific)
+-- Class matching rules:
+--   - exact match: "okular" matches "okular"
+--   - base name:   "soffice" matches "soffice.bin" (drops suffix after first dot)
+--   - wildcard:    "soffice*" matches any "soffice.*"
+--
+-- Examples:
+--   wide.krusader
+--   wide.soffice
+--   half_right.okular
+--   personal.half_left.okular
+--
+-- Example: domain-specific override for okular in domain "personal"
+--   personal.centered_mid.okular
+------------------------------------------------------------
+local GEOM_RULES = {
+  "wide.krusader",
+  "wide.soffice",            -- matches soffice and soffice.bin
+  "half_right.okular",
+  "personal.half_left.okular",
+  -- add more here
+}
+
+------------------------------------------------------------
+-- Left-edge window position correction for windows positioned at x == 0
+-- change to "pos1" or "pos2" if you see a gap between the window border and the left edge of your screen, despite x = 0
+------------------------------------------------------------
+--   "none"  -> do not adjust after set_window_geometry
+--   "pos1"  -> call set_window_position(x, y)
+--   "pos2"  -> call set_window_position2(x, y)
+------------------------------------------------------------
+local LEFT_EDGE_CORRECTION = "pos2"
+
+
+------------------------------------------------------------
 -- Token parser and lookup builders
 ------------------------------------------------------------
 local function parse_token(token)
-  local tag, rest = token:match("^([dc]):(.+)$")
+  local t = (token or ""):lower()
+  local tag, rest = t:match("^([dc]):(.+)$")
   if tag == "d" then return "domain", rest end
   if tag == "c" then return "class",  rest end
-  local d, c = token:match("^([^%.]+)%.(.+)$")
+  local d, c = t:match("^([^%.]+)%.(.+)$")
   if d and c then return "exact", d .. "." .. c end
-  return "domain", token
+  return "domain", t
 end
 
+------------------------------------------------------------
 -- Build lookups for EXCLUDE
+------------------------------------------------------------
 local EX_EXACT, EX_DOMAIN, EX_CLASS = {}, {}, {}
 for _, tok in ipairs(EXCLUDE) do
-  local kind, val = parse_token(tok)
-  if     kind == "exact"  then EX_EXACT[val]   = true
-  elseif kind == "domain" then EX_DOMAIN[val]  = true
-  elseif kind == "class"  then EX_CLASS[val]   = true
+  if tok ~= nil and tok ~= "" then
+    local kind, val = parse_token(tok)
+    if     kind == "exact"  then EX_EXACT[val]   = true
+    elseif kind == "domain" then EX_DOMAIN[val]  = true
+    elseif kind == "class"  then EX_CLASS[val]   = true
+    end
   end
 end
 
+------------------------------------------------------------
 -- Build lookups for PIN
+------------------------------------------------------------
 local PIN_EXACT, PIN_DOMAIN, PIN_CLASS = {}, {}, {}
 for _, tok in ipairs(PIN) do
-  local kind, val = parse_token(tok)
-  if     kind == "exact"  then PIN_EXACT[val]   = true
-  elseif kind == "domain" then PIN_DOMAIN[val]  = true
-  elseif kind == "class"  then PIN_CLASS[val]   = true
+  if tok ~= nil and tok ~= "" then
+    local kind, val = parse_token(tok)
+    if     kind == "exact"  then PIN_EXACT[val]   = true
+    elseif kind == "domain" then PIN_DOMAIN[val]  = true
+    elseif kind == "class"  then PIN_CLASS[val]   = true
+    end
   end
 end
 
+------------------------------------------------------------
 -- Build lookups for WORKSPACE_ROUTES
+------------------------------------------------------------
 local WS_EXACT, WS_DOMAIN, WS_CLASS = {}, {}, {}
 for wsnum, list in pairs(WORKSPACE_ROUTES) do
   for _, tok in ipairs(list) do
-    local kind, val = parse_token(tok)
-    if     kind == "exact"  then WS_EXACT[val]  = wsnum
-    elseif kind == "domain" then WS_DOMAIN[val] = wsnum
-    elseif kind == "class"  then WS_CLASS[val]  = wsnum
+    if tok ~= nil and tok ~= "" then
+      local kind, val = parse_token(tok)
+      if     kind == "exact"  then WS_EXACT[val]  = wsnum
+      elseif kind == "domain" then WS_DOMAIN[val] = wsnum
+      elseif kind == "class"  then WS_CLASS[val]  = wsnum
+      end
     end
   end
 end
@@ -161,143 +219,74 @@ if domain then
   end
 end
 
-------------------------------------------------------------
--- Geometry profiles and Rules
--- 1) Geometry profiles
--- 2) Group applications by Geometry profile
--- 3) Optionally override per domain or per class
-------------------------------------------------------------
 
 ------------------------------------------------------------
--- 1_ Geometry profiles
+-- Build rule maps and resolvers
 ------------------------------------------------------------
-local GEOM = {
-  wide         = { x = 100,  y = 456,  w = 3624, h = 1389 },
-  centered_mid = { x = 960,  y = 540,  w = 1200, h = 900  },
-  half_left    = { x = 0,    y = 0,    w = 1920, h = 2115 },
-  half_right   = { x = 1913, y = 0,    w = 1920, h = 2115 },
-  custom_name  = { x = 0,    y = 0,    w = 0,    h = 0    },
-}
+local GR_DOMAIN, GR_GLOBAL = {}, {}
 
-------------------------------------------------------------
--- 2+3) RULES
--- ["*"] is global defaults
--- In per_class you can supply either:
---   a) a geometry profile, e.g. "half_right"
---   b) a geometry table { x=..., y=..., w=..., h=... }
--- Example: domain-specific override for okular. Use this rule to override global defaults per domain
-------------------------------------------------------------
-local RULES = {
-  ["*"] = {
-    groups = {
-      wide       = { "krusader", "soffice" }, -- shared geometry
-      half_right = { "okular" }, -- shared geometry
-      -- wide = { "krusader", "okular" }, -- shared geometry
-    },
-    per_class = {
-      -- ["okular"] = "half_right", -- geometry profile
-      -- ["gimp-3.0"] = { x = 120, y = 120, w = 1600, h = 1000 }, -- numerical values
-    },
-  },
-
-  test = {
-    groups = {
-      half_left = { "some-application", "another-application" }, -- shared geometry
-    },
-    per_class = {
-      -- ["some-application"] = "half_right", -- geometry profile
-      -- ["some-application"] = { x = 0, y = 0, w = 1280, h = 900 }, -- numerical values
-    },
-  },
-
-  ["personal"] = {
-    groups = {
-      -- you can still group (other) applications here if you want
-    },
-    per_class = {
-      ["okular"] = "half_left",
-    },
-  },
-
-  -- Example: domain-specific override for okular in domain "personal"
-  -- personal = {
-  --   groups = {
-      -- you can still group (other) applications here if you want
-  --   per_class = {
-      -- Option A: geometry profile
-      -- ["okular"] = "centered_mid",
-      --
-      -- Option B: numerical values
-      -- ["okular"] = { x = 1913, y = 0, w = 1920, h = 2115 },
-  --   },
-  -- },
-}
-
-------------------------------------------------------------
--- Resolver helpers
-------------------------------------------------------------
-local function in_list(list, needle)
-  for _, v in ipairs(list or {}) do
-    if v == needle then return true end
+local function add_geom_rule(tok)
+  -- domain.profile.class
+  local d, p, c = tok:match("^([^%.]+)%.([^%.]+)%.(.+)$")
+  if d and p and c then
+    GR_DOMAIN[d] = GR_DOMAIN[d] or {}
+    GR_DOMAIN[d][c:lower()] = p
+    return
   end
-  return false
+  -- profile.class
+  local p2, c2 = tok:match("^([^%.]+)%.(.+)$")
+  if p2 and c2 then
+    GR_GLOBAL[c2:lower()] = p2
+    return
+  end
+  debug_print("GEOM_RULES: could not parse '" .. tok .. "'")
 end
 
-local function resolve_geom_spec(spec)
-  if type(spec) == "string" then
-    local g = GEOM[spec]
-    if not g then
-      debug_print("RULES: unknown profile '" .. spec .. "'")
-    end
-    return g
-  elseif type(spec) == "table" then
-    if spec.x and spec.y and spec.w and spec.h then
-      return spec
-    else
-      debug_print("RULES: bad geometry table for class")
-      return nil
-    end
-  else
-    return nil
-  end
+for _, tok in ipairs(GEOM_RULES) do
+  add_geom_rule(tok)
 end
 
--- Resolve geometry for domain+class, then global defaults
+local function class_match_rank(rule_cls, actual_cls)
+  -- exact match
+  if rule_cls == actual_cls then return 3 end
+  -- wildcard prefix, e.g. "soffice*"
+  if rule_cls:sub(-1) == "*" then
+    local pref = rule_cls:sub(1, -2)
+    if actual_cls:sub(1, #pref) == pref then return 2 end
+  end
+  -- base-name match: "soffice" vs "soffice.bin"
+  local base = actual_cls:gsub("%..*$", "")
+  if rule_cls == base then return 1 end
+  return 0
+end
+
+local function pick_profile(map, actual_cls)
+  if not map then return nil end
+  local best_p, best_r = nil, 0
+  for rule_cls, prof in pairs(map) do
+    local r = class_match_rank(rule_cls, actual_cls)
+    if r > best_r then
+      best_r, best_p = r, prof
+    end
+  end
+  return best_p
+end
+
+-- Resolve geometry for domain+class using GEOM_RULES
 local function find_geometry(d, class_lc)
-  -- 1) domain-specific per_class
-  local rd = d and RULES[d] or nil
-  if rd then
-    if rd.per_class and rd.per_class[class_lc] ~= nil then
-      local g = resolve_geom_spec(rd.per_class[class_lc])
-      if g then return g end
-    end
-    -- 2) domain-specific groups
-    if rd.groups then
-      for prof, list in pairs(rd.groups) do
-        if in_list(list, class_lc) then
-          return GEOM[prof]
-        end
-      end
-    end
+  local prof = nil
+  if d and GR_DOMAIN[d] then
+    prof = pick_profile(GR_DOMAIN[d], class_lc)
   end
-
-  -- 3) global per_class
-  local rdef = RULES["*"]
-  if rdef and rdef.per_class and rdef.per_class[class_lc] ~= nil then
-    local g = resolve_geom_spec(rdef.per_class[class_lc])
-    if g then return g end
+  if not prof then
+    prof = pick_profile(GR_GLOBAL, class_lc)
   end
-
-  -- 4) global groups
-  if rdef and rdef.groups then
-    for prof, list in pairs(rdef.groups) do
-      if in_list(list, class_lc) then
-        return GEOM[prof]
-      end
-    end
+  if not prof then return nil end
+  local g = GEOM[prof]
+  if not g then
+    debug_print("GEOM_RULES: unknown profile '" .. tostring(prof) .. "'")
   end
-
-  return nil
+  return g
 end
 
 -- Apply window geometry
