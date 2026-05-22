@@ -11,90 +11,38 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-PROBE_BEGIN = "D2WC_PROBE_BEGIN"
-PROBE_END = "D2WC_PROBE_END"
+PROBE_BEGIN = "D2WC_CLASS_PROBE_BEGIN"
+PROBE_END = "D2WC_CLASS_PROBE_END"
 
 PROBE_LUA = """local function safe(v)
   if v == nil then return "" end
   return tostring(v)
 end
 
-if get_window_type() ~= "WINDOW_TYPE_NORMAL" then
-  return
-end
+local class_instance_name = get_class_instance_name()
 
-debug_print("D2WC_PROBE_BEGIN")
-debug_print( "Domain: " .. safe(get_window_property( '_QUBES_VMNAME' )) );
-debug_print( "Application name: " .. safe(get_application_name()) );
-debug_print( "Window name: " .. safe(get_window_name()) );
-debug_print( "Window Type: " .. safe(get_window_type()) );
-debug_print( "Class instance name: " .. safe(get_class_instance_name()) );
-debug_print( "Window class: " .. safe(get_window_class()) );
-local sx, sy = get_screen_geometry()
-print( "Screen Geometry: x = " .. safe(sx) .. " y = " .. safe(sy) );
-local x, y, w, h = get_window_geometry()
-print( "Window geometry:  x = " .. safe(x) .. " y = " .. safe(y) .. " w = " .. safe(w) .. " h = " .. safe(h) );
-debug_print("D2WC_PROBE_END")
+debug_print("D2WC_CLASS_PROBE_BEGIN")
+debug_print( "Class instance name: " .. safe(class_instance_name) );
+debug_print("D2WC_CLASS_PROBE_END")
 """
 
 
 @dataclass(frozen=True)
-class ScreenGeometry:
-    """Screen geometry reported by Devilspie2."""
-
-    x: float | None = None
-    y: float | None = None
-
-
-@dataclass(frozen=True)
-class WindowGeometry:
-    """Window geometry reported by Devilspie2."""
-
-    x: float | None = None
-    y: float | None = None
-    width: float | None = None
-    height: float | None = None
-
-    @property
-    def size_text(self) -> str | None:
-        """Return WIDTHxHEIGHT text when both dimensions are known."""
-
-        if self.width is None or self.height is None:
-            return None
-        return f"{format_probe_number(self.width)}x{format_probe_number(self.height)}"
-
-
-@dataclass(frozen=True)
 class ActiveWindowInfo:
-    """Read-only Devilspie2 snapshot for a normal application window."""
+    """Read-only Devilspie2 class-instance snapshot from one window event."""
 
-    domain: str | None = None
-    application_name: str | None = None
-    window_name: str | None = None
-    window_type: str | None = None
     class_instance_name: str | None = None
-    window_class: str | None = None
-    screen_geometry: ScreenGeometry = ScreenGeometry()
-    geometry: WindowGeometry = WindowGeometry()
     raw_devilspie2_output: str | None = None
     error: str | None = None
 
-    @property
-    def normalized_domain(self) -> str | None:
-        """Return the Qubes domain, treating an empty VM name as dom0."""
-
-        if self.domain == "":
-            return "dom0"
-        return self.domain
-
 
 def capture_selected_window(timeout_seconds: float = 45.0) -> ActiveWindowInfo:
-    """Capture one normal window report through Devilspie2 debug output.
+    """Capture one Devilspie2 class-instance report.
 
     This function writes a temporary `debug.lua`, runs `devilspie2 --debug`
-    against that temporary config home, waits for one complete probe report, then
-    terminates Devilspie2. It does not read or write the user's real d2wc or
-    Devilspie2 configuration.
+    against that temporary config home, waits for one bounded class-instance
+    report, then terminates Devilspie2. It does not read or write the user's real
+    d2wc or Devilspie2 configuration.
     """
 
     try:
@@ -115,7 +63,7 @@ def capture_active_window(timeout_seconds: float = 45.0) -> ActiveWindowInfo:
 
 
 def run_devilspie2_probe(config_home: Path, timeout_seconds: float = 45.0) -> ActiveWindowInfo:
-    """Run Devilspie2 against a temporary config home and parse one probe report."""
+    """Run Devilspie2 against a temporary config home and parse one class report."""
 
     env = os.environ.copy()
     env["XDG_CONFIG_HOME"] = str(config_home)
@@ -171,7 +119,7 @@ def run_devilspie2_probe(config_home: Path, timeout_seconds: float = 45.0) -> Ac
         raw_output = "\n".join(output_lines)
         return ActiveWindowInfo(
             raw_devilspie2_output=raw_output or None,
-            error="Timed out waiting for a Devilspie2 normal-window probe report.",
+            error="Timed out waiting for a Devilspie2 class-instance probe report.",
         )
     finally:
         _terminate_process(process)
@@ -190,80 +138,19 @@ def _terminate_process(process: subprocess.Popen[str]) -> None:
 
 
 def parse_devilspie2_probe_output(output: str) -> ActiveWindowInfo:
-    """Parse the bounded output produced by the d2wc Devilspie2 probe script."""
-
-    fields = _parse_colon_fields(output)
+    """Parse the bounded output produced by the d2wc Devilspie2 class probe."""
 
     return ActiveWindowInfo(
-        domain=fields.get("Domain"),
-        application_name=fields.get("Application name"),
-        window_name=fields.get("Window name"),
-        window_type=fields.get("Window Type"),
-        class_instance_name=fields.get("Class instance name"),
-        window_class=fields.get("Window class"),
-        screen_geometry=parse_screen_geometry(fields.get("Screen Geometry")),
-        geometry=parse_window_geometry(fields.get("Window geometry")),
+        class_instance_name=parse_colon_field(output, "Class instance name"),
         raw_devilspie2_output=output,
     )
 
 
-def _parse_colon_fields(output: str) -> dict[str, str]:
-    fields: dict[str, str] = {}
+def parse_colon_field(output: str, field_name: str) -> str | None:
+    """Parse one `Name: value` field from Devilspie2 debug output."""
+
+    prefix = f"{field_name}:"
     for line in output.splitlines():
-        if ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip()
-    return fields
-
-
-def parse_screen_geometry(value: str | None) -> ScreenGeometry:
-    """Parse `x = WIDTH y = HEIGHT` screen geometry text."""
-
-    if value is None:
-        return ScreenGeometry()
-
-    parts = _parse_named_numbers(value)
-    return ScreenGeometry(x=parts.get("x"), y=parts.get("y"))
-
-
-def parse_window_geometry(value: str | None) -> WindowGeometry:
-    """Parse `x = X y = Y w = W h = H` window geometry text."""
-
-    if value is None:
-        return WindowGeometry()
-
-    parts = _parse_named_numbers(value)
-    return WindowGeometry(
-        x=parts.get("x"),
-        y=parts.get("y"),
-        width=parts.get("w"),
-        height=parts.get("h"),
-    )
-
-
-def _parse_named_numbers(value: str) -> dict[str, float]:
-    parts: dict[str, float] = {}
-    tokens = value.split()
-
-    for index, token in enumerate(tokens):
-        if token not in {"x", "y", "w", "h"}:
-            continue
-        if index + 2 >= len(tokens) or tokens[index + 1] != "=":
-            continue
-        try:
-            parts[token] = float(tokens[index + 2])
-        except ValueError:
-            continue
-
-    return parts
-
-
-def format_probe_number(value: float | None) -> str:
-    """Format Devilspie2 numeric output compactly for display."""
-
-    if value is None:
-        return "unknown"
-    if value.is_integer():
-        return str(int(value))
-    return str(value)
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
+    return None
