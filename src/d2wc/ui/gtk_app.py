@@ -119,15 +119,6 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
             ]
         )
 
-    if window_info.raw_xprop_output:
-        parts.extend(
-            [
-                "",
-                "Raw xprop output for selected window id:",
-                window_info.raw_xprop_output.rstrip(),
-            ]
-        )
-
     return "\n".join(parts)
 
 
