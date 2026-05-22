@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlockParser
 from d2wc.core.managed_config import ManagedConfig, extract_managed_config, render_managed_config
 from d2wc.core.rendering import RenderValidationError
-from d2wc.core.rule_grammar import RuleParseError, parse_prefixed_rule
+from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
 
 
@@ -149,6 +149,8 @@ def _normalize_left_edge_rule(rule_text: str) -> str:
         raise LeftEdgeOperationError(f"left-edge rule must not include g:: {rule_text}")
     if rule.left_edge_mode is None:
         raise LeftEdgeOperationError(f"left-edge rule must include le:: {rule_text}")
+    if rule.left_edge_mode not in LEFT_EDGE_MODES:
+        raise LeftEdgeOperationError(f"invalid left-edge mode: {rule.left_edge_mode}")
     parts: list[str] = []
     if rule.domain is not None:
         parts.append(f"d:{rule.domain}")
