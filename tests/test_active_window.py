@@ -44,6 +44,12 @@ def test_parse_xwininfo_title() -> None:
     assert parse_xwininfo_title(output) == "Terminal"
 
 
+def test_parse_xwininfo_title_for_no_name() -> None:
+    output = 'xwininfo: Window id: 0x3e00007 (has no name)\n'
+
+    assert parse_xwininfo_title(output) == "has no name"
+
+
 def test_parse_xprop_string() -> None:
     output = 'WM_NAME(STRING) = "Terminal"\n_QUBES_VMNAME(STRING) = "work"\n'
 
@@ -77,15 +83,17 @@ xwininfo: Window id: 0x3e00007 "Terminal"
 
 
 def test_capture_selected_window_with_mocked_commands() -> None:
-    outputs = {
-        ("xwininfo", "-frame"): """
+    xwininfo_output = """
 xwininfo: Window id: 0x3e00007 "Terminal"
 
   Absolute upper-left X:  10
   Absolute upper-left Y:  20
   Width: 800
   Height: 600
-""",
+"""
+    xprop_output = 'WM_NAME(STRING) = "Terminal"\n_NET_WM_NAME(UTF8_STRING) = "Terminal"\nWM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n_QUBES_VMNAME(STRING) = "work"\n'
+    outputs = {
+        ("xwininfo", "-frame"): xwininfo_output,
         (
             "xprop",
             "-id",
@@ -94,7 +102,7 @@ xwininfo: Window id: 0x3e00007 "Terminal"
             "_NET_WM_NAME",
             "WM_CLASS",
             "_QUBES_VMNAME",
-        ): 'WM_NAME(STRING) = "Terminal"\n_NET_WM_NAME(UTF8_STRING) = "Terminal"\nWM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n_QUBES_VMNAME(STRING) = "work"\n',
+        ): xprop_output,
     }
 
     def runner(command):
@@ -109,6 +117,8 @@ xwininfo: Window id: 0x3e00007 "Terminal"
     assert info.qubes_vmname == "work"
     assert info.domain == "work"
     assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
+    assert info.raw_xwininfo_output == xwininfo_output
+    assert info.raw_xprop_output == xprop_output
     assert info.error is None
 
 
@@ -159,6 +169,7 @@ xwininfo: Window id: 0x3e00007 "Terminal"
     assert info.window_id == "0x3e00007"
     assert info.title == "Terminal"
     assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
+    assert info.raw_xprop_output is None
     assert info.error is None
 
 
@@ -194,6 +205,16 @@ def test_capture_selected_window_reports_command_error() -> None:
     assert info.error == "xwininfo failed"
 
 
+def test_capture_selected_window_keeps_raw_xwininfo_when_id_parse_fails() -> None:
+    def runner(_command):
+        return "unexpected xwininfo output"
+
+    info = capture_selected_window(runner=runner)
+
+    assert info.error == "Could not determine selected window id from xwininfo output."
+    assert info.raw_xwininfo_output == "unexpected xwininfo output"
+
+
 def test_capture_active_window_uses_selected_window_capture_path() -> None:
     outputs = {
         ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Terminal"\n',
@@ -225,6 +246,8 @@ def test_format_active_window_info() -> None:
         wm_class="Xfce4-terminal",
         qubes_vmname="work",
         geometry=WindowGeometry(x=10, y=20, width=800, height=600),
+        raw_xwininfo_output="xwininfo raw output",
+        raw_xprop_output="xprop raw output",
     )
 
     text = format_active_window_info(info)
@@ -235,9 +258,27 @@ def test_format_active_window_info() -> None:
     assert "Class: Xfce4-terminal" in text
     assert "Qubes domain: work" in text
     assert "Geometry: x=10 y=20 w=800 h=600" in text
+    assert "Raw xwininfo -frame output:" in text
+    assert "xwininfo raw output" in text
+    assert "Raw xprop output for selected window id:" in text
+    assert "xprop raw output" in text
 
 
 def test_format_active_window_info_reports_errors() -> None:
     info = ActiveWindowInfo(error="Could not determine selected window")
 
     assert format_active_window_info(info) == "Window capture failed:\nCould not determine selected window"
+
+
+def test_format_active_window_info_reports_errors_with_raw_xwininfo() -> None:
+    info = ActiveWindowInfo(
+        error="Could not determine selected window",
+        raw_xwininfo_output="unexpected xwininfo output",
+    )
+
+    text = format_active_window_info(info)
+
+    assert "Window capture failed:" in text
+    assert "Could not determine selected window" in text
+    assert "Raw xwininfo -frame output:" in text
+    assert "unexpected xwininfo output" in text
