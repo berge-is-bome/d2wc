@@ -20,6 +20,7 @@ docs/
   implementation-plan.md
   testing.md
   lua-configurables.md
+  lua-design-history.md
   repository-layout.md
 src/
   d2wc.lua
@@ -29,10 +30,14 @@ src/
     cli.py
     core/
       backup.py
+      geom_operations.py
       lua_blocks.py
       managed_config.py
+      placement_operations.py
       rendering.py
+      route_operations.py
       rule_grammar.py
+      saving.py
       section_validation.py
       settings.py
       shadow_validation.py
@@ -55,7 +60,8 @@ tests/
 10. [Implementation Plan](implementation-plan.md) turns the design into ordered development stages.
 11. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
 12. [Lua Configurables](lua-configurables.md) explains the managed Lua sections and rule grammar.
-13. [Repository Layout](repository-layout.md) describes this repository structure.
+13. [Lua Design History Notes](lua-design-history.md) records design context recovered from the archived pre-repository Lua script history.
+14. [Repository Layout](repository-layout.md) describes this repository structure.
 
 ## Directory purposes
 
@@ -102,18 +108,18 @@ The UI split should only happen when the implementation reaches the active-windo
 
 ### `tests/`
 
-Python tests for the read-only core proof and future safe write behavior.
+Python tests for the configurator core proof and future UI behavior.
 
-The current test suite covers managed-block parsing, grammar validation, section validation, duplicate validation, shadow validation, rendering, backup path calculation, settings validation, split-profile generation, and CLI behavior.
+The current test suite covers managed-block parsing, grammar validation, section validation, duplicate validation, shadow validation, rendering, backup path calculation, settings validation, split-profile generation, safe save behavior, and guarded CLI behavior.
 
 Tests must continue to avoid modifying a user's real configuration files.
 
 ## Suggested next files
 
-The next useful files after the current core proof are:
+The next useful files after the current CLI/core proof are:
 
 1. `tests/fixtures/` for additional valid and invalid Lua samples.
-2. `docs/developer-notes.md` for implementation discoveries that do not belong in product docs.
+2. Manual desktop test logs when active-window capture and UI proof work begin.
 
 ## Branching convention
 
@@ -124,6 +130,7 @@ Use short topic branches for repo changes. Examples:
 3. `configurator-save-proof`
 4. `configurator-gtk-proof`
 5. `left-edge-correction-tests`
+6. `configurator-pin-exclude-proof`
 
 ## Documentation style
 
