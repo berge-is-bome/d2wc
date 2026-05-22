@@ -1,13 +1,13 @@
 """Minimal GTK configurator proof.
 
 The current UI proof is intentionally read-only. It runs a temporary Devilspie2
-probe from dom0, then shows the captured snapshot so the Qubes/XFCE window data
+probe from dom0, then shows the captured class-instance value so the event data
 path can be tested before any config-writing workflow is added.
 """
 
 from __future__ import annotations
 
-from d2wc.desktop.active_window import ActiveWindowInfo, capture_selected_window, format_probe_number
+from d2wc.desktop.active_window import ActiveWindowInfo, capture_selected_window
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -42,7 +42,7 @@ def run_configurator() -> int:
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(760, 420)
+    window.set_default_size(560, 220)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -56,8 +56,8 @@ def run_configurator() -> int:
 
     message = Gtk.Label(
         label=(
-            "Devilspie2 window probe proof only.\n"
-            "Open or focus a normal application window while this command is running.\n"
+            "Devilspie2 class-instance proof only.\n"
+            "Open or focus a window while this command is running.\n"
             "No config files are read or written from this window yet."
         )
     )
@@ -82,7 +82,7 @@ def run_configurator() -> int:
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
-    """Format captured Devilspie2 window information for the GTK proof window."""
+    """Format captured Devilspie2 class-instance information."""
 
     if window_info.error:
         parts = [f"Window probe failed:\n{window_info.error}"]
@@ -91,22 +91,7 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
             parts.append(window_info.raw_devilspie2_output.rstrip())
         return "\n\n".join(parts)
 
-    screen = window_info.screen_geometry
-    geometry = window_info.geometry
-
-    return "\n".join(
-        [
-            f"Domain: {_value_or_unknown(window_info.normalized_domain)}",
-            f"Application name: {_value_or_unknown(window_info.application_name)}",
-            f"Window name: {_value_or_unknown(window_info.window_name)}",
-            f"Window Type: {_value_or_unknown(window_info.window_type)}",
-            f"Class instance name: {_value_or_unknown(window_info.class_instance_name)}",
-            f"Window class: {_value_or_unknown(window_info.window_class)}",
-            f"Screen Geometry: x = {format_probe_number(screen.x)} y = {format_probe_number(screen.y)}",
-            f"Window geometry: x = {format_probe_number(geometry.x)} y = {format_probe_number(geometry.y)} w = {format_probe_number(geometry.width)} h = {format_probe_number(geometry.height)}",
-            f"geometry {_value_or_unknown(geometry.size_text)}",
-        ]
-    )
+    return f"Class instance name: {_value_or_unknown(window_info.class_instance_name)}"
 
 
 def _value_or_unknown(value: str | None) -> str:
