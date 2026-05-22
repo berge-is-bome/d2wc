@@ -2,6 +2,9 @@
 -- qubes devilspie2 workspace configurator
 -- version 0.1.12.1
 -- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
+-- version 0.1.12.2
+-- Split a dotted class string into tokens, e.g. "org.gnome.meld" -> {"org","gnome","meld"}
+-- Class matching improved to recognize class names within dotted segments of class names
 ------------------------------------------------------------
 
 
@@ -39,8 +42,9 @@ local PIN = {
 }
 
 ------------------------------------------------------------
--- Workspace routes. Place applications together on a workspace.
--- NOTE: Only one list per workspace key is allowed. In Lua, later duplicates overwrite earlier ones.
+-- Workspace routes. Place application windows on a specific workspace.
+-- NOTE: Only one list per workspace key is allowed.
+-- NOTE In Lua, later duplicates overwrite earlier ones.
 ------------------------------------------------------------
 local WORKSPACE_ROUTES = {
   [1] = { "d:personal", "d:work c:navigator", "d:work c:krusader", },
@@ -57,7 +61,7 @@ local GEOM = {
   wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
   centered_mid          = { x = 960,  y = 540,  w = 1200, h = 900  },
   half_left             = { x = 0,    y = 0,    w = 1920, h = 2115 },
-  half_right            = { x = 1913, y = 0,    w = 1920, h = 2115 },
+  half_right            = { x = 1914, y = 0,    w = 1920, h = 2115 },
 
   dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
@@ -70,40 +74,33 @@ local GEOM = {
 ------------------------------------------------------------
 -- Workspace placement rules
 ------------------------------------------------------------
--- Link targets to geometry profiles using g:.
+-- Link application windows to geometry profiles using g:.
 -- At least one domain or class must be specified with a geometry profile.
 
 -- Class matching rules:
 -- exact match: "okular" matches "okular"
 -- base name:   "soffice" matches "soffice.bin" (drops suffix after first dot)
 -- wildcard:    "soffice*" matches any "soffice.*"
---
--- Examples:
--- "c:krusader g:wide"           -- krusader will use the `wide` GEOM profile everywhere it is opened
--- "c:soffice g:centered_mid"    -- office will use the `centered_mid` GEOM profile everywhere it is opened
--- "c:okular g:half_right"       -- okular will use the `hlaf_right` GEOM profile everywhere it is opened
--- "d:personal c:okular g:half_left"    -- domain-specific override for okular in domain personal
--- "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu"    -- domain-specific override for qubes-app-menu in dom0
 ------------------------------------------------------------
 local WORKSPACE_PLACEMENT = {
-  "c:krusader g:wide",
-  "c:soffice g:centered_mid",
-  "c:okular g:half_right",
+  "c:krusader g:wide",    -- krusader will use the `wide` GEOM profile everywhere it is opened
+  "c:soffice g:centered_mid",    -- office will use the `centered_mid` GEOM profile everywhere it is opened
+  "c:okular g:half_right",    -- okular will use the `half_right` GEOM profile everywhere it is opened
   "c:kate g:half_right",
 
-  "d:personal c:okular g:half_left",
+  "d:personal c:okular g:half_left",    -- domain-specific override for okular in domain personal
 
   "d:dom0 c:qubes-qube-manager g:half_left",
   "d:dom0 c:xfce4-settings-manager g:dom0_settings_manager",
-  "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",
+  "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",    -- domain-specific override for qubes-app-menu in dom0
   -- add more here
 }
 
 ------------------------------------------------------------
 -- Left-edge window position correction
 
--- Sometimes when a window is positioned at X = 0, the devilspie2 function set_window_geometry()
--- does not place the window at exactly X = 0, but a few pixels off from 0.
+-- Sometimes when a window is positioned at `x = 0`, the devilspie2 function set_window_geometry()
+-- does not place the window at exactly `x = 0`, but a few pixels off from 0.
 
 -- Map targets to a correction mode when the target X is 0, but window placement is slightly off.
 
@@ -160,15 +157,47 @@ local function parse_prefixed_rule(rule_str)
   return out, true
 end
 
--- Class matching rank: exact > wildcard prefix > base-name
+-- Split a dotted class string into tokens, e.g. "org.gnome.meld" -> {"org","gnome","meld"}
+local function split_dotted(s)
+  local t = {}
+  for part in (s or ""):gmatch("[^%.]+") do
+    t[#t+1] = part
+  end
+  return t
+end
+
+-- Class matching
+-- Rank quality of a rule class pattern vs an actual class string.
+-- Priority:
+--   4 = exact match on full string (e.g. "org.gnome.meld")
+--   3 = exact match on any dotted segment (e.g. "meld")
+--   2 = wildcard prefix on full string (e.g. "org.gnome.*")
+--   1 = wildcard prefix on any segment (e.g. "mel*")
+--   0 = no match
 local function class_match_rank(rule_cls, actual_cls)
-  if rule_cls == actual_cls then return 3 end
+  -- 4) exact full-string match
+  if rule_cls == actual_cls then return 4 end
+
+  local tokens = split_dotted(actual_cls)
+
+  -- 3) exact match on any segment
+  for _, seg in ipairs(tokens) do
+    if rule_cls == seg then return 3 end
+  end
+
+  -- wildcard support
   if rule_cls:sub(-1) == "*" then
     local pref = rule_cls:sub(1, -2)
+
+    -- 2) wildcard on full string
     if actual_cls:sub(1, #pref) == pref then return 2 end
+
+    -- 1) wildcard on any segment
+    for _, seg in ipairs(tokens) do
+      if seg:sub(1, #pref) == pref then return 1 end
+    end
   end
-  local base = actual_cls:gsub("%..*$", "")
-  if rule_cls == base then return 1 end
+
   return 0
 end
 
@@ -330,7 +359,7 @@ end
 
 ------------------------------------------------------------
 -- Workspace routing
--- Precedence: exact domain.class -> domain -> class
+-- Precedence: domain.class -> domain -> class
 ------------------------------------------------------------
 local function compute_workspace(d, c)
   if not d then return nil end
@@ -404,8 +433,8 @@ for _, rule in ipairs(WORKSPACE_PLACEMENT) do
   end
 end
 
--- Resolve geometry for domain+class using WORKSPACE_PLACEMENT with precedence:
---   domain.class -> domain -> class
+-- Resolve geometry for domain+class using WORKSPACE_PLACEMENT:
+-- Precedence: domain.class -> domain -> class
 local function find_geometry(d, class_lc)
   local prof = nil
   if d and GR_DOMAIN_CLASS[d] then
