@@ -3,10 +3,13 @@ from d2wc.desktop.active_window import (
     CaptureCommandError,
     WindowGeometry,
     capture_active_window,
+    capture_selected_window,
     parse_active_window_id,
     parse_wm_class,
     parse_xprop_string,
     parse_xwininfo_geometry,
+    parse_xwininfo_title,
+    parse_xwininfo_window_id,
 )
 from d2wc.ui.gtk_app import format_active_window_info
 
@@ -17,10 +20,28 @@ def test_parse_active_window_id() -> None:
     assert parse_active_window_id(output) == "0x3e00007"
 
 
+def test_parse_active_window_id_supports_compact_xprop_output() -> None:
+    output = '_NET_ACTIVE_WINDOW(WINDOW): 0x3e00007\n'
+
+    assert parse_active_window_id(output) == "0x3e00007"
+
+
 def test_parse_active_window_id_returns_none_for_zero() -> None:
     output = '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x0\n'
 
     assert parse_active_window_id(output) is None
+
+
+def test_parse_xwininfo_window_id() -> None:
+    output = 'xwininfo: Window id: 0x3e00007 "Terminal"\n'
+
+    assert parse_xwininfo_window_id(output) == "0x3e00007"
+
+
+def test_parse_xwininfo_title() -> None:
+    output = 'xwininfo: Window id: 0x3e00007 "Terminal"\n'
+
+    assert parse_xwininfo_title(output) == "Terminal"
 
 
 def test_parse_xprop_string() -> None:
@@ -55,29 +76,31 @@ xwininfo: Window id: 0x3e00007 "Terminal"
     assert parse_xwininfo_geometry(output) == WindowGeometry(x=10, y=20, width=800, height=600)
 
 
-def test_capture_active_window_with_mocked_commands() -> None:
+def test_capture_selected_window_with_mocked_commands() -> None:
     outputs = {
-        ("xprop", "-root", "_NET_ACTIVE_WINDOW"): '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x3e00007\n',
-        (
-            "xprop",
-            "-id",
-            "0x3e00007",
-            "WM_NAME",
-            "WM_CLASS",
-            "_QUBES_VMNAME",
-        ): 'WM_NAME(STRING) = "Terminal"\nWM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n_QUBES_VMNAME(STRING) = "work"\n',
-        ("xwininfo", "-id", "0x3e00007"): """
+        ("xwininfo", "-frame"): """
+xwininfo: Window id: 0x3e00007 "Terminal"
+
   Absolute upper-left X:  10
   Absolute upper-left Y:  20
   Width: 800
   Height: 600
 """,
+        (
+            "xprop",
+            "-id",
+            "0x3e00007",
+            "WM_NAME",
+            "_NET_WM_NAME",
+            "WM_CLASS",
+            "_QUBES_VMNAME",
+        ): 'WM_NAME(STRING) = "Terminal"\n_NET_WM_NAME(UTF8_STRING) = "Terminal"\nWM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n_QUBES_VMNAME(STRING) = "work"\n',
     }
 
     def runner(command):
         return outputs[tuple(command)]
 
-    info = capture_active_window(runner=runner)
+    info = capture_selected_window(runner=runner)
 
     assert info.window_id == "0x3e00007"
     assert info.title == "Terminal"
@@ -89,18 +112,100 @@ def test_capture_active_window_with_mocked_commands() -> None:
     assert info.error is None
 
 
-def test_capture_active_window_treats_empty_qubes_vmname_as_dom0() -> None:
+def test_capture_selected_window_uses_xwininfo_title_when_xprop_title_is_missing() -> None:
     outputs = {
-        ("xprop", "-root", "_NET_ACTIVE_WINDOW"): '_NET_ACTIVE_WINDOW(WINDOW): window id # 0x3e00007\n',
+        ("xwininfo", "-frame"): """
+xwininfo: Window id: 0x3e00007 "Terminal from xwininfo"
+
+  Absolute upper-left X:  10
+  Absolute upper-left Y:  20
+  Width: 800
+  Height: 600
+""",
         (
             "xprop",
             "-id",
             "0x3e00007",
             "WM_NAME",
+            "_NET_WM_NAME",
+            "WM_CLASS",
+            "_QUBES_VMNAME",
+        ): 'WM_CLASS(STRING) = "xfce4-terminal", "Xfce4-terminal"\n',
+    }
+
+    def runner(command):
+        return outputs[tuple(command)]
+
+    info = capture_selected_window(runner=runner)
+
+    assert info.title == "Terminal from xwininfo"
+
+
+def test_capture_selected_window_tolerates_missing_xprop() -> None:
+    def runner(command):
+        if tuple(command) == ("xwininfo", "-frame"):
+            return """
+xwininfo: Window id: 0x3e00007 "Terminal"
+
+  Absolute upper-left X:  10
+  Absolute upper-left Y:  20
+  Width: 800
+  Height: 600
+"""
+        raise CaptureCommandError("xprop failed")
+
+    info = capture_selected_window(runner=runner)
+
+    assert info.window_id == "0x3e00007"
+    assert info.title == "Terminal"
+    assert info.geometry == WindowGeometry(x=10, y=20, width=800, height=600)
+    assert info.error is None
+
+
+def test_capture_selected_window_treats_empty_qubes_vmname_as_dom0() -> None:
+    outputs = {
+        ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Qubes Manager"\n',
+        (
+            "xprop",
+            "-id",
+            "0x3e00007",
+            "WM_NAME",
+            "_NET_WM_NAME",
             "WM_CLASS",
             "_QUBES_VMNAME",
         ): 'WM_NAME(STRING) = "Qubes Manager"\nWM_CLASS(STRING) = "qubes-qube-manager", "Qubes-qube-manager"\n_QUBES_VMNAME(STRING) = ""\n',
-        ("xwininfo", "-id", "0x3e00007"): "",
+    }
+
+    def runner(command):
+        return outputs[tuple(command)]
+
+    info = capture_selected_window(runner=runner)
+
+    assert info.qubes_vmname == ""
+    assert info.domain == "dom0"
+
+
+def test_capture_selected_window_reports_command_error() -> None:
+    def runner(_command):
+        raise CaptureCommandError("xwininfo failed")
+
+    info = capture_selected_window(runner=runner)
+
+    assert info.error == "xwininfo failed"
+
+
+def test_capture_active_window_uses_selected_window_capture_path() -> None:
+    outputs = {
+        ("xwininfo", "-frame"): 'xwininfo: Window id: 0x3e00007 "Terminal"\n',
+        (
+            "xprop",
+            "-id",
+            "0x3e00007",
+            "WM_NAME",
+            "_NET_WM_NAME",
+            "WM_CLASS",
+            "_QUBES_VMNAME",
+        ): "",
     }
 
     def runner(command):
@@ -108,17 +213,8 @@ def test_capture_active_window_treats_empty_qubes_vmname_as_dom0() -> None:
 
     info = capture_active_window(runner=runner)
 
-    assert info.qubes_vmname == ""
-    assert info.domain == "dom0"
-
-
-def test_capture_active_window_reports_command_error() -> None:
-    def runner(_command):
-        raise CaptureCommandError("xprop failed")
-
-    info = capture_active_window(runner=runner)
-
-    assert info.error == "xprop failed"
+    assert info.window_id == "0x3e00007"
+    assert info.title == "Terminal"
 
 
 def test_format_active_window_info() -> None:
@@ -142,6 +238,6 @@ def test_format_active_window_info() -> None:
 
 
 def test_format_active_window_info_reports_errors() -> None:
-    info = ActiveWindowInfo(error="Could not determine active window")
+    info = ActiveWindowInfo(error="Could not determine selected window")
 
-    assert format_active_window_info(info) == "Active window capture failed:\nCould not determine active window"
+    assert format_active_window_info(info) == "Window capture failed:\nCould not determine selected window"
