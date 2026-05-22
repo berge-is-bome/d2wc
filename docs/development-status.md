@@ -2,13 +2,13 @@
 
 ## Current repository status
 
-Current repository status after PR #12:
+Current repository status for branch `configurator-gtk-proof`:
 
 ```text
-Branch: main
-Status: all managed Lua sections now have CLI/core edit proofs merged
+Branch: configurator-gtk-proof
+Status: first read-only GTK launch proof implemented for review
 Latest merged proof: PR #12, LEFT_EDGE_CORRECTION edit proof
-Next likely implementation branch: configurator-gtk-proof
+Current proof branch: configurator-gtk-proof
 ```
 
 The CLI/core edit-proof phase is complete for the six managed Lua sections:
@@ -20,7 +20,9 @@ The CLI/core edit-proof phase is complete for the six managed Lua sections:
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-GTK UI work is now the next practical development phase. The first GTK branch should stay deliberately small and should not introduce real config writes from the UI.
+The first GTK proof is deliberately small. It adds a read-only window launched by `python -m d2wc configure` or `d2wc configure`. The window does not read or write config files, capture the active window, or edit rules.
+
+Manual Qubes/XFCE launch verification is still required before this proof should be considered complete.
 
 ## Latest confirmed local verification
 
@@ -42,6 +44,13 @@ Rendered /tmp/d2wc-rendered.lua validates successfully.
 ```
 
 Manual copied-config smoke testing also passed for the `LEFT_EDGE_CORRECTION` add, modify, and delete CLI commands before PR #12 was merged.
+
+The `configurator-gtk-proof` branch adds automated entrypoint-routing tests. Manual GTK launch testing should be run on Qubes/XFCE with:
+
+```bash
+python -m d2wc configure
+d2wc configure
+```
 
 ## Historical Lua script preservation
 
@@ -241,6 +250,7 @@ The current Python core supports:
 13. Marker-tail preservation for `-- add more here` in edited rule-list sections.
 14. Token-order-independent rule parsing and modify/delete matching.
 15. Exact duplicate target rejection where duplicates would make behavior ambiguous.
+16. Read-only first GTK launch proof.
 
 ## Test command guidance
 
@@ -266,15 +276,30 @@ python -m d2wc validate --config src/d2wc.lua
 python -m pytest
 ```
 
+For the first GTK proof, also run the manual desktop check on Qubes/XFCE:
+
+```bash
+python -m d2wc configure
+d2wc configure
+```
+
+Expected result:
+
+1. A window titled `d2wc Configurator` opens.
+2. The window states that it is a GTK launch proof only.
+3. The close button closes the window.
+4. Closing the window manager decoration also exits cleanly.
+5. No config files are read or written.
+
 ## Next practical work
 
-The next practical development branch should likely be:
+The current branch is:
 
 ```text
 configurator-gtk-proof
 ```
 
-Scope for that branch should stay small:
+Scope for this branch:
 
 1. Make `python -m d2wc configure` open a GTK window.
 2. Confirm the window opens cleanly on the Qubes/XFCE target environment.
@@ -283,4 +308,4 @@ Scope for that branch should stay small:
 5. Do not add active-window capture yet.
 6. Do not add rule editing UI yet.
 
-The purpose of the next branch is to prove the UI toolkit and source-checkout launch path before building workflows on top of it.
+After this branch is reviewed and manually verified, the next practical branch should be the active-window capture proof. That later branch should still avoid config writes by default.
