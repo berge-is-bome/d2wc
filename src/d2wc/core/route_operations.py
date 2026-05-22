@@ -268,13 +268,13 @@ def _render_workspace_routes_block_preserving_comments(
             continue
 
         stripped = line.strip()
-        if tail_started:
+        active, comment = _split_lua_comment(line)
+        workspace = _workspace_key_from_line(active)
+
+        if tail_started and workspace is None and not _is_route_closing_comment(active, comment):
             if stripped:
                 tail_marker_lines.append(line.rstrip())
             continue
-
-        active, comment = _split_lua_comment(line)
-        workspace = _workspace_key_from_line(active)
         if workspace is not None:
             current_workspace = workspace
             seen_route = True
