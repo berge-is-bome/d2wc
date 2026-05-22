@@ -16,8 +16,18 @@ class WindowGeometry:
 
     x: int | None = None
     y: int | None = None
+    relative_x: int | None = None
+    relative_y: int | None = None
     width: int | None = None
     height: int | None = None
+
+    @property
+    def size_text(self) -> str | None:
+        """Return WIDTHxHEIGHT text when both dimensions are known."""
+
+        if self.width is None or self.height is None:
+            return None
+        return f"{self.width}x{self.height}"
 
 
 @dataclass(frozen=True)
@@ -184,6 +194,8 @@ def parse_xwininfo_geometry(output: str) -> WindowGeometry:
     return WindowGeometry(
         x=_parse_xwininfo_int(output, "Absolute upper-left X"),
         y=_parse_xwininfo_int(output, "Absolute upper-left Y"),
+        relative_x=_parse_xwininfo_int(output, "Relative upper-left X"),
+        relative_y=_parse_xwininfo_int(output, "Relative upper-left Y"),
         width=_parse_xwininfo_int(output, "Width"),
         height=_parse_xwininfo_int(output, "Height"),
     )
