@@ -1,13 +1,13 @@
 """Minimal GTK configurator proof.
 
-The current UI proof is intentionally read-only. It opens a GTK window and shows
-a captured snapshot of the active X11 window so the Qubes/XFCE launch and window
-identity path can be tested before any config-writing workflow is added.
+The current UI proof is intentionally read-only. It prompts for a selected X11
+window from dom0, then shows the captured snapshot so the Qubes/XFCE launch and
+window identity path can be tested before any config-writing workflow is added.
 """
 
 from __future__ import annotations
 
-from d2wc.desktop.active_window import ActiveWindowInfo, capture_active_window
+from d2wc.desktop.active_window import ActiveWindowInfo, capture_selected_window
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -38,7 +38,7 @@ def _import_gtk():
 def run_configurator() -> int:
     """Open the read-only GTK configurator proof window."""
 
-    window_info = capture_active_window()
+    window_info = capture_selected_window()
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
@@ -56,7 +56,7 @@ def run_configurator() -> int:
 
     message = Gtk.Label(
         label=(
-            "Active-window capture proof only.\n"
+            "Qubes/dom0 selected-window capture proof only.\n"
             "No config files are read or written from this window yet."
         )
     )
@@ -81,10 +81,10 @@ def run_configurator() -> int:
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
-    """Format captured active-window information for the GTK proof window."""
+    """Format captured window information for the GTK proof window."""
 
     if window_info.error:
-        return f"Active window capture failed:\n{window_info.error}"
+        return f"Window capture failed:\n{window_info.error}"
 
     geometry = window_info.geometry
     geometry_text = "unknown"
@@ -93,7 +93,7 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
 
     return "\n".join(
         [
-            "Captured active window before opening this configurator:",
+            "Captured selected window from dom0:",
             f"Window ID: {_value_or_unknown(window_info.window_id)}",
             f"Title: {_value_or_unknown(window_info.title)}",
             f"Class instance: {_value_or_unknown(window_info.wm_class_instance)}",
