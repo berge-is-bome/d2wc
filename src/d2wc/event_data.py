@@ -111,16 +111,6 @@ _EVENT_FIXTURES: dict[str, WindowEventData] = {
         screen_geometry=EventScreenGeometry(width=3840.0, height=2160.0),
         window_geometry=EventWindowGeometry(x=474.0, y=359.0, w=3366.0, h=1801.0),
     ),
-    "tor-browser": WindowEventData(
-        domain="disp3979",
-        application_name="disp3979:Tor Browser",
-        window_name="Tor Browser",
-        window_type="WINDOW_TYPE_NORMAL",
-        class_instance_name="disp3979:Navigator",
-        window_class="disp3979:Tor Browser",
-        screen_geometry=EventScreenGeometry(width=3840.0, height=2160.0),
-        window_geometry=EventWindowGeometry(x=0.0, y=46.0, w=2122.0, h=1578.0),
-    ),
 }
 
 EVENT_FIXTURE_NAMES = tuple(_EVENT_FIXTURES)
