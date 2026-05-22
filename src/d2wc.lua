@@ -1,6 +1,6 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.11.2
+-- version 0.1.11.3
 ------------------------------------------------------------
 
 -- Only act on real app windows
@@ -97,7 +97,6 @@ local GEOM_RULES = {
 ------------------------------------------------------------
 local LEFT_EDGE_CORRECTION = "pos2"
 
-
 ------------------------------------------------------------
 -- Token parser and lookup builders
 ------------------------------------------------------------
@@ -168,6 +167,8 @@ elseif raw_domain ~= nil then
 else
   debug_print("_QUBES_VMNAME is nil; skipping domain-based workspace")
 end
+-- Normalize to lowercase for consistent matching
+if domain then domain = domain:lower() end
 
 -- Class helper: get WM_CLASS class part in lowercase (after the last colon)
 local function get_lower_class()
@@ -219,27 +220,27 @@ if domain then
   end
 end
 
-
 ------------------------------------------------------------
 -- Build rule maps and resolvers
 ------------------------------------------------------------
 local GR_DOMAIN, GR_GLOBAL = {}, {}
 
 local function add_geom_rule(tok)
+  local t = (tok or ""):lower()
   -- domain.profile.class
-  local d, p, c = tok:match("^([^%.]+)%.([^%.]+)%.(.+)$")
+  local d, p, c = t:match("^([^%.]+)%.([^%.]+)%.(.+)$")
   if d and p and c then
     GR_DOMAIN[d] = GR_DOMAIN[d] or {}
-    GR_DOMAIN[d][c:lower()] = p
+    GR_DOMAIN[d][c] = p
     return
   end
   -- profile.class
-  local p2, c2 = tok:match("^([^%.]+)%.(.+)$")
+  local p2, c2 = t:match("^([^%.]+)%.(.+)$")
   if p2 and c2 then
-    GR_GLOBAL[c2:lower()] = p2
+    GR_GLOBAL[c2] = p2
     return
   end
-  debug_print("GEOM_RULES: could not parse '" .. tok .. "'")
+  debug_print("GEOM_RULES: could not parse '" .. tostring(tok) .. "'")
 end
 
 for _, tok in ipairs(GEOM_RULES) do
