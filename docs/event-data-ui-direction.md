@@ -69,28 +69,30 @@ x, y, w, h = get_window_geometry();
 print( "Window geometry:  x = " ..x.." y = "..y.." w = "..w.." h = "..h );
 ```
 
-## Sample Thunderbird output
+## Sample event output
+
+Use standard VM names such as `work` and `personal` in documentation examples. These are standard Qubes OS VMs available during installation and keep the examples generic.
 
 ```text
-Domain: thunderbird-personal
-Application name: thunderbird-personal:net.thunderbird.Thunderbird
-Window name: Mozilla Thunderbird
+Domain: work
+Application name: work:org.example.App
+Window name: Example
 Window Type: WINDOW_TYPE_NORMAL
-Class instance name: thunderbird-personal:Mail
-Window class: thunderbird-personal:net.thunderbird.Thunderbird
+Class instance name: work:Example
+Window class: work:org.example.App
 Screen Geometry: x = 3840.0 y = 2160.0
 Window geometry:  x = 474.0 y = 359.0 w = 3366.0 h = 1801.0
 ```
 
-## Sample Tor Browser output
+A second standard-VM example can use `personal`:
 
 ```text
-Domain: disp3979
-Application name: disp3979:Tor Browser
-Window name: Tor Browser
+Domain: personal
+Application name: personal:org.example.App
+Window name: Example
 Window Type: WINDOW_TYPE_NORMAL
-Class instance name: disp3979:Navigator
-Window class: disp3979:Tor Browser
+Class instance name: personal:Example
+Window class: personal:org.example.App
 Screen Geometry: x = 3840.0 y = 2160.0
 Window geometry:  x = 0.0 y = 46.0 w = 2122.0 h = 1578.0
 ```
@@ -112,10 +114,10 @@ Some useful Devilspie2 values contain spaces.
 Example:
 
 ```text
-Window class: disp3979:Tor Browser
+Window class: personal:Example App
 ```
 
-The current `d2wc.lua` prefixed grammar splits rules on whitespace, so a token such as `c:Tor Browser` cannot be represented safely yet. This should be handled in a later grammar update before rule editing supports values containing spaces.
+The current `d2wc.lua` prefixed grammar splits rules on whitespace, so a token such as `c:Example App` cannot be represented safely yet. This should be handled in a later grammar update before rule editing supports values containing spaces.
 
 ## Immediate UI proof scope
 
