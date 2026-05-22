@@ -1,6 +1,6 @@
 ------------------------------------------------------------
--- qdwc = qubes devilspie2 workspace configurator
--- version 0.1.8
+-- qubes devilspie2 workspace configurator
+-- version 0.1.9
 ------------------------------------------------------------
 
 -- Only act on real app windows
@@ -8,47 +8,52 @@ if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
   return
 end
 
--- Exclusions: anything listed here is ignored completely
+-- Exclusions: anything listed here is ignored
 local EXCLUDE = {
   domains = {
-    -- ["some-domain"] = true,   -- optional domain exclusion
+    ["pesonal-test"] = true,
   },
   classes = {
-    -- ["some-class"] = true,     -- optional class-level exclude
-    ["qubes-app-menu"] = true,     -- optional class-level exclude
+    -- ["some-class"] = true,
+    ["qubes-app-menu"] = true,
   },
 }
 
--- Pin rules: pin window from a domain, or, all windows from a domain, making them visible on all workspaces
+-- Pin rules: pin window from a domain, or all windows from a domain, making them visible on all workspaces
 local PIN = {
-  ["dom0"] = { ["xfce4-terminal"] = true, ["qubes-qube-manager"] = true, }, -- pinned dom0 applications
+  ["dom0"] = { ["xfce4-terminal"] = true, ["qubes-qube-manager"] = true }, -- pinned dom0 applications
   -- ["personal"] = true, -- pin everything from personal
-  -- ["personal"] = { ["okular"] = true },              -- pin one class from personal
+  -- ["personal"] = { ["okular"] = true }, -- pin one class from personal
 }
 
--- Workspace by Qubes domain
-local workspaceAssociation = {
-  ["dom0"] = 1,
-  ["personal"] = 1,
-  ["test"] = 4,
-  ["business"] = 2,
-  ["business-clients"] = 2,
-  ["customer"] = 3,
-}
+-- Left-edge window position correction for windows positioned at x == 0
+--   "none"  -> do not adjust after set_window_geometry
+--   "pos1"  -> call set_window_position(x, y)
+--   "pos2"  -> call set_window_position2(x, y)
+local LEFT_EDGE_CORRECTION = "pos2" -- change to "pos1" or "pos2" if you see a gap between the window border and the left edge of your screen, despite x = 0
 
 -- Workspace routes. Place applications together on a workspace.
--- Keys are workspace numbers; values are lists of "domain.class".
--- Examples with hyphens in domain names are fine because these are strings.
+-- Keys are workspace numbers; values are lists of "domain" or "domain.class".
+-- Hyphenated domain names are fine because these are plain strings.
 local WORKSPACE_ROUTES = {
   [1] = { "personal", "work.navigator", "work.krusader" },
   -- [2] = { "test.okular", "business-clients.okular" },
 }
 
--- Left-edge window poition correction for windows that are positioned at x == 0
--- "none" -> do not adjust after set_window_geometry
--- "pos1" -> call set_window_position(x, y)
--- "pos2" -> call set_window_position2(x, y)
-local LEFT_EDGE_CORRECTION = "pos2"   -- change to "pos1" or "pos2" if you see a left gap when x = 0
+-- Build lookups:
+--   WS_EXACT["domain.class"] = ws
+--   WS_DOMAIN["domain"]      = ws
+local WS_EXACT, WS_DOMAIN = {}, {}
+for wsnum, list in pairs(WORKSPACE_ROUTES) do
+  for _, token in ipairs(list) do
+    local d, c = token:match("^([^%.]+)%.(.+)$")
+    if d and c then
+      WS_EXACT[d .. "." .. c] = wsnum
+    else
+      WS_DOMAIN[token] = wsnum
+    end
+  end
+end
 
 -- Read domain; treat "" as dom0; if nil, skip workspace assignment but still allow global geometry rules
 local raw_domain = get_window_property("_QUBES_VMNAME")
@@ -61,7 +66,7 @@ else
   debug_print("_QUBES_VMNAME is nil; skipping domain-based workspace")
 end
 
--- Optional domain exclusion: act as if devilspie2 is not running
+-- Optional domain exclusion. If enabled, the script will not touch workspace or geometry.
 if domain and EXCLUDE.domains[domain] then
   -- debug_print("excluded domain: " .. domain)
   return
@@ -81,9 +86,16 @@ if EXCLUDE.classes[cls] then
   return
 end
 
--- Assign workspace only if we have a domain
+-- Compute target workspace: exact domain.class, else bare domain, else nil
+local function compute_workspace(d, c)
+  if not d then return nil end
+  local key = d .. "." .. c
+  return WS_EXACT[key] or WS_DOMAIN[d]
+end
+
+-- Assign workspace
 if domain then
-  local ws = workspaceAssociation[domain]
+  local ws = compute_workspace(domain, cls)
   if ws and ws > 0 and ws <= get_workspace_count() then
     set_window_workspace(ws)
   end
@@ -91,19 +103,12 @@ end
 
 -- Pin windows (sticky on all workspaces).
 -- Pinning is done after workspace assignment, because workspace assignment removes the sticky flag.
-local should_pin = false
 if domain and PIN[domain] ~= nil then
   local rule = PIN[domain]
-  if rule == true then
-    should_pin = true
-  elseif type(rule) == "table" and rule[cls] then
-    should_pin = true
+  if rule == true or (type(rule) == "table" and rule[cls]) then
+    pin_window()
+    -- debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
   end
-end
-
-if should_pin then
-  pin_window()
-  debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
 end
 
 ------------------------------------------------------------
@@ -137,7 +142,7 @@ local RULES = {
     groups = {
       wide       = { "krusader" }, -- shared geometry
       half_right = { "okular" }, -- shared geometry
-      -- wide       = { "krusader", "okular" },  -- shared geometry
+      -- wide = { "krusader", "okular" }, -- shared geometry
     },
     per_class = {
       -- ["okular"] = "half_right", -- geometry profile
@@ -157,10 +162,10 @@ local RULES = {
 
   ["personal"] = {
     groups = {
-    -- you can still group (other) applications here if you want
+      -- you can still group (other) applications here if you want
     },
     per_class = {
-    ["okular"] = "half_left",
+      ["okular"] = "half_left",
     },
   },
 
@@ -256,6 +261,5 @@ if g then
       set_window_position2(g.x, g.y)
     end
   end
-
   -- debug_print(string.format("geometry: %s/%s -> %dx%d+%d+%d", tostring(domain), cls, g.w, g.h, g.x, g.y))
 end
