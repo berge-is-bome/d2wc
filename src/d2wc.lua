@@ -1,6 +1,6 @@
 ------------------------------------------------------------
--- qubes devilspie2 workspace configurator
--- version 0.1.12.1
+-- devilspie2 workspace configurator
+-- version 0.1.12.3
 -- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
 -- version 0.1.12.2
 -- Split a dotted class string into tokens, e.g. "org.gnome.meld" -> {"org","gnome","meld"}
@@ -24,9 +24,9 @@
 -- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
-  -- "d:work c:okular",       -- this domain.class
-  "d:personal-test",          -- domain
-  -- "c:<class_name>",        -- class everywhere
+  -- "d:work c:okular",    -- this domain.class
+  "d:personal-test",       -- domain
+  -- "c:<class_name>",     -- class everywhere
   -- add more here
 }
 
@@ -34,8 +34,8 @@ local EXCLUDE = {
 -- Pin rules: windows listed here are made visible on all workspaces
 ------------------------------------------------------------
 local PIN = {
-  "d:dom0 c:xfce4-terminal",
-  "d:dom0 c:qubes-qube-manager",
+  "d:dom0 c:xfce4-terminal",         -- pin dom0 xfce4-terminal windows
+  "d:dom0 c:qubes-qube-manager",     -- pin Qube Manager
   -- "d:personal",                   -- pin everything from personal
   -- "c:xfce4-terminal",             -- pin xfce4-terminal everywhere
   -- add more here
@@ -55,7 +55,7 @@ local WORKSPACE_ROUTES = {
 
 ------------------------------------------------------------
 -- Geometry profiles.
--- Geometry profiles determine where something will be placed and what size it will be.
+-- Geometry profiles determine where a window will be placed and what size it will be.
 ------------------------------------------------------------
 local GEOM = {
   wide                  = { x = 100,  y = 456,  w = 3624, h = 1389 },
@@ -66,8 +66,9 @@ local GEOM = {
   dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
 
-  custom_name1          = { x = 0,    y = 0,    w = 0,    h = 0    },
-  custom_name2          = { x = 0,    y = 0,    w = 0,    h = 0    },
+  dom0_template_manager = { x = 1129, y = 0  ,  w = 1220, h = 2115 },
+  dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
+  dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
   -- add more here
 }
 
@@ -83,9 +84,9 @@ local GEOM = {
 -- wildcard:    "soffice*" matches any "soffice.*"
 ------------------------------------------------------------
 local WORKSPACE_PLACEMENT = {
-  "c:krusader g:wide",    -- krusader will use the `wide` GEOM profile everywhere it is opened
-  "c:soffice g:centered_mid",    -- office will use the `centered_mid` GEOM profile everywhere it is opened
-  "c:okular g:half_right",    -- okular will use the `half_right` GEOM profile everywhere it is opened
+  "c:krusader g:wide",     -- krusader will use the `wide` GEOM profile everywhere it is opened
+  "c:soffice g:centered_mid",     -- office will use the `centered_mid` GEOM profile everywhere it is opened
+  "c:okular g:half_right",     -- okular will use the `half_right` GEOM profile everywhere it is opened
   "c:kate g:half_right",
 
   "d:personal c:okular g:half_left",    -- domain-specific override for okular in domain personal
