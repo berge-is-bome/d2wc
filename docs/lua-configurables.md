@@ -2,20 +2,22 @@
 
 The current `d2wc` execution layer is a `devilspie2` Lua script. The configurator should treat the script as a managed rules file and edit only the known user-customizable sections.
 
+The current practical target is Qubes OS with XFCE. Broader non-Qubes behavior is a later goal and should be tested deliberately before the documentation promises full non-Qubes parity.
+
 ## Rule grammar
 
 Rules use space-separated prefixed tokens.
 
 Supported prefixes:
 
-1. `d:<domain>` for a Qubes domain or Linux desktop grouping concept.
+1. `d:<domain>` for a Qubes domain.
 2. `c:<class>` for the application class.
 3. `g:<geom_profile>` for a named geometry profile.
 4. `le:<pos1|pos2>` for left-edge correction mode.
 
 Token order should not matter. Matching is case-insensitive.
 
-The current matching precedence is:
+The current target precedence is:
 
 1. `domain.class`
 2. `domain`
@@ -23,11 +25,42 @@ The current matching precedence is:
 
 A rule with duplicate tokens of the same prefix is invalid and should be skipped rather than guessed.
 
+Legacy dot-token rules such as `personal.okular`, `krusader.wide`, or `personal.okular.half_left` are historical only. Current managed edits should use the prefixed grammar.
+
+## Qubes domain behavior
+
+In Qubes, `_QUBES_VMNAME` identifies the source domain.
+
+Current behavior:
+
+1. If `_QUBES_VMNAME` is an empty string, the Lua script treats the window as `dom0`.
+2. If `_QUBES_VMNAME` is non-empty, the Lua script uses that value as the domain.
+3. The detected domain is lowercased before matching.
+4. If `_QUBES_VMNAME` is nil or unavailable, domain-based workspace assignment is skipped.
+
+The nil case is mainly relevant to future non-Qubes testing. It should not distract from the current Qubes-first target.
+
+## Class matching scope
+
+The Lua script has two related ideas:
+
+1. Target precedence: `domain.class -> domain -> class`.
+2. Class pattern matching inside placement rules.
+
+`WORKSPACE_PLACEMENT` currently has ranked class matching for application classes:
+
+1. Exact full-string match, for example `org.gnome.meld`.
+2. Exact dotted-segment match, for example `meld` matching `org.gnome.meld`.
+3. Wildcard prefix on the full class string, for example `org.gnome.*`.
+4. Wildcard prefix on a dotted segment, for example `mel*` matching `org.gnome.meld`.
+
+Do not assume that the same dotted/wildcard matching applies to every managed section. `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, and `LEFT_EDGE_CORRECTION` currently use direct target lookups.
+
 ## `EXCLUDE`
 
 `EXCLUDE` tells `d2wc` to ignore matching windows.
 
-The configurator should use this for windows that should not be moved, resized, pinned, or routed. Examples include app menus, splash windows, panels, transient helpers, or applications that behave badly when managed.
+The configurator should use this for windows that should not be moved, resized, pinned, routed, or corrected. Examples include app menus, splash windows, panels, transient helpers, or applications that behave badly when managed.
 
 User-facing actions:
 
@@ -84,6 +117,8 @@ User-facing actions:
 3. Create or refresh generated profiles such as `half_left` and `half_right`.
 4. Show which placement rules depend on a profile before renaming or deleting it.
 
+Geometry values should live in `GEOM` profiles. Historical inline geometry tables inside rule entries are not part of the current managed grammar.
+
 ## `WORKSPACE_PLACEMENT`
 
 `WORKSPACE_PLACEMENT` links a domain, class, or domain/class target to a named geometry profile.
@@ -97,6 +132,8 @@ User-facing actions:
 3. Apply a geometry profile to this application class everywhere.
 4. Preview the exact rule before saving.
 5. Warn when a referenced geometry profile does not exist.
+
+`WORKSPACE_PLACEMENT` is the section where advanced dotted/wildcard class matching currently matters.
 
 ## `LEFT_EDGE_CORRECTION`
 
@@ -127,4 +164,6 @@ Required behavior:
 3. Validate all generated rules before writing.
 4. Keep generated rule order stable.
 5. Back up the previous Lua file before saving.
-6. Provide a preview/diff before applying changes.
+6. Provide a preview before applying changes.
+
+For historical context behind these sections and the current grammar, see [Lua Design History Notes](lua-design-history.md).
