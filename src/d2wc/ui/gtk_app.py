@@ -42,7 +42,7 @@ def run_configurator() -> int:
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(560, 360)
+    window.set_default_size(760, 560)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -64,12 +64,17 @@ def run_configurator() -> int:
     message.set_line_wrap(True)
     box.pack_start(message, False, False, 0)
 
+    scrolled = Gtk.ScrolledWindow()
+    scrolled.set_hexpand(True)
+    scrolled.set_vexpand(True)
+    box.pack_start(scrolled, True, True, 0)
+
     details = Gtk.Label(label=format_active_window_info(window_info))
     details.set_xalign(0)
     details.set_yalign(0)
     details.set_selectable(True)
-    details.set_line_wrap(True)
-    box.pack_start(details, True, True, 0)
+    details.set_line_wrap(False)
+    scrolled.add(details)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -84,24 +89,46 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
     """Format captured window information for the GTK proof window."""
 
     if window_info.error:
-        return f"Window capture failed:\n{window_info.error}"
+        parts = [f"Window capture failed:\n{window_info.error}"]
+        if window_info.raw_xwininfo_output:
+            parts.append("Raw xwininfo -frame output:")
+            parts.append(window_info.raw_xwininfo_output.rstrip())
+        return "\n\n".join(parts)
 
     geometry = window_info.geometry
     geometry_text = "unknown"
     if None not in (geometry.x, geometry.y, geometry.width, geometry.height):
         geometry_text = f"x={geometry.x} y={geometry.y} w={geometry.width} h={geometry.height}"
 
-    return "\n".join(
-        [
-            "Captured selected window from dom0:",
-            f"Window ID: {_value_or_unknown(window_info.window_id)}",
-            f"Title: {_value_or_unknown(window_info.title)}",
-            f"Class instance: {_value_or_unknown(window_info.wm_class_instance)}",
-            f"Class: {_value_or_unknown(window_info.wm_class)}",
-            f"Qubes domain: {_value_or_unknown(window_info.domain)}",
-            f"Geometry: {geometry_text}",
-        ]
-    )
+    parts = [
+        "Parsed summary:",
+        f"Window ID: {_value_or_unknown(window_info.window_id)}",
+        f"Title: {_value_or_unknown(window_info.title)}",
+        f"Class instance: {_value_or_unknown(window_info.wm_class_instance)}",
+        f"Class: {_value_or_unknown(window_info.wm_class)}",
+        f"Qubes domain: {_value_or_unknown(window_info.domain)}",
+        f"Geometry: {geometry_text}",
+    ]
+
+    if window_info.raw_xwininfo_output:
+        parts.extend(
+            [
+                "",
+                "Raw xwininfo -frame output:",
+                window_info.raw_xwininfo_output.rstrip(),
+            ]
+        )
+
+    if window_info.raw_xprop_output:
+        parts.extend(
+            [
+                "",
+                "Raw xprop output for selected window id:",
+                window_info.raw_xprop_output.rstrip(),
+            ]
+        )
+
+    return "\n".join(parts)
 
 
 def _value_or_unknown(value: str | None) -> str:
