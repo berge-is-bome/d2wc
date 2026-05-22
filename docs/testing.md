@@ -429,3 +429,110 @@ Required proof:
 4. Apply `set_window_position(x, y)`.
 5. Read actual geometry again.
 6. Apply `set_window_position2(x, y)` if needed.
+7. Read actual geometry again.
+8. Save no permanent rule unless the user confirms.
+
+## Event-monitoring tests
+
+Event monitoring is Phase 2 and should not block Phase 1.
+
+When Phase 2 starts, first tests should only log events.
+
+Required proof:
+
+1. Detect geometry changes for active window.
+2. Detect quiet period after resizing stops.
+3. Apply threshold.
+4. Log final geometry.
+5. Do not open configurator yet.
+6. Do not save rules.
+
+## Packaging tests
+
+Packaging tests should start after the source-checkout workflow works.
+
+Required first checks:
+
+1. Source checkout can run the CLI.
+2. Source checkout can run tests.
+3. Local RPM installs command and files.
+4. Local RPM install does not require network access once dependencies are present.
+5. User config is not overwritten on upgrade.
+6. User config is preserved on uninstall.
+
+Qubes/dom0 packaging tests must assume no network access inside dom0.
+
+## Safety gates
+
+The following gates must pass before the configurator can write to a real user config:
+
+1. Parser reads current script.
+2. Validator accepts current script.
+3. Renderer round-trip preserves the model.
+4. Rendered output validates.
+5. Backup/write tests pass in temporary directories.
+6. Dry-run preview works.
+7. `window_border_width` validation passes before generated split profiles are written.
+8. Generated split profiles are previewed before save.
+9. User explicitly selects a real config file or initializes one.
+10. Backup location is writable.
+11. Save preview is shown.
+12. For UI workflows, the preview and confirmation path must be tested before any real config write is enabled.
+
+## Suggested test tooling
+
+The likely test stack is:
+
+1. `pytest` for Python tests.
+2. Temporary directories through pytest fixtures.
+3. Plain fixture files under `tests/fixtures/`.
+4. Manual test notes for desktop behavior.
+
+## Manual test log format
+
+Manual desktop tests should record enough detail to reproduce failures.
+
+Suggested fields:
+
+1. Date.
+2. Distribution.
+3. Qubes or non-Qubes.
+4. Desktop environment.
+5. Window manager.
+6. Application.
+7. Domain, if available.
+8. Class.
+9. Command run.
+10. Expected result.
+11. Actual result.
+12. Notes.
+
+## Continuous integration
+
+The current GitHub Actions test workflow should continue to run the Python test suite. Later CI expansion can include additional fixture validation and render round-trip checks.
+
+Desktop behavior will remain manual until a suitable test environment is designed.
+
+## Related documents
+
+1. [Development Status](development-status.md)
+2. [UI Flow](ui-flow.md)
+3. [Runtime Architecture](runtime-architecture.md)
+4. [Implementation Plan](implementation-plan.md)
+5. [Left-Edge Correction Testing](left-edge-correction-testing.md)
+6. [Lua Design History Notes](lua-design-history.md)
+
+## Immediate test priorities
+
+The current core proof has already covered parser, grammar, validation, renderer, settings, split-profile, backup path, safe save, CLI, duplicate-validation, shadow-validation, and add/modify/delete operations for all six managed Lua sections.
+
+The next immediate test priorities are:
+
+1. Keep the full source-checkout verification path green.
+2. Keep the automated GTK entrypoint routing test green without requiring a live desktop session.
+3. Manually verify `python -m d2wc configure` opens and closes a GTK window on Qubes/XFCE.
+4. Manually verify `d2wc configure` opens and closes the same GTK window after editable install.
+5. Confirm that the first GTK proof performs no real config writes.
+6. Keep active-window capture and rule-editing UI tests deferred until those features are implemented.
+
+No UI save workflow should be built before the read-only GTK proof is working.
