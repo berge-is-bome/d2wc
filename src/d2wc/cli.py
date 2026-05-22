@@ -32,6 +32,14 @@ from d2wc.core.placement_operations import (
     modify_placement_rule_in_source,
 )
 from d2wc.core.rendering import RenderValidationError, render_source
+from d2wc.core.route_operations import (
+    RouteOperationError,
+    RouteRuleExistsError,
+    RouteRuleNotFoundError,
+    add_route_rule_to_source,
+    delete_route_rule_from_source,
+    modify_route_rule_in_source,
+)
 from d2wc.core.saving import (
     SaveConfigError,
     SaveValidationError,
@@ -155,6 +163,36 @@ def build_parser() -> argparse.ArgumentParser:
     delete_placement.add_argument("--rule", required=True, help="Placement rule to delete.")
     _add_common_write_arguments(delete_placement)
     delete_placement.set_defaults(func=_cmd_delete_placement)
+
+    add_route = subcommands.add_parser(
+        "add-route",
+        help="Preview or add one WORKSPACE_ROUTES rule. Writes only when --write is supplied.",
+    )
+    add_route.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    add_route.add_argument("--workspace", type=int, required=True, help="Workspace number to add the rule to.")
+    add_route.add_argument("--rule", required=True, help="Route rule to add, for example d:personal c:navigator.")
+    _add_common_write_arguments(add_route)
+    add_route.set_defaults(func=_cmd_add_route)
+
+    modify_route = subcommands.add_parser(
+        "modify-route",
+        help="Preview or modify one WORKSPACE_ROUTES rule. Writes only when --write is supplied.",
+    )
+    modify_route.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    modify_route.add_argument("--old-rule", required=True, help="Existing route rule to modify.")
+    modify_route.add_argument("--new-workspace", type=int, required=True, help="Replacement workspace number.")
+    modify_route.add_argument("--new-rule", required=True, help="Replacement route rule.")
+    _add_common_write_arguments(modify_route)
+    modify_route.set_defaults(func=_cmd_modify_route)
+
+    delete_route = subcommands.add_parser(
+        "delete-route",
+        help="Preview or delete one WORKSPACE_ROUTES rule. Writes only when --write is supplied.",
+    )
+    delete_route.add_argument("--config", type=Path, required=True, help="Path to the Lua config to edit.")
+    delete_route.add_argument("--rule", required=True, help="Route rule to delete.")
+    _add_common_write_arguments(delete_route)
+    delete_route.set_defaults(func=_cmd_delete_route)
 
     return parser
 
@@ -345,6 +383,33 @@ def _cmd_delete_placement(args: argparse.Namespace) -> int:
     )
 
 
+def _cmd_add_route(args: argparse.Namespace) -> int:
+    return _run_route_edit(
+        args,
+        operation="add",
+        success_verb="added",
+        edit_callback=lambda source: add_route_rule_to_source(source, args.workspace, args.rule),
+    )
+
+
+def _cmd_modify_route(args: argparse.Namespace) -> int:
+    return _run_route_edit(
+        args,
+        operation="modify",
+        success_verb="modified",
+        edit_callback=lambda source: modify_route_rule_in_source(source, args.old_rule, args.new_workspace, args.new_rule),
+    )
+
+
+def _cmd_delete_route(args: argparse.Namespace) -> int:
+    return _run_route_edit(
+        args,
+        operation="delete",
+        success_verb="deleted",
+        edit_callback=lambda source: delete_route_rule_from_source(source, args.rule),
+    )
+
+
 def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, edit_callback) -> int:
     config_path: Path = args.config
 
@@ -502,6 +567,91 @@ def _run_placement_edit(args: argparse.Namespace, operation: str, success_verb: 
     print(f"Config: {result.config_path}")
     print(f"Backup: {result.backup_path}")
     print(f"OK: WORKSPACE_PLACEMENT rule {success_verb}: {rule_text}")
+    return 0
+
+
+def _run_route_edit(args: argparse.Namespace, operation: str, success_verb: str, edit_callback) -> int:
+    config_path: Path = args.config
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        edit = edit_callback(source)
+    except FileNotFoundError:
+        print(f"ERROR: config file not found: {config_path}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not read config file {config_path}: {exc}")
+        return 2
+    except RouteRuleExistsError as exc:
+        print(f"ERROR: {exc}")
+        print("Use modify-route to update an existing WORKSPACE_ROUTES rule.")
+        return 2
+    except RouteRuleNotFoundError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except RouteOperationError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+    except RenderValidationError as exc:
+        print(f"ERROR: cannot edit invalid config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+
+    if operation == "modify":
+        rule_text = edit.new_rule
+        workspace = edit.new_workspace
+        old_rule_text = edit.old_rule
+        old_workspace = edit.old_workspace
+    else:
+        rule_text = edit.rule
+        workspace = edit.workspace
+        old_rule_text = None
+        old_workspace = None
+
+    if not args.write:
+        try:
+            preview = preview_source_save_config(config_path, edit.source, backup_dir=args.backup_dir)
+        except SaveValidationError as exc:
+            print(f"ERROR: cannot preview invalid edited config: {config_path}")
+            for message in exc.validation.errors:
+                print(f"- {message}")
+            return 1
+        except SaveConfigError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+        except OSError as exc:
+            print(f"ERROR: could not preview save: {exc}")
+            return 2
+
+        print(f"Config: {preview.config_path}")
+        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned WORKSPACE_ROUTES {operation}: workspace={workspace} rule={rule_text}")
+        if old_rule_text is not None:
+            print(f"Old workspace: {old_workspace}")
+            print(f"Old rule: {old_rule_text}")
+        print(f"Rendered bytes: {preview.bytes_written}")
+        print("Preview only: no files were modified.")
+        print("Run again with --write to save.")
+        return 0
+
+    try:
+        result = save_source_config(config_path, edit.source, backup_dir=args.backup_dir, validation=edit.validation)
+    except SaveValidationError as exc:
+        print(f"ERROR: cannot save invalid edited config: {config_path}")
+        for message in exc.validation.errors:
+            print(f"- {message}")
+        return 1
+    except SaveConfigError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+    except OSError as exc:
+        print(f"ERROR: could not save config: {exc}")
+        return 2
+
+    print(f"Config: {result.config_path}")
+    print(f"Backup: {result.backup_path}")
+    print(f"OK: WORKSPACE_ROUTES rule {success_verb}: workspace={workspace} rule={rule_text}")
     return 0
 
 
