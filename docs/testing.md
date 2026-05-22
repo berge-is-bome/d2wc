@@ -2,13 +2,19 @@
 
 ## Purpose
 
-This document defines the first testing strategy for `d2wc`.
+This document defines the testing strategy for `d2wc`.
 
-The testing goal is simple: the configurator must never damage a user's working Lua rules file. The parser, validator, renderer, backup logic, and UI proof must therefore be tested before the configurator is allowed to write to a real user configuration.
+The testing goal is simple: the configurator must never damage a user's working Lua rules file. Parser, validator, renderer, backup logic, CLI editing operations, and future UI behavior must therefore be tested before the configurator is allowed to write to a real user configuration.
 
 ## Current confirmed verification
 
 The latest confirmed source-checkout verification is recorded in [Development Status](development-status.md).
+
+Latest reported verification after PR #9:
+
+```text
+153 pytest tests passed.
+```
 
 Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
 
@@ -48,6 +54,7 @@ The project should follow these principles:
 8. Keep future Qt/KDE support possible by not tying core tests to GTK.
 9. Test generated geometry before writing it to `GEOM`.
 10. Re-validate rendered Lua output after renderer changes.
+11. Preserve comments, blank lines, and marker-tail behavior when editing managed rule-list sections.
 
 ## Test levels
 
@@ -66,6 +73,8 @@ Examples:
 7. Rendering deterministic Lua for one block.
 8. Runtime setting validation.
 9. Split-profile generation from screen geometry and `window_border_width`.
+10. Rule-list add, modify, and delete operations.
+11. Comment preservation and marker-tail behavior.
 
 These tests should not require a running desktop session.
 
@@ -82,6 +91,7 @@ Examples:
 5. Create backups in a temporary directory.
 6. Verify invalid Lua configuration samples produce useful errors.
 7. Generate `half_left` and `half_right` profiles into a temporary config.
+8. Run guarded CLI edit commands against copied temporary configs.
 
 These tests should not modify the user's real `~/.config/d2wc/` files.
 
@@ -95,9 +105,10 @@ Examples:
 2. Assign the command to a keyboard shortcut.
 3. Capture active-window class.
 4. Capture active-window domain where `_QUBES_VMNAME` exists.
-5. Capture active-window geometry.
-6. Detect left-edge placement offset using `get_window_geometry()`.
-7. Preview generated split profiles on the active screen.
+5. Treat an empty `_QUBES_VMNAME` as `dom0`.
+6. Capture active-window geometry.
+7. Detect left-edge placement offset using `get_window_geometry()`.
+8. Preview generated split profiles on the active screen.
 
 These tests may require manual confirmation at first.
 
@@ -138,12 +149,6 @@ Required parser test cases:
 8. Fails clearly when a required block is missing.
 9. Fails clearly when a block is malformed.
 
-Completion criteria:
-
-1. The parser can read the current script.
-2. Parsed output can be inspected in a developer-friendly format.
-3. Errors identify the block and reason.
-
 ## Rule grammar tests
 
 Rule grammar tests should cover prefixed tokens.
@@ -179,41 +184,21 @@ d:dom0 c:qubes-qube-manager le:pos1
 
 Required grammar-invalid examples:
 
-These examples test one complete rule string at a time. The point is not whether the rule belongs in a specific Lua section yet. The point is whether the rule string itself uses the prefixed grammar correctly.
-
-A valid `WORKSPACE_PLACEMENT` rule can contain one domain, one class, and one geometry profile:
-
-```text
-"d:personal c:okular g:half_left"
-```
-
-The following examples are invalid because the same prefix appears more than once inside one rule string.
-
-Duplicate domain prefix:
-
 ```text
 "d:personal d:work c:okular g:half_left"
 ```
-
-Duplicate class prefix:
 
 ```text
 "d:personal c:okular c:krusader g:half_left"
 ```
 
-Duplicate geometry profile prefix:
-
 ```text
 "d:personal c:okular g:half_left g:half_right"
 ```
 
-Duplicate left-edge correction prefix:
-
 ```text
 "d:personal c:okular le:pos1 le:pos2"
 ```
-
-Unknown prefix:
 
 ```text
 "d:personal c:okular x:unknown"
@@ -256,6 +241,8 @@ Tests should verify:
 2. Workspace key is not duplicated.
 3. Route rule has at least `d:` or `c:`.
 4. Adding a rule appends to the existing workspace list instead of creating another same-number key.
+5. Comments around route rows are preserved where practical.
+6. Tail comments after `-- add more here` are preserved as tail content.
 
 ### `GEOM`
 
@@ -317,8 +304,6 @@ Required tests:
 7. Reject invalid border widths before rendering.
 8. Write generated profiles only to a temporary config during tests.
 
-The first tests should not assume the final split-profile formula is settled. They should confirm that the calculation is deterministic, validated, and previewable.
-
 ## Renderer tests
 
 Renderer tests should prove that generated Lua is stable and readable.
@@ -331,9 +316,10 @@ Required behavior:
 4. Avoid duplicate workspace keys.
 5. Preserve pure note comments.
 6. Preserve blank separator lines.
-7. Align right-side comments in managed rule-list sections.
+7. Align right-side comments in managed rule-list sections where supported.
 8. Align right-side comments in `GEOM` entries.
 9. Render generated `half_left` and `half_right` profiles as normal `GEOM` entries.
+10. Preserve marker-tail comments after `-- add more here` in edited sections.
 
 Test approach:
 
@@ -346,35 +332,19 @@ Test approach:
 
 This is more important than byte-for-byte output matching.
 
-## Dry-run tests
+## Dry-run and guarded-write tests
 
-Before real saving exists, the tool should support a dry-run path.
+The tool should support dry-run or preview behavior before real writes.
 
-Possible command:
+Existing guarded behavior includes:
 
-```bash
-python -m d2wc validate --config tests/fixtures/d2wc-current.lua
-```
+1. `save` preview by default.
+2. `save --write` for real safe-save writes.
+3. `GEOM` edit commands preview by default and write only with `--write`.
+4. `WORKSPACE_PLACEMENT` edit commands preview by default and write only with `--write`.
+5. `WORKSPACE_ROUTES` edit commands preview by default and write only with `--write`.
 
-Possible command:
-
-```bash
-python -m d2wc render --config tests/fixtures/d2wc-current.lua --stdout
-```
-
-Possible command:
-
-```bash
-python -m d2wc plan-add-geom --config tests/fixtures/d2wc-current.lua --name test_left --x 0 --y 0 --w 1200 --h 900
-```
-
-Possible command:
-
-```bash
-python -m d2wc plan-split-profiles --screen-x 0 --screen-y 0 --screen-w 3840 --screen-h 2160 --window-border-width 6
-```
-
-The exact command names can change, but dry-run behavior should exist before real writes.
+The next guarded edit commands should follow the same pattern for `PIN` and `EXCLUDE`.
 
 ## Backup and write tests
 
@@ -389,6 +359,7 @@ Required tests:
 5. Failed validation prevents any write.
 6. Failed write leaves previous file intact where possible.
 7. Generated split profiles are not written if `window_border_width` validation fails.
+8. Rule-list edit failures leave the original file unchanged.
 
 No backup/write test should target the user's actual config directory.
 
@@ -406,7 +377,7 @@ Required manual proof tests:
 6. Configurator can show parsed configuration summary.
 7. No real user config is modified.
 
-GTK proof should happen after parser, validator, renderer, and safe save behavior are proven, not before.
+GTK proof should happen after parser, validator, renderer, safe save behavior, and current target-rule edit proofs are proven, not before.
 
 ## Active-window capture tests
 
@@ -424,8 +395,6 @@ Required tests on Qubes/XFCE:
 8. Read `_QUBES_VMNAME` where available.
 9. Treat empty `_QUBES_VMNAME` as `dom0` where relevant.
 10. Handle missing `_QUBES_VMNAME` without failure.
-
-The test output should be inspectable before it is connected to save workflows.
 
 ## Left-edge correction tests
 
@@ -456,8 +425,6 @@ Required proof:
 4. Log final geometry.
 5. Do not open configurator yet.
 6. Do not save rules.
-
-Only after this should post-resize configurator entry be enabled.
 
 ## Packaging tests
 
@@ -490,8 +457,6 @@ The following gates must pass before the configurator can write to a real user c
 10. Backup location is writable.
 11. Save preview is shown.
 
-The default behavior during early development should be read-only or test-file-only.
-
 ## Suggested test tooling
 
 The likely test stack is:
@@ -500,8 +465,6 @@ The likely test stack is:
 2. Temporary directories through pytest fixtures.
 3. Plain fixture files under `tests/fixtures/`.
 4. Manual test notes for desktop behavior.
-
-The final tool choice can be confirmed when the Python package skeleton is created.
 
 ## Manual test log format
 
@@ -522,18 +485,9 @@ Suggested fields:
 11. Actual result.
 12. Notes.
 
-## Continuous integration later
+## Continuous integration
 
-CI can be added after the source-checkout workflow is stable.
-
-First CI checks:
-
-1. Run unit tests.
-2. Run parser tests against fixtures.
-3. Run validation tests.
-4. Run render round-trip tests.
-5. Validate rendered Lua output.
-6. Run generated split-profile tests.
+The current GitHub Actions test workflow should continue to run the Python test suite. Later CI expansion can include additional fixture validation and render round-trip checks.
 
 Desktop behavior will remain manual until a suitable test environment is designed.
 
@@ -544,18 +498,19 @@ Desktop behavior will remain manual until a suitable test environment is designe
 3. [Runtime Architecture](runtime-architecture.md)
 4. [Implementation Plan](implementation-plan.md)
 5. [Left-Edge Correction Testing](left-edge-correction-testing.md)
+6. [Lua Design History Notes](lua-design-history.md)
 
 ## Immediate test priorities
 
-The current core proof has already covered the first parser, grammar, validation, renderer, settings, split-profile, backup path, CLI, duplicate-validation, and shadow-validation tests.
+The current core proof has already covered parser, grammar, validation, renderer, settings, split-profile, backup path, safe save, CLI, duplicate-validation, shadow-validation, placement edit, route edit, and route comment preservation tests.
 
 The next immediate test priorities are:
 
-1. Safe write behavior using temporary directories only.
-2. Backup creation before replacement.
-3. Render-to-temp and validate-before-replace workflow.
-4. Failure handling that leaves the original file intact.
-5. Additional fixture coverage for valid and invalid Lua samples.
-6. GTK window proof only after safe save behavior is tested.
+1. `PIN` add, modify, and delete operation tests.
+2. `EXCLUDE` add, modify, and delete operation tests.
+3. Rule-list comment preservation tests for `PIN` and `EXCLUDE`.
+4. Marker-tail preservation tests for `PIN` and `EXCLUDE`.
+5. Guarded CLI preview/write tests for `PIN` and `EXCLUDE`.
+6. Continue using copied temporary configs for manual smoke testing.
 
-No UI save workflow should be built before the parser, validator, renderer, and backup/write tests exist.
+No UI save workflow should be built before the target-rule operations are proven through CLI/core tests.
