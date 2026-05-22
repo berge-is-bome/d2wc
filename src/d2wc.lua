@@ -1,6 +1,6 @@
 ------------------------------------------------------------
 -- qubes devilspie2 workspace configurator
--- version 0.1.9
+-- version 0.1.10
 ------------------------------------------------------------
 
 -- Only act on real app windows
@@ -8,22 +8,31 @@ if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
   return
 end
 
+------------------------------------------------------------
 -- Exclusions: anything listed here is ignored
+-- Accepts:
+--   "domain"            (e.g. "personal")
+--   "class"             (e.g. "okular")
+--   "domain.class"      (e.g. "personal.okular")
+-- Optional disambiguation:
+--   "d:<domain>"        force treat as domain
+--   "c:<class>"         force treat as class
+------------------------------------------------------------
 local EXCLUDE = {
-  domains = {
-    ["pesonal-test"] = true,
-  },
-  classes = {
-    -- ["some-class"] = true,
-    ["qubes-app-menu"] = true,
-  },
+  "personal-test",       -- whole domain
+  -- "c:qubes-app-menu",    -- class everywhere
+  -- "personal.okular",     -- only this domain.class
 }
 
--- Pin rules: pin window from a domain, or all windows from a domain, making them visible on all workspaces
+------------------------------------------------------------
+-- Pin rules: windows listed here are made visible on all workspaces
+-- Same token grammar as EXCLUDE (domain, class, domain.class, or d:/c: prefixes)
+------------------------------------------------------------
 local PIN = {
-  ["dom0"] = { ["xfce4-terminal"] = true, ["qubes-qube-manager"] = true }, -- pinned dom0 applications
-  -- ["personal"] = true, -- pin everything from personal
-  -- ["personal"] = { ["okular"] = true }, -- pin one class from personal
+  "dom0.xfce4-terminal",
+  "dom0.qubes-qube-manager",
+  -- "d:personal",        -- pin everything from personal
+  -- "c:okular",          -- pin okular everywhere
 }
 
 -- Left-edge window position correction for windows positioned at x == 0
@@ -32,29 +41,65 @@ local PIN = {
 --   "pos2"  -> call set_window_position2(x, y)
 local LEFT_EDGE_CORRECTION = "pos2" -- change to "pos1" or "pos2" if you see a gap between the window border and the left edge of your screen, despite x = 0
 
+------------------------------------------------------------
 -- Workspace routes. Place applications together on a workspace.
--- Keys are workspace numbers; values are lists of "domain" or "domain.class".
+-- Keys are workspace numbers; values are lists of:
+--   "domain", "class", or "domain.class"
+-- Optional disambiguation with "d:" or "c:" like above.
 -- Hyphenated domain names are fine because these are plain strings.
+------------------------------------------------------------
 local WORKSPACE_ROUTES = {
   [1] = { "personal", "work.navigator", "work.krusader" },
-  -- [2] = { "test.okular", "business-clients.okular" },
+  -- [2] = { "test.okular", "d:business-clients", "c:okular" },
 }
 
--- Build lookups:
---   WS_EXACT["domain.class"] = ws
---   WS_DOMAIN["domain"]      = ws
-local WS_EXACT, WS_DOMAIN = {}, {}
+------------------------------------------------------------
+-- Token parser and lookup builders
+------------------------------------------------------------
+local function parse_token(token)
+  local tag, rest = token:match("^([dc]):(.+)$")
+  if tag == "d" then return "domain", rest end
+  if tag == "c" then return "class",  rest end
+  local d, c = token:match("^([^%.]+)%.(.+)$")
+  if d and c then return "exact", d .. "." .. c end
+  return "domain", token
+end
+
+-- Build lookups for EXCLUDE
+local EX_EXACT, EX_DOMAIN, EX_CLASS = {}, {}, {}
+for _, tok in ipairs(EXCLUDE) do
+  local kind, val = parse_token(tok)
+  if     kind == "exact"  then EX_EXACT[val]   = true
+  elseif kind == "domain" then EX_DOMAIN[val]  = true
+  elseif kind == "class"  then EX_CLASS[val]   = true
+  end
+end
+
+-- Build lookups for PIN
+local PIN_EXACT, PIN_DOMAIN, PIN_CLASS = {}, {}, {}
+for _, tok in ipairs(PIN) do
+  local kind, val = parse_token(tok)
+  if     kind == "exact"  then PIN_EXACT[val]   = true
+  elseif kind == "domain" then PIN_DOMAIN[val]  = true
+  elseif kind == "class"  then PIN_CLASS[val]   = true
+  end
+end
+
+-- Build lookups for WORKSPACE_ROUTES
+local WS_EXACT, WS_DOMAIN, WS_CLASS = {}, {}, {}
 for wsnum, list in pairs(WORKSPACE_ROUTES) do
-  for _, token in ipairs(list) do
-    local d, c = token:match("^([^%.]+)%.(.+)$")
-    if d and c then
-      WS_EXACT[d .. "." .. c] = wsnum
-    else
-      WS_DOMAIN[token] = wsnum
+  for _, tok in ipairs(list) do
+    local kind, val = parse_token(tok)
+    if     kind == "exact"  then WS_EXACT[val]  = wsnum
+    elseif kind == "domain" then WS_DOMAIN[val] = wsnum
+    elseif kind == "class"  then WS_CLASS[val]  = wsnum
     end
   end
 end
 
+------------------------------------------------------------
+-- Qubes domain and class extraction
+------------------------------------------------------------
 -- Read domain; treat "" as dom0; if nil, skip workspace assignment but still allow global geometry rules
 local raw_domain = get_window_property("_QUBES_VMNAME")
 local domain
@@ -66,12 +111,6 @@ else
   debug_print("_QUBES_VMNAME is nil; skipping domain-based workspace")
 end
 
--- Optional domain exclusion. If enabled, the script will not touch workspace or geometry.
-if domain and EXCLUDE.domains[domain] then
-  -- debug_print("excluded domain: " .. domain)
-  return
-end
-
 -- Class helper: get WM_CLASS class part in lowercase (after the last colon)
 local function get_lower_class()
   local s = (get_class_instance_name() or ""):lower()
@@ -80,17 +119,26 @@ end
 
 local cls = get_lower_class()
 
--- Optional class exclusion. If enabled, the script will not touch workspace or geometry.
-if EXCLUDE.classes[cls] then
-  -- debug_print("excluded class: " .. cls)
-  return
+------------------------------------------------------------
+-- Apply exclusions
+------------------------------------------------------------
+-- Optional domain/class/domain.class exclusion. If enabled, the script will not touch workspace or geometry.
+if domain then
+  local key = domain .. "." .. cls
+  if EX_EXACT[key] or EX_DOMAIN[domain] or EX_CLASS[cls] then
+    -- debug_print("excluded: " .. key)
+    return
+  end
 end
 
--- Compute target workspace: exact domain.class, else bare domain, else nil
+------------------------------------------------------------
+-- Workspace routing
+-- Precedence: exact domain.class -> domain -> class
+------------------------------------------------------------
 local function compute_workspace(d, c)
   if not d then return nil end
   local key = d .. "." .. c
-  return WS_EXACT[key] or WS_DOMAIN[d]
+  return WS_EXACT[key] or WS_DOMAIN[d] or WS_CLASS[c]
 end
 
 -- Assign workspace
@@ -101,11 +149,13 @@ if domain then
   end
 end
 
+------------------------------------------------------------
 -- Pin windows (sticky on all workspaces).
 -- Pinning is done after workspace assignment, because workspace assignment removes the sticky flag.
-if domain and PIN[domain] ~= nil then
-  local rule = PIN[domain]
-  if rule == true or (type(rule) == "table" and rule[cls]) then
+------------------------------------------------------------
+if domain then
+  local key = domain .. "." .. cls
+  if PIN_EXACT[key] or PIN_DOMAIN[domain] or PIN_CLASS[cls] then
     pin_window()
     -- debug_print(("pinned: dom=%s cls=%s"):format(tostring(domain), cls))
   end
@@ -140,7 +190,7 @@ local GEOM = {
 local RULES = {
   ["*"] = {
     groups = {
-      wide       = { "krusader" }, -- shared geometry
+      wide       = { "krusader", "soffice" }, -- shared geometry
       half_right = { "okular" }, -- shared geometry
       -- wide = { "krusader", "okular" }, -- shared geometry
     },
@@ -176,7 +226,7 @@ local RULES = {
   --   per_class = {
       -- Option A: geometry profile
       -- ["okular"] = "centered_mid",
-
+      --
       -- Option B: numerical values
       -- ["okular"] = { x = 1913, y = 0, w = 1920, h = 2115 },
   --   },
