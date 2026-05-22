@@ -35,6 +35,8 @@ class ActiveWindowInfo:
     wm_class: str | None = None
     qubes_vmname: str | None = None
     geometry: WindowGeometry = WindowGeometry()
+    raw_xwininfo_output: str | None = None
+    raw_xprop_output: str | None = None
     error: str | None = None
 
     @property
@@ -50,9 +52,11 @@ def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindow
     """Capture a user-selected X11 window from dom0.
 
     This is the Qubes-safe proof path. It runs `xwininfo -frame`, which prompts
-    the user to click the target window from dom0. The selected window id is then
-    optionally inspected with xprop for title/class/Qubes metadata. Missing xprop
-    properties are tolerated because frame/client property placement can vary.
+    the user to click the target window from dom0. The raw xwininfo output is
+    kept because it is the first reliable proof artifact. The selected window id
+    is then optionally inspected with xprop for title/class/Qubes metadata.
+    Missing xprop properties are tolerated because frame/client property
+    placement can vary.
     """
 
     run = runner or _run_command
@@ -64,7 +68,10 @@ def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindow
 
     window_id = parse_xwininfo_window_id(xwininfo_output)
     if window_id is None:
-        return ActiveWindowInfo(error="Could not determine selected window id from xwininfo output.")
+        return ActiveWindowInfo(
+            error="Could not determine selected window id from xwininfo output.",
+            raw_xwininfo_output=xwininfo_output,
+        )
 
     xprop_output = ""
     try:
@@ -84,6 +91,8 @@ def capture_selected_window(runner: CommandRunner | None = None) -> ActiveWindow
         wm_class=wm_class,
         qubes_vmname=parse_xprop_string(xprop_output, "_QUBES_VMNAME"),
         geometry=parse_xwininfo_geometry(xwininfo_output),
+        raw_xwininfo_output=xwininfo_output,
+        raw_xprop_output=xprop_output or None,
     )
 
 
@@ -147,9 +156,14 @@ def parse_xwininfo_window_id(output: str) -> str | None:
 def parse_xwininfo_title(output: str) -> str | None:
     """Parse the selected window title from the first xwininfo line."""
 
-    match = re.search(r'xwininfo:\s+Window id:\s+0x[0-9a-fA-F]+\s+"(.*)"', output)
-    if match:
-        return match.group(1)
+    quoted = re.search(r'xwininfo:\s+Window id:\s+0x[0-9a-fA-F]+\s+"(.*)"', output)
+    if quoted:
+        return quoted.group(1)
+
+    no_name = re.search(r"xwininfo:\s+Window id:\s+0x[0-9a-fA-F]+\s+\((has no name)\)", output)
+    if no_name:
+        return no_name.group(1)
+
     return None
 
 
