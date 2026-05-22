@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, and the first read-only GTK launch proof.
+`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, the read-only GTK launch proof, and a read-only active-window capture proof.
 
 ## Current status
 
@@ -25,7 +25,7 @@ The Python core currently supports validation, render preview, safe-save behavio
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The first GTK proof adds a read-only window launched by `python -m d2wc configure` or `d2wc configure`. It does not read or write user config files, capture the active window, or edit rules.
+The GTK proof opens a read-only window launched by `python -m d2wc configure` or `d2wc configure`. It captures the active X11 window before the configurator window is shown and displays the captured title, class, Qubes domain, and geometry. It does not read or write user config files or edit rules.
 
 Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #12 was `197 passed`.
 
@@ -40,8 +40,8 @@ docs/
   repository-layout.md           Repository structure and development conventions.
 src/
   d2wc.lua                       Current devilspie2 Lua rules script.
-  d2wc/                          Python configurator core proof and GTK UI proof.
-tests/                           Python tests for the configurator core proof.
+  d2wc/                          Python configurator core, desktop integration, and GTK UI proof.
+tests/                           Python tests for the configurator core and desktop proof helpers.
 ```
 
 ## Local development
@@ -76,7 +76,7 @@ The `validate` command is read-only. It parses and validates the managed Lua sec
 
 The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
 
-The first GTK proof can be launched directly from the source checkout with:
+The GTK proof can be launched directly from the source checkout with:
 
 ```bash
 python -m d2wc configure
@@ -88,21 +88,22 @@ or, after refreshing the editable install:
 d2wc configure
 ```
 
-The GTK proof is read-only. It opens a window and closes cleanly, but does not read or write config files.
+The GTK proof is read-only. It captures and displays active-window details, opens a window, and closes cleanly, but does not read or write config files.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
 ## Development direction
 
-The CLI/core editing proof phase is complete for the managed Lua sections. The next development phase is the first GTK configurator proof.
+The CLI/core editing proof phase is complete for the managed Lua sections. The current development phase is active-window capture from the GTK configurator.
 
 The immediate goal is intentionally small:
 
-1. `python -m d2wc configure` opens a GTK window.
-2. The window opens cleanly on the Qubes/XFCE target environment.
-3. The window closes cleanly.
-4. No config writes happen from the first UI proof.
-5. Active-window capture and rule editing UI remain later stages.
+1. `python -m d2wc configure` captures the active X11 window before the configurator appears.
+2. The GTK window displays the captured title, class, Qubes domain, and geometry.
+3. The window opens cleanly on the Qubes/XFCE target environment.
+4. The window closes cleanly.
+5. No config writes happen from this UI proof.
+6. Rule editing UI remains a later stage.
 
 Planned longer-term entry points remain:
 
