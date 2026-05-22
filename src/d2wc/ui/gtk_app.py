@@ -42,7 +42,7 @@ def run_configurator() -> int:
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(760, 560)
+    window.set_default_size(520, 260)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -56,7 +56,7 @@ def run_configurator() -> int:
 
     message = Gtk.Label(
         label=(
-            "Qubes/dom0 selected-window capture proof only.\n"
+            "Qubes/dom0 selected-window geometry proof only.\n"
             "No config files are read or written from this window yet."
         )
     )
@@ -64,17 +64,12 @@ def run_configurator() -> int:
     message.set_line_wrap(True)
     box.pack_start(message, False, False, 0)
 
-    scrolled = Gtk.ScrolledWindow()
-    scrolled.set_hexpand(True)
-    scrolled.set_vexpand(True)
-    box.pack_start(scrolled, True, True, 0)
-
     details = Gtk.Label(label=format_active_window_info(window_info))
     details.set_xalign(0)
     details.set_yalign(0)
     details.set_selectable(True)
     details.set_line_wrap(False)
-    scrolled.add(details)
+    box.pack_start(details, True, True, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -86,40 +81,27 @@ def run_configurator() -> int:
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
-    """Format captured window information for the GTK proof window."""
+    """Format captured window geometry for the GTK proof window."""
 
     if window_info.error:
         parts = [f"Window capture failed:\n{window_info.error}"]
         if window_info.raw_xwininfo_output:
-            parts.append("Raw xwininfo -frame output:")
-            parts.append(window_info.raw_xwininfo_output.rstrip())
+            parts.append("Raw xwininfo -frame output kept for debugging.")
         return "\n\n".join(parts)
 
     geometry = window_info.geometry
-    geometry_text = "unknown"
-    if None not in (geometry.x, geometry.y, geometry.width, geometry.height):
-        geometry_text = f"x={geometry.x} y={geometry.y} w={geometry.width} h={geometry.height}"
 
-    parts = [
-        "Parsed summary:",
-        f"Window ID: {_value_or_unknown(window_info.window_id)}",
-        f"Title: {_value_or_unknown(window_info.title)}",
-        f"Class instance: {_value_or_unknown(window_info.wm_class_instance)}",
-        f"Class: {_value_or_unknown(window_info.wm_class)}",
-        f"Qubes domain: {_value_or_unknown(window_info.domain)}",
-        f"Geometry: {geometry_text}",
-    ]
-
-    if window_info.raw_xwininfo_output:
-        parts.extend(
-            [
-                "",
-                "Raw xwininfo -frame output:",
-                window_info.raw_xwininfo_output.rstrip(),
-            ]
-        )
-
-    return "\n".join(parts)
+    return "\n".join(
+        [
+            f"Absolute upper-left X:  {_value_or_unknown_int(geometry.x)}",
+            f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
+            f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
+            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
+            f"Width: { _value_or_unknown_int(geometry.width)}",
+            f"Height: { _value_or_unknown_int(geometry.height)}",
+            f"geometry {_value_or_unknown(geometry.size_text)}",
+        ]
+    )
 
 
 def _value_or_unknown(value: str | None) -> str:
@@ -128,3 +110,9 @@ def _value_or_unknown(value: str | None) -> str:
     if value == "":
         return "empty"
     return value
+
+
+def _value_or_unknown_int(value: int | None) -> str:
+    if value is None:
+        return "unknown"
+    return str(value)
