@@ -2,31 +2,34 @@
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from typing import Callable
 
+from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 from d2wc.event_data import WindowEventData
 from d2wc.event_preview import build_event_rule_preview
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
+FALLBACK_WORKSPACES = ("1", "2", "3", "4")
 SECTION_LABELS = {
     "EXCLUDE": "Exclude",
     "PIN": "Pin",
     "WORKSPACE_ROUTES": "Workspace routes",
-    "GEOM": "Geometry",
+    "GEOM": "Window geometry",
     "WORKSPACE_PLACEMENT": "Workspace placement",
     "LEFT_EDGE_CORRECTION": "Left edge correction",
 }
 SECTION_BY_LABEL = {label: section for section, label in SECTION_LABELS.items()}
 SECTION_COLUMNS = {
-    "EXCLUDE": ("Action", "Window", "New window"),
-    "PIN": ("Action", "Window", "New window"),
-    "WORKSPACE_ROUTES": ("Action", "Window", "New window", "Workspace"),
-    "GEOM": ("Action", "Geometry", "New profile", "Coordinates"),
-    "WORKSPACE_PLACEMENT": ("Action", "Window", "New window", "Profile filter", "Geometry"),
-    "LEFT_EDGE_CORRECTION": ("Action", "Window", "New window"),
+    "EXCLUDE": ("Action", "Domain", "Class"),
+    "PIN": ("Action", "Domain", "Class"),
+    "WORKSPACE_ROUTES": ("Action", "Domain", "Class", "Workspace"),
+    "GEOM": ("Action", "Window geometry", "New profile", "Coordinates"),
+    "WORKSPACE_PLACEMENT": ("Action", "Domain", "Class", "Window geometry"),
+    "LEFT_EDGE_CORRECTION": ("Action", "Domain", "Class", "Left edge"),
 }
 
 
@@ -74,6 +77,14 @@ class ManagedGridRow:
         """Build a row from stable-order values."""
 
         return cls(*values)
+
+
+@dataclass(frozen=True)
+class _RuleParts:
+    domain: str = ""
+    class_name: str = ""
+    geometry_profile: str = ""
+    left_edge_mode: str = ""
 
 
 def build_configured_grid_rows(snapshot: TestConfigSnapshot | None) -> tuple[ManagedGridRow, ...]:
@@ -136,7 +147,7 @@ def build_configured_grid_rows(snapshot: TestConfigSnapshot | None) -> tuple[Man
             action="Modify",
             existing_entry=rule,
             target_entry=rule,
-            existing_profile=_profile_from_rule(rule),
+            existing_profile=_rule_parts(rule).geometry_profile,
         )
         for rule in config.workspace_placement
     )
@@ -249,6 +260,8 @@ def build_managed_section_editor(
     rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     main_box.pack_start(rows_box, True, True, 0)
 
+    workspace_values = _workspace_values()
+
     def current_snapshot() -> TestConfigSnapshot | None:
         return state["snapshot"] if isinstance(state["snapshot"], TestConfigSnapshot) else None
 
@@ -273,6 +286,8 @@ def build_managed_section_editor(
                     rows,
                     row_controls,
                     apply_row_action,
+                    event_data,
+                    workspace_values,
                 ),
                 True,
                 True,
@@ -329,26 +344,28 @@ class _EditorControls:
         self,
         *,
         section: str,
+        existing_rule: str,
         action_combo,
-        existing_combo,
-        target_entry,
-        profile_filter_entry,
-        profile_combo,
+        domain_combo,
+        class_combo,
+        geometry_combo,
+        left_edge_combo,
         new_profile_entry,
-        workspace_entry,
+        workspace_combo,
         x_entry,
         y_entry,
         w_entry,
         h_entry,
     ) -> None:
         self.section = section
+        self.existing_rule = existing_rule
         self.action_combo = action_combo
-        self.existing_combo = existing_combo
-        self.target_entry = target_entry
-        self.profile_filter_entry = profile_filter_entry
-        self.profile_combo = profile_combo
+        self.domain_combo = domain_combo
+        self.class_combo = class_combo
+        self.geometry_combo = geometry_combo
+        self.left_edge_combo = left_edge_combo
         self.new_profile_entry = new_profile_entry
-        self.workspace_entry = workspace_entry
+        self.workspace_combo = workspace_combo
         self.x_entry = x_entry
         self.y_entry = y_entry
         self.w_entry = w_entry
@@ -492,6 +509,8 @@ def _build_section_rows_grid(
     rows: tuple[ManagedGridRow, ...],
     row_controls: list[_EditorControls],
     apply_row_action,
+    event_data: WindowEventData | None,
+    workspace_values: tuple[str, ...],
 ):
     scroller = Gtk.ScrolledWindow()
     scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -515,7 +534,7 @@ def _build_section_rows_grid(
         grid.attach(label, column_index, 0, 1, 1)
 
     for row_index, row in enumerate(rows, start=1):
-        controls = _build_row_controls(Gtk, snapshot, section, row)
+        controls = _build_row_controls(Gtk, snapshot, section, row, event_data, workspace_values)
         row_controls.append(controls)
         for column_index, column_name in enumerate(columns):
             grid.attach(_widget_for_column(Gtk, controls, column_name), column_index, row_index, 1, 1)
@@ -532,14 +551,16 @@ def _build_row_controls(
     snapshot: TestConfigSnapshot | None,
     section: str,
     row: ManagedGridRow,
+    event_data: WindowEventData | None,
+    workspace_values: tuple[str, ...],
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
-    existing_combo = _searchable_combo(Gtk, "Window")
-    target_entry = _entry(Gtk, "New window", width=28)
-    profile_filter_entry = _entry(Gtk, "Filter", width=12)
-    profile_combo = _searchable_combo(Gtk, "Geometry", width=18)
+    domain_combo = _searchable_combo(Gtk, "Domain", width=18)
+    class_combo = _searchable_combo(Gtk, "Class", width=22)
+    geometry_combo = _searchable_combo(Gtk, "Window geometry", width=18)
+    left_edge_combo = _combo_box(Gtk, tuple(sorted(LEFT_EDGE_MODES)))
     new_profile_entry = _entry(Gtk, "New profile", width=18)
-    workspace_entry = _entry(Gtk, "Workspace", width=8)
+    workspace_combo = _combo_box(Gtk, workspace_values)
     x_entry = _entry(Gtk, "x", width=6)
     y_entry = _entry(Gtk, "y", width=6)
     w_entry = _entry(Gtk, "w", width=6)
@@ -547,27 +568,27 @@ def _build_row_controls(
 
     controls = _EditorControls(
         section=section,
+        existing_rule=row.existing_entry,
         action_combo=action_combo,
-        existing_combo=existing_combo,
-        target_entry=target_entry,
-        profile_filter_entry=profile_filter_entry,
-        profile_combo=profile_combo,
+        domain_combo=domain_combo,
+        class_combo=class_combo,
+        geometry_combo=geometry_combo,
+        left_edge_combo=left_edge_combo,
         new_profile_entry=new_profile_entry,
-        workspace_entry=workspace_entry,
+        workspace_combo=workspace_combo,
         x_entry=x_entry,
         y_entry=y_entry,
         w_entry=w_entry,
         h_entry=h_entry,
     )
 
-    _reset_combo(existing_combo, _entries_for_section(snapshot, section), include_blank=True)
-    _refresh_profile_choices(snapshot, controls, preserve_current=False)
-    _populate_controls_from_grid_row(snapshot, controls, row)
+    _reset_combo(domain_combo, _domain_values(snapshot, event_data), include_blank=True)
+    _reset_combo(class_combo, _class_values(snapshot, event_data), include_blank=True)
+    _reset_combo(geometry_combo, _profile_names(snapshot), include_blank=True)
+    _populate_controls_from_grid_row(controls, row)
 
     action_combo.connect("changed", lambda _combo: _set_field_sensitivity(section, _active_action(controls), controls))
-    profile_filter_entry.connect("changed", lambda _entry: _refresh_profile_choices(snapshot, controls, preserve_current=False))
-    existing_combo.connect("changed", lambda _combo: _populate_fields_from_existing(snapshot, controls))
-    profile_combo.connect("changed", lambda _combo: _populate_geom_fields_from_profile(snapshot, controls))
+    geometry_combo.connect("changed", lambda _combo: _populate_geom_fields_from_profile(snapshot, controls))
     _set_field_sensitivity(section, _active_action(controls), controls)
     return controls
 
@@ -575,18 +596,18 @@ def _build_row_controls(
 def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
     if column_name == "Action":
         return controls.action_combo
-    if column_name == "Window":
-        return controls.existing_combo.widget
-    if column_name == "New window":
-        return controls.target_entry
-    if column_name == "Profile filter":
-        return controls.profile_filter_entry
-    if column_name == "Geometry":
-        return controls.profile_combo.widget
+    if column_name == "Domain":
+        return controls.domain_combo.widget
+    if column_name == "Class":
+        return controls.class_combo.widget
+    if column_name == "Window geometry":
+        return controls.geometry_combo.widget
     if column_name == "New profile":
         return controls.new_profile_entry
     if column_name == "Workspace":
-        return controls.workspace_entry
+        return controls.workspace_combo
+    if column_name == "Left edge":
+        return controls.left_edge_combo
     if column_name == "Coordinates":
         return _geometry_box(Gtk, controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry)
     return _text_label(Gtk, "")
@@ -595,27 +616,15 @@ def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
 def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionRequest:
     section = controls.section
     action = _active_action(controls).lower()
-    existing_entry = controls.existing_combo.get_active_text() or ""
-    selected_profile = controls.profile_combo.get_active_text() or ""
-    profile_name = controls.new_profile_entry.get_text().strip() or selected_profile
-    target_entry = controls.target_entry.get_text().strip()
-
-    if section == "WORKSPACE_PLACEMENT" and action == "modify" and existing_entry:
-        if not profile_name:
-            raise ValueError("WORKSPACE_PLACEMENT modify requires a geometry selection")
-        target_entry = _replace_rule_profile(existing_entry, profile_name)
-    elif section == "WORKSPACE_PLACEMENT" and action == "add" and target_entry and " g:" not in f" {target_entry}":
-        if profile_name:
-            target_entry = f"{target_entry} g:{profile_name}"
-    if section == "GEOM" and action in {"modify", "delete"} and not profile_name:
-        profile_name = selected_profile or existing_entry
+    profile_name = controls.new_profile_entry.get_text().strip() or controls.geometry_combo.get_active_text() or ""
+    target_rule = _rule_from_controls(controls)
 
     return ManagedSectionActionRequest(
         section=section,
         operation=action,
-        rule=target_entry,
-        existing_rule=existing_entry,
-        workspace=_optional_int(controls.workspace_entry.get_text()),
+        rule=target_rule,
+        existing_rule=controls.existing_rule,
+        workspace=_optional_int(controls.workspace_combo.get_active_text()),
         profile_name=profile_name,
         x=_optional_int(controls.x_entry.get_text()),
         y=_optional_int(controls.y_entry.get_text()),
@@ -624,104 +633,54 @@ def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionReq
     )
 
 
+def _rule_from_controls(controls: _EditorControls) -> str:
+    section = controls.section
+    if section == "GEOM":
+        return ""
+
+    parts: list[str] = []
+    domain = controls.domain_combo.get_active_text() or ""
+    class_name = controls.class_combo.get_active_text() or ""
+    if domain:
+        parts.append(f"d:{domain}")
+    if class_name:
+        parts.append(f"c:{class_name}")
+    if section == "WORKSPACE_PLACEMENT":
+        geometry_profile = controls.geometry_combo.get_active_text() or ""
+        if geometry_profile:
+            parts.append(f"g:{geometry_profile}")
+    if section == "LEFT_EDGE_CORRECTION":
+        left_edge_mode = controls.left_edge_combo.get_active_text() or ""
+        if left_edge_mode:
+            parts.append(f"le:{left_edge_mode}")
+    return " ".join(parts)
+
+
 def _set_field_sensitivity(section: str, action: str, controls: _EditorControls) -> None:
     is_rule_section = section in {"EXCLUDE", "PIN", "WORKSPACE_ROUTES", "WORKSPACE_PLACEMENT", "LEFT_EDGE_CORRECTION"}
     is_geom = section == "GEOM"
     normalized_action = action.lower()
     edits_values = normalized_action in {"add", "modify"}
     needs_existing = normalized_action in {"modify", "delete"}
-    target_editable = is_rule_section and edits_values and not (section == "WORKSPACE_PLACEMENT" and normalized_action == "modify")
     needs_workspace = section == "WORKSPACE_ROUTES" and edits_values
-    needs_profile = section in {"GEOM", "WORKSPACE_PLACEMENT"} and edits_values
-    needs_geometry = is_geom and edits_values
+    needs_geometry_profile = section == "WORKSPACE_PLACEMENT" and edits_values
+    needs_left_edge = section == "LEFT_EDGE_CORRECTION" and edits_values
+    edits_geom_values = is_geom and edits_values
 
-    controls.existing_combo.set_sensitive(needs_existing)
-    controls.target_entry.set_sensitive(target_editable)
-    controls.workspace_entry.set_sensitive(needs_workspace)
-    controls.profile_filter_entry.set_sensitive(needs_profile)
-    controls.profile_combo.set_sensitive(needs_profile or (is_geom and needs_existing))
-    controls.new_profile_entry.set_sensitive(is_geom and edits_values)
+    controls.domain_combo.set_sensitive(is_rule_section and edits_values)
+    controls.class_combo.set_sensitive(is_rule_section and edits_values)
+    controls.workspace_combo.set_sensitive(needs_workspace)
+    controls.geometry_combo.set_sensitive(needs_geometry_profile or (is_geom and needs_existing))
+    controls.left_edge_combo.set_sensitive(needs_left_edge)
+    controls.new_profile_entry.set_sensitive(edits_geom_values)
     for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
-        entry.set_sensitive(needs_geometry)
-
-    if not target_editable:
-        controls.target_entry.set_text("")
-    if not needs_workspace:
-        controls.workspace_entry.set_text("")
-    if not needs_profile and not is_geom:
-        controls.profile_filter_entry.set_text("")
-        controls.new_profile_entry.set_text("")
-    if not needs_geometry:
-        for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
-            entry.set_text("")
+        entry.set_sensitive(edits_geom_values)
 
 
-def _entries_for_section(snapshot: TestConfigSnapshot | None, section: str) -> tuple[str, ...]:
-    if snapshot is None or snapshot.config is None:
-        return ()
-    config = snapshot.config
-    if section == "EXCLUDE":
-        return config.exclude
-    if section == "PIN":
-        return config.pin
-    if section == "WORKSPACE_ROUTES":
-        return tuple(rule for route in config.workspace_routes for rule in route.rules)
-    if section == "GEOM":
-        return tuple(profile.name for profile in config.geom)
-    if section == "WORKSPACE_PLACEMENT":
-        return config.workspace_placement
-    if section == "LEFT_EDGE_CORRECTION":
-        return config.left_edge_correction
-    return ()
-
-
-def _refresh_profile_choices(
-    snapshot: TestConfigSnapshot | None,
-    controls: _EditorControls,
-    *,
-    preserve_current: bool = True,
-) -> None:
-    current = controls.profile_combo.get_active_text() or ""
-    profiles = _profile_names(snapshot)
-    filter_text = controls.profile_filter_entry.get_text().strip().lower()
-    if filter_text:
-        profiles = tuple(profile for profile in profiles if filter_text in profile.lower())
-    _reset_combo(controls.profile_combo, profiles, include_blank=True)
-    if preserve_current and current:
-        _set_combo_active_text(controls.profile_combo, current)
-
-
-def _profile_names(snapshot: TestConfigSnapshot | None) -> tuple[str, ...]:
-    if snapshot is None or snapshot.config is None:
-        return ()
-    return tuple(profile.name for profile in snapshot.config.geom)
-
-
-def _populate_fields_from_existing(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
-    section = controls.section
-    action = _active_action(controls).lower()
-    existing = controls.existing_combo.get_active_text() or ""
-    if action not in {"modify", "delete"} or not existing:
+def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
+    if controls.section != "GEOM" or snapshot is None or snapshot.config is None:
         return
-    if section == "GEOM":
-        _set_combo_active_text(controls.profile_combo, existing)
-        controls.new_profile_entry.set_text(existing)
-        _populate_geom_fields_from_profile(snapshot, controls, profile_name=existing)
-        return
-    if section == "WORKSPACE_PLACEMENT":
-        controls.target_entry.set_text("")
-        profile_name = _profile_from_rule(existing)
-        if profile_name:
-            _set_combo_active_text(controls.profile_combo, profile_name)
-        return
-    if action == "modify":
-        controls.target_entry.set_text(existing)
-
-
-def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls, *, profile_name: str | None = None) -> None:
-    if snapshot is None or snapshot.config is None:
-        return
-    active_profile = profile_name or controls.profile_combo.get_active_text() or controls.existing_combo.get_active_text() or ""
+    active_profile = controls.geometry_combo.get_active_text() or ""
     for profile in snapshot.config.geom:
         if profile.name == active_profile:
             controls.new_profile_entry.set_text(profile.name)
@@ -732,22 +691,89 @@ def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, cont
             return
 
 
-def _populate_controls_from_grid_row(
-    snapshot: TestConfigSnapshot | None,
-    controls: _EditorControls,
-    row: ManagedGridRow,
-) -> None:
+def _populate_controls_from_grid_row(controls: _EditorControls, row: ManagedGridRow) -> None:
     _set_combo_active_text(controls.action_combo, row.action)
-    if row.existing_entry:
-        _set_combo_active_text(controls.existing_combo, row.existing_entry)
-    controls.target_entry.set_text(row.target_entry)
-    controls.profile_filter_entry.set_text(row.profile_filter)
-    _refresh_profile_choices(snapshot, controls, preserve_current=False)
+
+    parts = _rule_parts(row.target_entry or row.existing_entry)
+    if parts.domain:
+        _set_combo_active_text(controls.domain_combo, parts.domain)
+    if parts.class_name:
+        _set_combo_active_text(controls.class_combo, parts.class_name)
+    if parts.geometry_profile:
+        _set_combo_active_text(controls.geometry_combo, parts.geometry_profile)
+    if parts.left_edge_mode:
+        _set_combo_active_text(controls.left_edge_combo, parts.left_edge_mode)
     if row.existing_profile:
-        _set_combo_active_text(controls.profile_combo, row.existing_profile)
-    controls.new_profile_entry.set_text(row.new_profile)
-    controls.workspace_entry.set_text(row.workspace)
+        _set_combo_active_text(controls.geometry_combo, row.existing_profile)
+    if row.new_profile:
+        controls.new_profile_entry.set_text(row.new_profile)
+    if row.workspace:
+        _set_combo_active_text(controls.workspace_combo, row.workspace)
     _set_geometry_fields_from_text(controls, row.geometry)
+
+
+def _domain_values(snapshot: TestConfigSnapshot | None, event_data: WindowEventData | None) -> tuple[str, ...]:
+    values = {_rule_parts(row.target_entry or row.existing_entry).domain for row in build_configured_grid_rows(snapshot)}
+    event_domain = event_data.display_domain.lower() if event_data and event_data.display_domain else ""
+    if event_domain:
+        values.add(event_domain)
+    values.discard("")
+    return tuple(sorted(values))
+
+
+def _class_values(snapshot: TestConfigSnapshot | None, event_data: WindowEventData | None) -> tuple[str, ...]:
+    values = {_rule_parts(row.target_entry or row.existing_entry).class_name for row in build_configured_grid_rows(snapshot)}
+    event_class = _class_from_event(event_data)
+    if event_class:
+        values.add(event_class)
+    values.discard("")
+    return tuple(sorted(values))
+
+
+def _profile_names(snapshot: TestConfigSnapshot | None) -> tuple[str, ...]:
+    if snapshot is None or snapshot.config is None:
+        return ()
+    return tuple(profile.name for profile in snapshot.config.geom)
+
+
+def _workspace_values() -> tuple[str, ...]:
+    try:
+        result = subprocess.run(
+            ["xprop", "-root", "_NET_NUMBER_OF_DESKTOPS"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return FALLBACK_WORKSPACES
+
+    if result.returncode != 0:
+        return FALLBACK_WORKSPACES
+
+    try:
+        count = int(result.stdout.rsplit("=", 1)[-1].strip())
+    except ValueError:
+        return FALLBACK_WORKSPACES
+
+    if count < 1:
+        return FALLBACK_WORKSPACES
+    return tuple(str(workspace) for workspace in range(1, count + 1))
+
+
+def _rule_parts(rule: str) -> _RuleParts:
+    if not rule.strip():
+        return _RuleParts()
+    try:
+        parsed = parse_prefixed_rule(rule)
+    except RuleParseError:
+        return _RuleParts()
+    return _RuleParts(
+        domain=parsed.domain or "",
+        class_name=parsed.class_name or "",
+        geometry_profile=parsed.geometry_profile or "",
+        left_edge_mode=parsed.left_edge_mode or "",
+    )
 
 
 def _row_has_candidate_value(row: ManagedGridRow) -> bool:
@@ -755,9 +781,8 @@ def _row_has_candidate_value(row: ManagedGridRow) -> bool:
 
 
 def _target_rule_from_event(event: WindowEventData) -> str:
-    raw_class = event.class_instance_name or event.window_class or ""
-    class_token = raw_class.rsplit(":", 1)[-1].lower()
-    if not class_token or any(char.isspace() for char in class_token):
+    class_token = _class_from_event(event)
+    if not class_token:
         return ""
 
     domain = event.display_domain
@@ -766,26 +791,14 @@ def _target_rule_from_event(event: WindowEventData) -> str:
     return f"c:{class_token}"
 
 
-def _profile_from_rule(rule: str) -> str:
-    for token in rule.split():
-        if token.startswith("g:"):
-            return token[2:]
-    return ""
-
-
-def _replace_rule_profile(rule: str, profile_name: str) -> str:
-    tokens = rule.split()
-    replaced = False
-    new_tokens = []
-    for token in tokens:
-        if token.startswith("g:"):
-            new_tokens.append(f"g:{profile_name}")
-            replaced = True
-        else:
-            new_tokens.append(token)
-    if not replaced:
-        new_tokens.append(f"g:{profile_name}")
-    return " ".join(new_tokens)
+def _class_from_event(event: WindowEventData | None) -> str:
+    if event is None:
+        return ""
+    raw_class = event.class_instance_name or event.window_class or ""
+    class_token = raw_class.rsplit(":", 1)[-1].lower()
+    if not class_token or any(char.isspace() for char in class_token):
+        return ""
+    return class_token
 
 
 def _show_message(Gtk, parent, text: str) -> None:
@@ -844,15 +857,6 @@ def _searchable_combo(Gtk, placeholder: str, *, width: int = 28) -> _SearchableC
     return _SearchableCombo(Gtk, placeholder, width=width)
 
 
-def _reset_combo(combo, values: tuple[str, ...], *, include_blank: bool = False) -> None:
-    combo.remove_all()
-    if include_blank:
-        combo.append_text("")
-    for value in values:
-        combo.append_text(value)
-    combo.set_active(0)
-
-
 def _entry(Gtk, placeholder: str, *, width: int | None = None):
     entry = Gtk.Entry()
     entry.set_placeholder_text(placeholder)
@@ -906,8 +910,8 @@ def _event_number_to_text(value: float | None) -> str:
     return str(int(round(value)))
 
 
-def _optional_int(value: str) -> int | None:
-    stripped = value.strip()
+def _optional_int(value: str | None) -> int | None:
+    stripped = (value or "").strip()
     if not stripped:
         return None
     return int(stripped)
