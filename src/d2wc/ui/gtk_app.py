@@ -45,7 +45,7 @@ def run_configurator(
     Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(900, 620)
+    window.set_default_size(1280, 720)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -68,9 +68,10 @@ def run_configurator(
         test_config_snapshot,
         managed_sections_box,
         _replace_managed_sections,
+        _event,
     )
 
-    content.pack_start(editor.widget, False, False, 0)
+    content.pack_start(editor.widget, True, True, 0)
     content.pack_start(managed_sections_box, False, False, 0)
     _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
 
