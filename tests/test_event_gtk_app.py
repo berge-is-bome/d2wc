@@ -1,8 +1,5 @@
-from d2wc.ui.gtk_app import _mode_message
+from d2wc.ui.managed_actions import EDITOR_ACTIONS
 
 
-def test_mode_message_for_missing_test_config() -> None:
-    text = _mode_message(None, None)
-
-    assert "Mode: event preview only" in text
-    assert "Test config: not loaded" in text
+def test_managed_editor_actions() -> None:
+    assert EDITOR_ACTIONS == ("Add", "Modify", "Delete")
