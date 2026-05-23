@@ -39,8 +39,18 @@ def test_build_configured_grid_rows_flattens_all_sections() -> None:
 def test_build_known_window_grid_rows_creates_event_proposals() -> None:
     rows = build_known_window_grid_rows(get_event_fixture("example"))
 
-    assert [row.section for row in rows] == ["GEOM", "WORKSPACE_PLACEMENT"]
-    assert rows[0].action == "Add"
-    assert rows[0].new_profile == "event_example"
-    assert rows[0].geometry == "x=474 y=359 w=3366 h=1801"
-    assert rows[1].target_entry == "d:work c:example g:event_example"
+    assert [row.section for row in rows] == [
+        "EXCLUDE",
+        "PIN",
+        "WORKSPACE_ROUTES",
+        "GEOM",
+        "WORKSPACE_PLACEMENT",
+        "LEFT_EDGE_CORRECTION",
+    ]
+    assert all(row.action == "Add" for row in rows)
+    assert rows[0].target_entry == "d:work c:example"
+    assert rows[2].target_entry == "d:work c:example"
+    assert rows[3].new_profile == "event_example"
+    assert rows[3].geometry == "x=474 y=359 w=3366 h=1801"
+    assert rows[4].target_entry == "d:work c:example g:event_example"
+    assert rows[5].target_entry == "d:work c:example le:pos1"
