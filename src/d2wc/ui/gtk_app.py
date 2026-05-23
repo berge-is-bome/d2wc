@@ -56,36 +56,16 @@ def run_configurator(
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
 
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_hexpand(True)
-    scroller.set_vexpand(True)
-    outer.pack_start(scroller, True, True, 0)
-
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    content.set_margin_end(8)
-    scroller.add(content)
+    content.set_hexpand(True)
+    content.set_vexpand(True)
+    outer.pack_start(content, True, True, 0)
 
-    managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    editor = build_managed_section_editor(
-        Gtk,
-        test_config_snapshot,
-        managed_sections_box,
-        _replace_managed_sections,
-        _event,
-    )
-
+    editor = build_managed_section_editor(Gtk, test_config_snapshot, _event)
     content.pack_start(editor.widget, True, True, 0)
-    content.pack_start(managed_sections_box, False, False, 0)
-    _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
-
-    apply_button = Gtk.Button(label="Apply")
-    apply_button.set_sensitive(test_config_snapshot is not None and test_config_snapshot.ok)
-    apply_button.connect("clicked", lambda _button: editor.apply())
-    button_box.pack_start(apply_button, False, False, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -119,65 +99,6 @@ def _apply_ui_font_point_increase(Gtk, Gdk, Pango, point_increase: int) -> None:
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
-
-
-def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
-    for child in managed_sections_box.get_children():
-        managed_sections_box.remove(child)
-    _populate_managed_sections(Gtk, managed_sections_box, snapshot)
-    managed_sections_box.show_all()
-
-
-def _populate_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
-    if snapshot is None:
-        content.pack_start(
-            _build_section_frame(Gtk, "Managed sections", "No test config loaded. Use --test-config or --init-test-config."),
-            False,
-            False,
-            0,
-        )
-        return
-
-    if not snapshot.ok:
-        content.pack_start(
-            _build_section_frame(Gtk, "Managed sections", "Managed sections are unavailable until the test config is valid."),
-            False,
-            False,
-            0,
-        )
-        return
-
-    for section in snapshot.sections:
-        content.pack_start(
-            _build_section_frame(Gtk, section.name, section.display_text),
-            False,
-            False,
-            0,
-        )
-
-
-def _build_section_frame(Gtk, title: str, body: str):
-    return _wrap_label_in_frame(Gtk, title, _build_text_label(Gtk, body))
-
-
-def _wrap_label_in_frame(Gtk, title: str, label):
-    frame = Gtk.Frame(label=title)
-    frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
-    frame.add(label)
-    return frame
-
-
-def _build_text_label(Gtk, body: str):
-    label = Gtk.Label(label=body)
-    label.set_xalign(0)
-    label.set_yalign(0)
-    label.set_selectable(True)
-    label.set_line_wrap(True)
-    label.set_margin_top(8)
-    label.set_margin_bottom(8)
-    label.set_margin_start(8)
-    label.set_margin_end(8)
-    return label
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
