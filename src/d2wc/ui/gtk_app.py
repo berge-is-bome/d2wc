@@ -50,7 +50,7 @@ def run_configurator(
     Gtk, Gdk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(760, 660)
+    window.set_default_size(760, 520)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -72,16 +72,26 @@ def run_configurator(
     message.set_line_wrap(True)
     outer.pack_start(message, False, False, 0)
 
-    outer.pack_start(_build_section_frame(Gtk, "Identity", format_event_identity(event)), False, False, 0)
-    outer.pack_start(_build_section_frame(Gtk, "Geometry", format_event_geometry(event)), False, False, 0)
-    outer.pack_start(_build_section_frame(Gtk, "Read-only proposal", format_event_rule_preview(preview)), False, False, 0)
-    outer.pack_start(
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_hexpand(True)
+    scroller.set_vexpand(True)
+    outer.pack_start(scroller, True, True, 0)
+
+    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+    content.set_margin_end(8)
+    scroller.add(content)
+
+    content.pack_start(_build_section_frame(Gtk, "Identity", format_event_identity(event)), False, False, 0)
+    content.pack_start(_build_section_frame(Gtk, "Geometry", format_event_geometry(event)), False, False, 0)
+    content.pack_start(_build_section_frame(Gtk, "Read-only proposal", format_event_rule_preview(preview)), False, False, 0)
+    content.pack_start(
         _build_section_frame(Gtk, "Existing config status", format_event_config_awareness(config_awareness)),
         False,
         False,
         0,
     )
-    outer.pack_start(
+    content.pack_start(
         _build_section_frame(
             Gtk,
             "Configuration options",
