@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from d2wc.core.backup import extract_backup_member_text, list_backup_members
 from d2wc.cli import main
 
 
@@ -45,7 +46,7 @@ def test_cli_add_route_preview_does_not_modify_config(tmp_path, capsys) -> None:
     assert "Planned WORKSPACE_ROUTES add: workspace=3 rule=d:test c:krusader" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_add_route_write_updates_config_and_creates_backup(tmp_path, capsys) -> None:
@@ -67,13 +68,14 @@ def test_cli_add_route_write_updates_config_and_creates_backup(tmp_path, capsys)
 
     captured = capsys.readouterr()
     saved = config_path.read_text(encoding="utf-8")
-    backups = list(tmp_path.glob("d2wc.lua.*.bak"))
+    backups = list(tmp_path.glob("d2wc.lua.bak.tgz"))
 
     assert exit_code == 0
     assert "OK: WORKSPACE_ROUTES rule added: workspace=3 rule=d:test c:krusader" in captured.out
     assert '[3] = { "d:test c:krusader", },' in saved
     assert backups
-    assert backups[0].read_text(encoding="utf-8") == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_route_rejects_duplicate_target(tmp_path, capsys) -> None:
@@ -99,7 +101,7 @@ def test_cli_add_route_rejects_duplicate_target(tmp_path, capsys) -> None:
     assert "route rule already exists for target: d:personal" in captured.out
     assert "Use modify-route" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_modify_route_preview_does_not_modify_config(tmp_path, capsys) -> None:
@@ -199,4 +201,4 @@ def test_cli_delete_route_rejects_missing_rule(tmp_path, capsys) -> None:
     assert exit_code == 2
     assert "route rule not found: d:missing" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))

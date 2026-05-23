@@ -22,7 +22,7 @@ The repository currently contains:
 8. Lua configurables documentation.
 9. Lua design history notes recovered from archived pre-repository script versions.
 10. Python package skeleton for the configurator core.
-11. Parser, validator, renderer, settings, split-profile, backup path, duplicate-validation, and shadow-validation tests.
+11. Parser, validator, renderer, settings, split-profile, backup archive path and member name, duplicate-validation, and shadow-validation tests.
 12. Core safe-save helper and temporary-directory tests.
 13. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
 14. Guarded CLI save command requiring `--write` before modifying a config file.
@@ -98,7 +98,7 @@ Completed validation includes prefixed grammar, duplicate-prefix checks, require
 
 Complete for the current CLI/core editing proofs.
 
-Completed behavior includes deterministic managed-block rendering, comment preservation where practical, marker-tail preservation, safe-save staging, validation before replacement, timestamped backups, and `--write` guarded writes.
+Completed behavior includes deterministic managed-block rendering, comment preservation where practical, marker-tail preservation, safe-save staging, validation before replacement, timestamped backup members stored in .bak.tgz archives, and `--write` guarded writes.
 
 ### Stage 5: safe save proof
 
@@ -218,7 +218,7 @@ Confirmed behavior:
 1. `Add GEOM` adds the event-derived `GEOM` profile to the test config.
 2. `Add placement` adds the event-derived `WORKSPACE_PLACEMENT` rule to the test config.
 3. `Add both` applies both actions in sequence.
-4. The action-result panel reports success or error and backup path.
+4. The action-result panel reports success or error and backup archive path and member name.
 5. The managed-section display refreshes after writes.
 
 ### Stage 19: managed-section editor for the test config
@@ -295,7 +295,7 @@ Purpose:
 
 ### Stage 24: backup retention or archive review
 
-Review the current timestamped backup strategy before real-config writes are enabled.
+Review the current backup-archive strategy before real-config writes are enabled.
 
 Options to evaluate:
 

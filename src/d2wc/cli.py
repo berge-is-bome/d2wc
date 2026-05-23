@@ -304,7 +304,8 @@ def _cmd_save(args: argparse.Namespace) -> int:
             return 2
 
         print(f"Config: {preview.config_path}")
-        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned backup archive: {preview.backup_path}")
+        print(f"Planned backup member: {preview.backup_member}")
         print(f"Rendered bytes: {preview.bytes_written}")
         print("Preview only: no files were modified.")
         print("Run again with --write to save.")
@@ -325,7 +326,8 @@ def _cmd_save(args: argparse.Namespace) -> int:
         return 2
 
     print(f"Config: {result.config_path}")
-    print(f"Backup: {result.backup_path}")
+    print(f"Backup archive: {result.backup_path}")
+    print(f"Backup member: {result.backup_member}")
     print("OK: config saved.")
     return 0
 
@@ -463,7 +465,8 @@ def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, 
             return 2
 
         print(f"Config: {preview.config_path}")
-        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned backup archive: {preview.backup_path}")
+        print(f"Planned backup member: {preview.backup_member}")
         print(f"Planned GEOM {operation}: {profile_name}")
         if operation != "delete":
             profile = edit.profile
@@ -488,7 +491,8 @@ def _run_geom_edit(args: argparse.Namespace, operation: str, success_verb: str, 
         return 2
 
     print(f"Config: {result.config_path}")
-    print(f"Backup: {result.backup_path}")
+    print(f"Backup archive: {result.backup_path}")
+    print(f"Backup member: {result.backup_member}")
     print(f"OK: GEOM profile {success_verb}: {profile_name}")
     return 0
 
@@ -544,7 +548,8 @@ def _run_placement_edit(args: argparse.Namespace, operation: str, success_verb: 
             return 2
 
         print(f"Config: {preview.config_path}")
-        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned backup archive: {preview.backup_path}")
+        print(f"Planned backup member: {preview.backup_member}")
         print(f"Planned WORKSPACE_PLACEMENT {operation}: {rule_text}")
         if old_rule_text is not None:
             print(f"Old rule: {old_rule_text}")
@@ -568,7 +573,8 @@ def _run_placement_edit(args: argparse.Namespace, operation: str, success_verb: 
         return 2
 
     print(f"Config: {result.config_path}")
-    print(f"Backup: {result.backup_path}")
+    print(f"Backup archive: {result.backup_path}")
+    print(f"Backup member: {result.backup_member}")
     print(f"OK: WORKSPACE_PLACEMENT rule {success_verb}: {rule_text}")
     return 0
 
@@ -628,7 +634,8 @@ def _run_route_edit(args: argparse.Namespace, operation: str, success_verb: str,
             return 2
 
         print(f"Config: {preview.config_path}")
-        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned backup archive: {preview.backup_path}")
+        print(f"Planned backup member: {preview.backup_member}")
         print(f"Planned WORKSPACE_ROUTES {operation}: workspace={workspace} rule={rule_text}")
         if old_rule_text is not None:
             print(f"Old workspace: {old_workspace}")
@@ -653,7 +660,8 @@ def _run_route_edit(args: argparse.Namespace, operation: str, success_verb: str,
         return 2
 
     print(f"Config: {result.config_path}")
-    print(f"Backup: {result.backup_path}")
+    print(f"Backup archive: {result.backup_path}")
+    print(f"Backup member: {result.backup_member}")
     print(f"OK: WORKSPACE_ROUTES rule {success_verb}: workspace={workspace} rule={rule_text}")
     return 0
 

@@ -12,6 +12,7 @@ from d2wc.core.saving import (
     save_rendered_config,
     save_source_config,
 )
+from d2wc.core.backup import extract_backup_member_text, list_backup_members
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +35,7 @@ def test_preview_save_config_reports_paths_without_writing(tmp_path: Path) -> No
     )
 
     assert preview.config_path == config_path
-    assert preview.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
+    assert preview.backup_path == tmp_path / "d2wc.lua.bak.tgz"
     assert preview.bytes_written > 0
     assert preview.validation.ok
     assert config_path.read_text(encoding="utf-8") == original
@@ -54,7 +55,7 @@ def test_preview_source_save_config_reports_paths_without_writing(tmp_path: Path
     )
 
     assert preview.config_path == config_path
-    assert preview.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
+    assert preview.backup_path == tmp_path / "d2wc.lua.bak.tgz"
     assert preview.bytes_written == len(edited_source.encode("utf-8"))
     assert preview.validation.ok
     assert config_path.read_text(encoding="utf-8") == original
@@ -72,7 +73,7 @@ def test_preview_save_config_uses_explicit_backup_directory_without_creating_it(
         when=datetime(2026, 5, 20, 15, 30, 0),
     )
 
-    assert preview.backup_path == backup_dir / "d2wc.lua.2026-05-20-153000.bak"
+    assert preview.backup_path == backup_dir / "d2wc.lua.bak.tgz"
     assert not backup_dir.exists()
 
 
@@ -95,7 +96,7 @@ local LEFT_EDGE_CORRECTION = {}
         )
 
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
     assert not list(tmp_path.glob("*.tmp"))
 
 
@@ -103,30 +104,52 @@ def test_create_backup_copies_config_without_modifying_original(tmp_path: Path) 
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text("original", encoding="utf-8")
 
-    backup_path = create_backup(
+    backup_path, backup_member = create_backup(
         config_path,
         when=datetime(2026, 5, 20, 15, 30, 0),
     )
 
-    assert backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
-    assert backup_path.read_text(encoding="utf-8") == "original"
+    assert backup_path == tmp_path / "d2wc.lua.bak.tgz"
+    assert backup_member == "d2wc.lua.2026-05-20-153000.bak"
+    assert extract_backup_member_text(backup_path, backup_member) == "original"
     assert config_path.read_text(encoding="utf-8") == "original"
 
 
 def test_create_backup_does_not_overwrite_existing_backup(tmp_path: Path) -> None:
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text("current", encoding="utf-8")
-    first_backup = tmp_path / "d2wc.lua.2026-05-20-153000.bak"
-    first_backup.write_text("existing", encoding="utf-8")
+    first_path, first_member = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+    config_path.write_text("current-2", encoding="utf-8")
+    backup_path, backup_member = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 1),
+    )
+    assert first_path == backup_path
+    assert first_member == "d2wc.lua.2026-05-20-153000.bak"
+    assert backup_member == "d2wc.lua.2026-05-20-153001.bak"
+    assert list_backup_members(backup_path) == [first_member, backup_member]
 
-    backup_path = create_backup(
+
+def test_create_backup_uses_suffix_for_duplicate_member_name(tmp_path: Path) -> None:
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text("current", encoding="utf-8")
+
+    first_path, first_member = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+    second_path, second_member = create_backup(
         config_path,
         when=datetime(2026, 5, 20, 15, 30, 0),
     )
 
-    assert backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak.1"
-    assert first_backup.read_text(encoding="utf-8") == "existing"
-    assert backup_path.read_text(encoding="utf-8") == "current"
+    assert first_path == second_path
+    assert first_member == "d2wc.lua.2026-05-20-153000.bak"
+    assert second_member == "d2wc.lua.2026-05-20-153000.bak.1"
+    assert list_backup_members(first_path) == [first_member, second_member]
 
 
 def test_create_backup_fsyncs_backup_file_and_directory(tmp_path: Path, monkeypatch) -> None:
@@ -139,7 +162,7 @@ def test_create_backup_fsyncs_backup_file_and_directory(tmp_path: Path, monkeypa
 
     monkeypatch.setattr("d2wc.core.saving.os.fsync", record_fsync)
 
-    backup_path = create_backup(
+    backup_path, backup_member = create_backup(
         config_path,
         when=datetime(2026, 5, 20, 15, 30, 0),
     )
@@ -160,8 +183,8 @@ def test_save_rendered_config_writes_rendered_output_and_creates_backup(tmp_path
     saved = config_path.read_text(encoding="utf-8")
 
     assert result.config_path == config_path
-    assert result.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
-    assert result.backup_path.read_text(encoding="utf-8") == original
+    assert result.backup_path == tmp_path / "d2wc.lua.bak.tgz"
+    assert extract_backup_member_text(result.backup_path, result.backup_member) == original
     assert result.validation.ok
     assert result.bytes_written == len(saved.encode("utf-8"))
     assert 'local EXCLUDE = {' in saved
@@ -182,8 +205,8 @@ def test_save_source_config_writes_supplied_source_and_creates_backup(tmp_path: 
     saved = config_path.read_text(encoding="utf-8")
 
     assert result.config_path == config_path
-    assert result.backup_path == tmp_path / "d2wc.lua.2026-05-20-153000.bak"
-    assert result.backup_path.read_text(encoding="utf-8") == original
+    assert result.backup_path == tmp_path / "d2wc.lua.bak.tgz"
+    assert extract_backup_member_text(result.backup_path, result.backup_member) == original
     assert result.validation.ok
     assert result.bytes_written == len(saved.encode("utf-8"))
     assert "smoke_test" in saved
@@ -218,7 +241,7 @@ def test_save_rendered_config_can_write_backup_to_explicit_directory(tmp_path: P
         when=datetime(2026, 5, 20, 15, 30, 0),
     )
 
-    assert result.backup_path == backup_dir / "d2wc.lua.2026-05-20-153000.bak"
+    assert result.backup_path == backup_dir / "d2wc.lua.bak.tgz"
     assert result.backup_path.exists()
     assert config_path.exists()
 
@@ -242,7 +265,7 @@ local LEFT_EDGE_CORRECTION = {}
         )
 
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
     assert not list(tmp_path.glob("*.tmp"))
 
 
