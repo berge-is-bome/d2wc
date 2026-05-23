@@ -210,6 +210,14 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
     )
 
 
+def _value_or_unknown(value: str | None) -> str:
+    if value is None:
+        return "unknown"
+    if value == "":
+        return "empty"
+    return value
+
+
 def _value_or_unknown_int(value: int | None) -> str:
     if value is None:
         return "unknown"
