@@ -14,11 +14,32 @@ The current UI direction is:
 
 1. Devilspie2/Lua remains the window event source.
 2. When a window event occurs, Lua captures the relevant identity and geometry data directly from Devilspie2 functions.
-3. The user still gets the existing three configuration options.
-4. If the user chooses the configurator, GTK opens with the identity and geometry data captured from the Lua event that triggered it.
-5. Duplicate configurator launches are acceptable for now, for example one for a menu or launcher event and one for the actual application window event.
-6. Later, `d2wc` should suppress automatically opening the configurator for windows that already have a profile, placement rule, route, pin, exclude, or other known handling rule.
-7. After suppression is in place, the user can add the menu or launcher event once and then see the configurator only for the real application window event.
+3. If the user chooses the configurator, GTK opens with the identity and geometry data captured from the Lua event that triggered it.
+4. Duplicate configurator launches are acceptable for now, for example one for a menu or launcher event and one for the actual application window event.
+5. Later, `d2wc` should suppress automatically opening the configurator for windows that already have a profile, placement rule, route, pin, exclude, or other known handling rule.
+6. After suppression is in place, the user can add the menu or launcher event once and then see the configurator only for the real application window event.
+
+## Current UI development strategy
+
+GTK UI development now uses a dedicated test config as the write target:
+
+```text
+~/.config/devilspie2/d2wc-test.lua
+```
+
+This lets the UI exercise real parser, renderer, safe-save, backup, and edit-operation paths without modifying the real user config.
+
+The current GTK test-config workflow supports:
+
+1. Creating the test config from bundled `src/d2wc.lua` when missing.
+2. Loading the existing test config.
+3. Replacing the test config from bundled `src/d2wc.lua`.
+4. Displaying all six managed sections.
+5. Adding event-derived `GEOM` and `WORKSPACE_PLACEMENT` entries.
+6. Adding and deleting entries in all six managed sections through the managed-section form.
+7. Refreshing the displayed section data after each test-config write.
+
+Real user config writes remain a later design step.
 
 ## Why this direction changed
 
@@ -118,18 +139,6 @@ Window class: personal:Example App
 ```
 
 The current `d2wc.lua` prefixed grammar splits rules on whitespace, so a token such as `c:Example App` cannot be represented safely yet. This should be handled in a later grammar update before rule editing supports values containing spaces.
-
-## Immediate UI proof scope
-
-The next UI proof should be small:
-
-1. Accept representative event data from a Python fixture or command arguments.
-2. Open GTK with clear sections for identity and geometry.
-3. Display the captured event values.
-4. Perform no config writes.
-5. Perform no automatic rule generation.
-6. Avoid live target-selection experiments in this branch.
-7. Later UI stages can wire displayed event data into the already-tested `GEOM` and `WORKSPACE_PLACEMENT` core edit operations first.
 
 ## Relationship to PR #16 and Issue #17
 
