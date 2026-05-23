@@ -21,12 +21,12 @@ SECTION_LABELS = {
 }
 SECTION_BY_LABEL = {label: section for section, label in SECTION_LABELS.items()}
 SECTION_COLUMNS = {
-    "EXCLUDE": ("Action", "Existing entry", "Target entry"),
-    "PIN": ("Action", "Existing entry", "Target entry"),
-    "WORKSPACE_ROUTES": ("Action", "Existing entry", "Target entry", "Workspace"),
-    "GEOM": ("Action", "Existing profile", "New profile", "Geometry"),
-    "WORKSPACE_PLACEMENT": ("Action", "Existing entry", "Target entry", "Profile filter", "Existing profile"),
-    "LEFT_EDGE_CORRECTION": ("Action", "Existing entry", "Target entry"),
+    "EXCLUDE": ("Action", "Window", "New window"),
+    "PIN": ("Action", "Window", "New window"),
+    "WORKSPACE_ROUTES": ("Action", "Window", "New window", "Workspace"),
+    "GEOM": ("Action", "Geometry", "New profile", "Coordinates"),
+    "WORKSPACE_PLACEMENT": ("Action", "Window", "New window", "Profile filter", "Geometry"),
+    "LEFT_EDGE_CORRECTION": ("Action", "Window", "New window"),
 }
 
 
@@ -217,8 +217,6 @@ def build_known_window_grid_rows(event_data: WindowEventData | None) -> tuple[Ma
 def build_managed_section_editor(
     Gtk,
     snapshot: TestConfigSnapshot | None,
-    sections_box,
-    refresh_sections,
     event_data: WindowEventData | None = None,
 ) -> ManagedSectionEditor:
     """Build the section-focused managed editor for the dedicated test config."""
@@ -251,9 +249,6 @@ def build_managed_section_editor(
     rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     main_box.pack_start(rows_box, True, True, 0)
 
-    status_label = _text_label(Gtk, format_action_result(None))
-    main_box.pack_start(status_label, False, False, 0)
-
     def current_snapshot() -> TestConfigSnapshot | None:
         return state["snapshot"] if isinstance(state["snapshot"], TestConfigSnapshot) else None
 
@@ -276,7 +271,6 @@ def build_managed_section_editor(
                     current_snapshot(),
                     section,
                     rows,
-                    status_label,
                     row_controls,
                     apply_row_action,
                 ),
@@ -297,20 +291,19 @@ def build_managed_section_editor(
     def apply_row_action(controls: _EditorControls) -> None:
         snapshot_value = current_snapshot()
         if snapshot_value is None:
-            status_label.set_text("Action: managed section edit\nStatus: error\nNo test config is loaded.")
+            _show_message(Gtk, frame, "No test config is loaded.")
             return
 
         try:
             request = _request_from_controls(controls)
         except ValueError as exc:
-            status_label.set_text(f"Action: managed section edit\nStatus: error\n{exc}")
+            _show_message(Gtk, frame, str(exc))
             return
 
         result = apply_managed_section_action(snapshot_value.path, request)
-        status_label.set_text(format_action_result(result))
+        _show_message(Gtk, frame, format_action_result(result))
         refreshed_snapshot = load_test_config_snapshot(snapshot_value.path)
         state["snapshot"] = refreshed_snapshot
-        refresh_sections(Gtk, sections_box, refreshed_snapshot)
         if result.ok:
             refresh_editor_rows()
 
@@ -318,8 +311,6 @@ def build_managed_section_editor(
         row_controls = state["row_controls"]
         if isinstance(row_controls, list) and row_controls:
             apply_row_action(row_controls[0])
-        else:
-            status_label.set_text("Action: managed section edit\nStatus: error\nNo editable row is available.")
 
     def toggle_mode() -> None:
         state["show_not_configured"] = not bool(state["show_not_configured"])
@@ -349,7 +340,6 @@ class _EditorControls:
         y_entry,
         w_entry,
         h_entry,
-        action_label,
     ) -> None:
         self.section = section
         self.action_combo = action_combo
@@ -363,7 +353,6 @@ class _EditorControls:
         self.y_entry = y_entry
         self.w_entry = w_entry
         self.h_entry = h_entry
-        self.action_label = action_label
 
 
 def _rows_for_section(
@@ -390,7 +379,6 @@ def _build_section_rows_grid(
     snapshot: TestConfigSnapshot | None,
     section: str,
     rows: tuple[ManagedGridRow, ...],
-    status_label,
     row_controls: list[_EditorControls],
     apply_row_action,
 ):
@@ -398,7 +386,7 @@ def _build_section_rows_grid(
     scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
     scroller.set_hexpand(True)
     scroller.set_vexpand(True)
-    scroller.set_size_request(-1, 220)
+    scroller.set_size_request(-1, 260)
 
     grid = Gtk.Grid()
     grid.set_row_spacing(6)
@@ -416,7 +404,7 @@ def _build_section_rows_grid(
         grid.attach(label, column_index, 0, 1, 1)
 
     for row_index, row in enumerate(rows, start=1):
-        controls = _build_row_controls(Gtk, snapshot, section, row, status_label)
+        controls = _build_row_controls(Gtk, snapshot, section, row)
         row_controls.append(controls)
         for column_index, column_name in enumerate(columns):
             grid.attach(_widget_for_column(Gtk, controls, column_name), column_index, row_index, 1, 1)
@@ -433,11 +421,10 @@ def _build_row_controls(
     snapshot: TestConfigSnapshot | None,
     section: str,
     row: ManagedGridRow,
-    status_label,
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
     existing_combo = Gtk.ComboBoxText()
-    target_entry = _entry(Gtk, "Target entry", width=28)
+    target_entry = _entry(Gtk, "New window", width=28)
     profile_filter_entry = _entry(Gtk, "Filter", width=12)
     profile_combo = Gtk.ComboBoxText()
     new_profile_entry = _entry(Gtk, "New profile", width=18)
@@ -460,15 +447,14 @@ def _build_row_controls(
         y_entry=y_entry,
         w_entry=w_entry,
         h_entry=h_entry,
-        action_label=status_label,
     )
 
     _reset_combo(existing_combo, _entries_for_section(snapshot, section), include_blank=True)
-    _refresh_profile_choices(snapshot, controls)
+    _refresh_profile_choices(snapshot, controls, preserve_current=False)
     _populate_controls_from_grid_row(snapshot, controls, row)
 
     action_combo.connect("changed", lambda _combo: _set_field_sensitivity(section, _active_action(controls), controls))
-    profile_filter_entry.connect("changed", lambda _entry: _refresh_profile_choices(snapshot, controls))
+    profile_filter_entry.connect("changed", lambda _entry: _refresh_profile_choices(snapshot, controls, preserve_current=False))
     existing_combo.connect("changed", lambda _combo: _populate_fields_from_existing(snapshot, controls))
     profile_combo.connect("changed", lambda _combo: _populate_geom_fields_from_profile(snapshot, controls))
     _set_field_sensitivity(section, _active_action(controls), controls)
@@ -478,19 +464,19 @@ def _build_row_controls(
 def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
     if column_name == "Action":
         return controls.action_combo
-    if column_name == "Existing entry":
+    if column_name == "Window":
         return controls.existing_combo
-    if column_name == "Target entry":
+    if column_name == "New window":
         return controls.target_entry
     if column_name == "Profile filter":
         return controls.profile_filter_entry
-    if column_name == "Existing profile":
+    if column_name == "Geometry":
         return controls.profile_combo
     if column_name == "New profile":
         return controls.new_profile_entry
     if column_name == "Workspace":
         return controls.workspace_entry
-    if column_name == "Geometry":
+    if column_name == "Coordinates":
         return _geometry_box(Gtk, controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry)
     return _text_label(Gtk, "")
 
@@ -505,7 +491,7 @@ def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionReq
 
     if section == "WORKSPACE_PLACEMENT" and action == "modify" and existing_entry:
         if not profile_name:
-            raise ValueError("WORKSPACE_PLACEMENT modify requires an existing profile selection")
+            raise ValueError("WORKSPACE_PLACEMENT modify requires a geometry selection")
         target_entry = _replace_rule_profile(existing_entry, profile_name)
     elif section == "WORKSPACE_PLACEMENT" and action == "add" and target_entry and " g:" not in f" {target_entry}":
         if profile_name:
@@ -525,17 +511,6 @@ def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionReq
         w=_optional_int(controls.w_entry.get_text()),
         h=_optional_int(controls.h_entry.get_text()),
     )
-
-
-def _clear_action_fields(controls: _EditorControls) -> None:
-    controls.existing_combo.set_active(0)
-    controls.target_entry.set_text("")
-    controls.profile_filter_entry.set_text("")
-    controls.profile_combo.set_active(0)
-    controls.new_profile_entry.set_text("")
-    controls.workspace_entry.set_text("")
-    for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
-        entry.set_text("")
 
 
 def _set_field_sensitivity(section: str, action: str, controls: _EditorControls) -> None:
@@ -589,14 +564,19 @@ def _entries_for_section(snapshot: TestConfigSnapshot | None, section: str) -> t
     return ()
 
 
-def _refresh_profile_choices(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
+def _refresh_profile_choices(
+    snapshot: TestConfigSnapshot | None,
+    controls: _EditorControls,
+    *,
+    preserve_current: bool = True,
+) -> None:
     current = controls.profile_combo.get_active_text() or ""
     profiles = _profile_names(snapshot)
     filter_text = controls.profile_filter_entry.get_text().strip().lower()
     if filter_text:
         profiles = tuple(profile for profile in profiles if filter_text in profile.lower())
     _reset_combo(controls.profile_combo, profiles, include_blank=True)
-    if current:
+    if preserve_current and current:
         _set_combo_active_text(controls.profile_combo, current)
 
 
@@ -613,6 +593,7 @@ def _populate_fields_from_existing(snapshot: TestConfigSnapshot | None, controls
     if action not in {"modify", "delete"} or not existing:
         return
     if section == "GEOM":
+        _set_combo_active_text(controls.profile_combo, existing)
         controls.new_profile_entry.set_text(existing)
         _populate_geom_fields_from_profile(snapshot, controls, profile_name=existing)
         return
@@ -650,7 +631,7 @@ def _populate_controls_from_grid_row(
         _set_combo_active_text(controls.existing_combo, row.existing_entry)
     controls.target_entry.set_text(row.target_entry)
     controls.profile_filter_entry.set_text(row.profile_filter)
-    _refresh_profile_choices(snapshot, controls)
+    _refresh_profile_choices(snapshot, controls, preserve_current=False)
     if row.existing_profile:
         _set_combo_active_text(controls.profile_combo, row.existing_profile)
     controls.new_profile_entry.set_text(row.new_profile)
@@ -694,6 +675,18 @@ def _replace_rule_profile(rule: str, profile_name: str) -> str:
     if not replaced:
         new_tokens.append(f"g:{profile_name}")
     return " ".join(new_tokens)
+
+
+def _show_message(Gtk, parent, text: str) -> None:
+    dialog = Gtk.MessageDialog(
+        transient_for=parent.get_toplevel(),
+        flags=0,
+        message_type=Gtk.MessageType.INFO,
+        buttons=Gtk.ButtonsType.OK,
+        text=text,
+    )
+    dialog.run()
+    dialog.destroy()
 
 
 def _section_combo(Gtk):
