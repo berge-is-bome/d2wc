@@ -146,9 +146,9 @@ def _run_editor_action(
     refreshed_snapshot = load_test_config_snapshot(snapshot.path)
     state["snapshot"] = refreshed_snapshot
     refresh_sections(Gtk, sections_box, refreshed_snapshot)
+    _refresh_dynamic_choices(refreshed_snapshot, controls)
     if result.ok:
         _clear_action_fields(controls)
-    _refresh_dynamic_choices(refreshed_snapshot, controls)
 
 
 def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionRequest:
