@@ -6,9 +6,15 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from d2wc.core.geom_operations import GeometryOperationError, add_geometry_profile_to_source
 from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlockParser
-from d2wc.core.managed_config import ManagedConfig, extract_managed_config
+from d2wc.core.managed_config import GeometryProfile, ManagedConfig, extract_managed_config
+from d2wc.core.placement_operations import PlacementOperationError, add_placement_rule_to_source
+from d2wc.core.rendering import RenderValidationError
+from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
+from d2wc.event_data import WindowEventData
+from d2wc.event_preview import EventRulePreview, build_event_rule_preview
 
 TEST_CONFIG_RELATIVE_PATH = Path(".config/devilspie2/d2wc-test.lua")
 BUNDLED_CONFIG_PATH = Path(__file__).resolve().parents[1] / "d2wc.lua"
@@ -51,6 +57,17 @@ class TestConfigSnapshot:
         """Return whether the test config exists and validates."""
 
         return self.exists and self.validation is not None and self.validation.ok and self.config is not None
+
+
+@dataclass(frozen=True)
+class TestConfigActionResult:
+    """Result of applying a UI action to the dedicated test config."""
+
+    ok: bool
+    action: str
+    path: Path | None = None
+    backup_path: Path | None = None
+    message: str = ""
 
 
 def default_test_config_path() -> Path:
@@ -126,6 +143,90 @@ def load_test_config_snapshot(path: Path | None = None) -> TestConfigSnapshot:
     )
 
 
+def add_event_geometry_to_test_config(
+    config_path: Path,
+    event: WindowEventData,
+) -> TestConfigActionResult:
+    """Add the event-derived GEOM profile to the test config."""
+
+    preview = build_event_rule_preview(event)
+    profile = _geometry_profile_from_event_preview(event, preview)
+    if profile is None:
+        return TestConfigActionResult(
+            ok=False,
+            action="add GEOM",
+            path=config_path,
+            message=preview.warning or "No event GEOM proposal is available.",
+        )
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        edit = add_geometry_profile_to_source(source, profile)
+        result = save_source_config(config_path, edit.source, validation=edit.validation)
+    except (OSError, GeometryOperationError, RenderValidationError, SaveConfigError, SaveValidationError) as exc:
+        return TestConfigActionResult(
+            ok=False,
+            action="add GEOM",
+            path=config_path,
+            message=str(exc),
+        )
+
+    return TestConfigActionResult(
+        ok=True,
+        action="add GEOM",
+        path=result.config_path,
+        backup_path=result.backup_path,
+        message=f"Added GEOM profile: {profile.name}",
+    )
+
+
+def add_event_placement_to_test_config(
+    config_path: Path,
+    event: WindowEventData,
+) -> TestConfigActionResult:
+    """Add the event-derived WORKSPACE_PLACEMENT rule to the test config."""
+
+    preview = build_event_rule_preview(event)
+    if not preview.ok or not preview.placement_rule:
+        return TestConfigActionResult(
+            ok=False,
+            action="add WORKSPACE_PLACEMENT",
+            path=config_path,
+            message=preview.warning or "No event placement proposal is available.",
+        )
+
+    try:
+        source = config_path.read_text(encoding="utf-8")
+        edit = add_placement_rule_to_source(source, preview.placement_rule)
+        result = save_source_config(config_path, edit.source, validation=edit.validation)
+    except (OSError, PlacementOperationError, RenderValidationError, SaveConfigError, SaveValidationError) as exc:
+        return TestConfigActionResult(
+            ok=False,
+            action="add WORKSPACE_PLACEMENT",
+            path=config_path,
+            message=str(exc),
+        )
+
+    return TestConfigActionResult(
+        ok=True,
+        action="add WORKSPACE_PLACEMENT",
+        path=result.config_path,
+        backup_path=result.backup_path,
+        message=f"Added WORKSPACE_PLACEMENT rule: {preview.placement_rule}",
+    )
+
+
+def add_event_proposal_to_test_config(
+    config_path: Path,
+    event: WindowEventData,
+) -> tuple[TestConfigActionResult, ...]:
+    """Add both event-derived GEOM and placement entries to the test config."""
+
+    geom_result = add_event_geometry_to_test_config(config_path, event)
+    placement_result = add_event_placement_to_test_config(config_path, event)
+    return geom_result, placement_result
+
+
 def format_test_config_status(snapshot: TestConfigSnapshot | None) -> str:
     """Format the test config status for the GTK UI."""
 
@@ -174,6 +275,24 @@ def format_prepare_result(result: TestConfigPrepareResult | None) -> str:
     )
 
 
+def format_action_result(result: TestConfigActionResult | tuple[TestConfigActionResult, ...] | None) -> str:
+    """Format a test-config action result for GTK display."""
+
+    if result is None:
+        return "Action result: none"
+    if isinstance(result, tuple):
+        return "\n\n".join(format_action_result(item) for item in result)
+
+    lines = [f"Action: {result.action}", f"Status: {'ok' if result.ok else 'error'}"]
+    if result.message:
+        lines.append(result.message)
+    if result.path is not None:
+        lines.append(f"Target: {result.path}")
+    if result.backup_path is not None:
+        lines.append(f"Backup: {result.backup_path}")
+    return "\n".join(lines)
+
+
 def _section_summaries(config: ManagedConfig) -> tuple[ManagedSectionSummary, ...]:
     section_entries: dict[str, tuple[str, ...]] = {
         "EXCLUDE": config.exclude,
@@ -204,3 +323,23 @@ def _format_section_entries(entries: tuple[str, ...]) -> str:
     if not entries:
         return "(empty)"
     return "\n".join(f"- {entry}" for entry in entries)
+
+
+def _geometry_profile_from_event_preview(
+    event: WindowEventData,
+    preview: EventRulePreview,
+) -> GeometryProfile | None:
+    if not preview.ok or not preview.geometry_profile_name:
+        return None
+
+    geometry = event.window_geometry
+    if None in (geometry.x, geometry.y, geometry.w, geometry.h):
+        return None
+
+    return GeometryProfile(
+        name=preview.geometry_profile_name,
+        x=int(round(geometry.x or 0)),
+        y=int(round(geometry.y or 0)),
+        w=int(round(geometry.w or 0)),
+        h=int(round(geometry.h or 0)),
+    )
