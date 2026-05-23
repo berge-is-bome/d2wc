@@ -21,7 +21,7 @@ The current UI direction is:
 
 ## Current UI development strategy
 
-GTK UI development now uses a dedicated test config as the write target:
+GTK UI development uses this dedicated test config as the write target:
 
 ```text
 ~/.config/devilspie2/d2wc-test.lua
@@ -31,13 +31,13 @@ This lets the UI exercise real parser, renderer, safe-save, backup, and edit-ope
 
 The current GTK test-config workflow supports:
 
-1. Creating the test config from bundled `src/d2wc.lua` when missing.
-2. Loading the existing test config.
-3. Replacing the test config from bundled `src/d2wc.lua`.
+1. Creating `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua` when missing.
+2. Loading the existing `~/.config/devilspie2/d2wc-test.lua`.
+3. Replacing `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua`.
 4. Displaying all six managed sections.
-5. Adding event-derived `GEOM` and `WORKSPACE_PLACEMENT` entries.
-6. Adding and deleting entries in all six managed sections through the managed-section form.
-7. Refreshing the displayed section data after each test-config write.
+5. Adding, modifying, and deleting entries in all six managed sections through the managed-section editor.
+6. Refreshing the displayed section data after each test-config write.
+7. Keeping a single `Apply` action for editor changes.
 
 Real user config writes remain a later design step.
 
@@ -139,6 +139,17 @@ Window class: personal:Example App
 ```
 
 The current `d2wc.lua` prefixed grammar splits rules on whitespace, so a token such as `c:Example App` cannot be represented safely yet. This should be handled in a later grammar update before rule editing supports values containing spaces.
+
+## Follow-up UI direction
+
+The next major GTK UI direction is a grid-style editor. The intended layout is landscape-oriented:
+
+1. Top area: entries already configured in the script.
+2. Bottom area: known windows that can be configured later.
+3. Row-oriented editing with section, action, existing-entry, target-entry, profile, workspace, and geometry controls.
+4. Row-level apply/cancel behavior.
+
+This is intentionally a follow-up branch, not part of PR #23.
 
 ## Relationship to PR #16 and Issue #17
 
