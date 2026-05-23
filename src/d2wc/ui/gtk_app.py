@@ -14,6 +14,10 @@ from d2wc.event_preview import (
 from d2wc.test_config import (
     TestConfigPrepareResult,
     TestConfigSnapshot,
+    add_event_geometry_to_test_config,
+    add_event_placement_to_test_config,
+    add_event_proposal_to_test_config,
+    format_action_result,
     format_prepare_result,
     format_test_config_status,
 )
@@ -70,12 +74,7 @@ def run_configurator(
     title.set_xalign(0)
     outer.pack_start(title, False, False, 0)
 
-    message = Gtk.Label(
-        label=(
-            "Devilspie2 event-data and test-config UI proof.\n"
-            "The event values and managed-section display are safe UI development surfaces."
-        )
-    )
+    message = Gtk.Label(label=_mode_message(test_config_snapshot, prepare_result))
     message.set_xalign(0)
     message.set_line_wrap(True)
     outer.pack_start(message, False, False, 0)
@@ -111,12 +110,16 @@ def run_configurator(
         False,
         0,
     )
+
+    action_label = _build_text_label(Gtk, format_action_result(None))
+    content.pack_start(_wrap_label_in_frame(Gtk, "Test config action result", action_label), False, False, 0)
+
     _pack_managed_sections(Gtk, content, test_config_snapshot)
     content.pack_start(
         _build_section_frame(
             Gtk,
             "Configuration options",
-            "This UI branch may prepare or replace only ~/.config/devilspie2/d2wc-test.lua.\n"
+            "This UI branch may prepare, replace, or edit only ~/.config/devilspie2/d2wc-test.lua.\n"
             "The real user config remains out of scope for automatic writes.",
         ),
         False,
@@ -131,6 +134,9 @@ def run_configurator(
     copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
     button_box.pack_start(copy_button, False, False, 0)
 
+    action_buttons = _build_test_config_action_buttons(Gtk, event, test_config_snapshot, action_label)
+    button_box.pack_start(action_buttons, False, False, 0)
+
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
     button_box.pack_end(close_button, False, False, 0)
@@ -138,6 +144,73 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
+
+
+def _mode_message(
+    snapshot: TestConfigSnapshot | None,
+    prepare_result: TestConfigPrepareResult | None,
+) -> str:
+    if prepare_result is not None and prepare_result.replaced:
+        mode = "Mode: test config replaced/reset"
+    elif prepare_result is not None and prepare_result.created:
+        mode = "Mode: test config created"
+    elif prepare_result is not None and prepare_result.skipped:
+        mode = "Mode: init skipped, existing test config loaded"
+    elif snapshot is not None:
+        mode = "Mode: existing test config loaded"
+    else:
+        mode = "Mode: event preview only"
+
+    return "\n".join(
+        [
+            "Devilspie2 event-data and test-config UI proof.",
+            mode,
+        ]
+    )
+
+
+def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: TestConfigSnapshot | None, action_label):
+    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    can_write_test_config = snapshot is not None and snapshot.ok
+
+    add_geom_button = Gtk.Button(label="Add GEOM")
+    add_geom_button.set_sensitive(can_write_test_config)
+    add_geom_button.connect(
+        "clicked",
+        lambda _button: _run_test_config_action(
+            action_label,
+            add_event_geometry_to_test_config(snapshot.path, event) if snapshot is not None else None,
+        ),
+    )
+    box.pack_start(add_geom_button, False, False, 0)
+
+    add_placement_button = Gtk.Button(label="Add placement")
+    add_placement_button.set_sensitive(can_write_test_config)
+    add_placement_button.connect(
+        "clicked",
+        lambda _button: _run_test_config_action(
+            action_label,
+            add_event_placement_to_test_config(snapshot.path, event) if snapshot is not None else None,
+        ),
+    )
+    box.pack_start(add_placement_button, False, False, 0)
+
+    add_both_button = Gtk.Button(label="Add both")
+    add_both_button.set_sensitive(can_write_test_config)
+    add_both_button.connect(
+        "clicked",
+        lambda _button: _run_test_config_action(
+            action_label,
+            add_event_proposal_to_test_config(snapshot.path, event) if snapshot is not None else None,
+        ),
+    )
+    box.pack_start(add_both_button, False, False, 0)
+
+    return box
+
+
+def _run_test_config_action(action_label, result) -> None:
+    action_label.set_text(format_action_result(result))
 
 
 def _pack_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
@@ -169,9 +242,17 @@ def _pack_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) ->
 
 
 def _build_section_frame(Gtk, title: str, body: str):
+    return _wrap_label_in_frame(Gtk, title, _build_text_label(Gtk, body))
+
+
+def _wrap_label_in_frame(Gtk, title: str, label):
     frame = Gtk.Frame(label=title)
     frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+    frame.add(label)
+    return frame
 
+
+def _build_text_label(Gtk, body: str):
     label = Gtk.Label(label=body)
     label.set_xalign(0)
     label.set_yalign(0)
@@ -181,9 +262,7 @@ def _build_section_frame(Gtk, title: str, body: str):
     label.set_margin_bottom(8)
     label.set_margin_start(8)
     label.set_margin_end(8)
-    frame.add(label)
-
-    return frame
+    return label
 
 
 def _copy_text_to_clipboard(Gtk, Gdk, text: str) -> None:
