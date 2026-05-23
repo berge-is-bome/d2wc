@@ -2,11 +2,12 @@
 
 ## Current repository status
 
-Current repository status after PR #22:
+Current repository status for PR #23:
 
 ```text
 Main: 4d2134fdab1e53932cb5e6548b834a5f97db9518
 Latest merged proof: PR #22, test-config proposal action buttons
+Current draft PR: PR #23, managed-section test-config actions
 Current branch: configurator-managed-section-actions
 Tracking issue: #17, Build GTK configurator UI around Devilspie2 event data
 Draft research PR: PR #16, Devilspie2 window probe proof
@@ -21,7 +22,7 @@ The CLI/core edit-proof phase is complete for the six managed Lua sections:
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The GTK UI has moved beyond read-only display into a dedicated test-config workflow. UI writes are currently scoped to:
+The GTK UI has moved beyond read-only display into a dedicated test-config editor. UI writes are scoped to:
 
 ```text
 ~/.config/devilspie2/d2wc-test.lua
@@ -31,16 +32,23 @@ The real user config remains out of scope for automatic GTK writes.
 
 ## Latest confirmed local verification
 
-Verification reported after PR #22:
+Verification reported on PR #23:
 
 ```bash
-python -m d2wc validate --config src/d2wc.lua
-python -m pytest
-PYTHONPATH=src python3 -m d2wc configure --replace-test-config
-PYTHONPATH=src python3 -m d2wc configure --test-config
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m pytest
+python3 -m d2wc configure --test-config
 ```
 
 Result:
+
+```text
+257 pytest tests passed.
+The dom0 installed-wheel test was clear.
+The managed editor add, modify, delete, Apply, and field-clearing behavior were confirmed.
+```
+
+Earlier verification after PR #22 reported:
 
 ```text
 251 pytest tests passed.
@@ -49,7 +57,7 @@ Add placement button added d:work c:example g:event_example to d2wc-test.lua.
 The GTK action result panel and managed-section display refreshed after writes.
 ```
 
-Earlier source-checkout verification after PR #21 reported:
+Earlier verification after PR #21 reported:
 
 ```text
 247 pytest tests passed.
@@ -57,7 +65,7 @@ d2wc-test.lua was created and read successfully.
 --init-test-config, --test-config, and --replace-test-config worked as expected.
 ```
 
-Earlier source-checkout verification after PR #20 reported:
+Earlier verification after PR #20 reported:
 
 ```text
 238 pytest tests passed.
@@ -75,10 +83,11 @@ configurator-managed-section-actions
 Scope for this branch:
 
 1. Keep all GTK writes scoped to the dedicated test config.
-2. Add a managed-section form that can add and delete entries in all six managed sections.
-3. Reuse the existing tested core edit operations and safe-save helper.
-4. Refresh the displayed managed sections after each test-config write.
-5. Update repository documentation to describe the current test-config workflow.
+2. Add a managed-section editor that can add, modify, and delete entries in all six managed sections.
+3. Use a single `Apply` action next to `Close`.
+4. Reuse the existing tested core edit operations and safe-save helper.
+5. Refresh the displayed managed sections after each test-config write.
+6. Update repository documentation to describe the current test-config workflow.
 
 The GTK test-config workflow currently supports:
 
@@ -86,9 +95,9 @@ The GTK test-config workflow currently supports:
 2. `--test-config`
 3. `--replace-test-config`
 4. `--test-config-path`
-5. Event-derived `GEOM` and `WORKSPACE_PLACEMENT` add buttons.
-6. Managed-section add/delete form for all six sections.
-7. Visible action-result panel with backup paths.
+5. Managed-section add, modify, and delete for all six sections.
+6. Section/action-aware fields.
+7. Visible action result text with backup paths.
 8. Automatic reload of displayed test-config sections after writes.
 
 See [Event-Data GTK UI Direction](event-data-ui-direction.md) for the full direction and Devilspie2 function references.
@@ -139,41 +148,45 @@ The current Python core supports:
 13. Marker-tail preservation for `-- add more here` in edited rule-list sections.
 14. Token-order-independent rule parsing and modify/delete matching.
 15. Exact duplicate target rejection where duplicates would make behavior ambiguous.
-16. GTK event-data fixture and command-argument display.
-17. GTK event proposal preview.
-18. Dedicated test-config preparation and loading.
-19. Test-config-only GTK add actions for event-derived geometry and placement.
-20. Test-config-only generic add/delete backend for all six managed sections.
+16. GTK event-data fixture and command-argument plumbing.
+17. Dedicated test-config preparation and loading.
+18. Test-config-only generic add, modify, and delete backend for all six managed sections.
+19. GTK managed-section editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
 
 ## Test command guidance
 
 Install the project in editable mode from the repository root:
 
 ```bash
-python -m pip install -e .
+python3 -m pip install -e .
 ```
 
 Use the four-command renderer verification path when renderer behavior changes:
 
 ```bash
-python -m d2wc validate --config src/d2wc.lua
-python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-python -m d2wc validate --config /tmp/d2wc-rendered.lua
-python -m pytest
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python3 -m d2wc validate --config /tmp/d2wc-rendered.lua
+python3 -m pytest
 ```
 
-When renderer behavior has not changed, the shorter verification path is normally enough:
+When renderer behavior has not changed, use this verification path:
 
 ```bash
-python -m d2wc validate --config src/d2wc.lua
-python -m pytest
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m pytest
 ```
 
 For the current GTK test-config workflow:
 
 ```bash
-PYTHONPATH=src python3 -m d2wc configure --replace-test-config
-PYTHONPATH=src python3 -m d2wc configure --test-config
+python3 -m d2wc configure --test-config
+```
+
+For a clean GTK test-config baseline:
+
+```bash
+python3 -m d2wc configure --replace-test-config
 ```
 
 ## Historical Lua script preservation
@@ -247,3 +260,4 @@ Useful research outcomes:
 11. PR #20: read-only event proposal preview.
 12. PR #21: test-config configurator UI proof.
 13. PR #22: test-config proposal action buttons.
+14. PR #23: managed-section test-config actions.
