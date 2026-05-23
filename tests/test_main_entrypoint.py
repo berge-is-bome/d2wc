@@ -51,8 +51,8 @@ local LEFT_EDGE_CORRECTION = {
         encoding="utf-8",
     )
 
-    def fake_run_configurator(event_data, config_awareness) -> int:
-        calls.append((event_data, config_awareness))
+    def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
+        calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
         return 0
 
     monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
@@ -79,11 +79,55 @@ local LEFT_EDGE_CORRECTION = {
 
     assert exit_code == 0
     assert len(calls) == 1
-    event_data, config_awareness = calls[0]
+    event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
     assert event_data.domain == "personal"
     assert event_data.class_instance_name == "personal:Example"
     assert event_data.window_geometry.x == 10.0
     assert config_awareness.status == "ok"
+    assert test_config_snapshot is None
+    assert prepare_result is None
+
+
+def test_main_configure_loads_test_config(monkeypatch, tmp_path) -> None:
+    calls = []
+    test_config_path = tmp_path / "d2wc-test.lua"
+    test_config_path.write_text(
+        '''
+local EXCLUDE = {
+}
+local PIN = {
+}
+local WORKSPACE_ROUTES = {
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+''',
+        encoding="utf-8",
+    )
+
+    def fake_default_test_config_path():
+        return test_config_path
+
+    def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
+        calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
+        return 0
+
+    monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
+    monkeypatch.setattr("d2wc.test_config.default_test_config_path", fake_default_test_config_path)
+
+    exit_code = __main__.main(["configure", "--test-config"])
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert config_awareness.status == "ok"
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == test_config_path
+    assert prepare_result is None
 
 
 def test_main_delegates_other_commands_to_cli(monkeypatch) -> None:
