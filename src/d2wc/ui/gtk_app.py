@@ -7,6 +7,9 @@ from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fi
 from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 
+UI_FONT_POINT_INCREASE = 2
+DEFAULT_UI_FONT_SIZE_PT = 10
+
 
 class GtkConfiguratorImportError(RuntimeError):
     """Raised when GTK/PyGObject cannot be imported."""
@@ -23,14 +26,14 @@ def _import_gtk():
 
     try:
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk
+        from gi.repository import Gdk, Gtk, Pango
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk
+    return Gtk, Gdk, Pango
 
 
 def run_configurator(
@@ -42,7 +45,8 @@ def run_configurator(
     """Open the GTK configurator proof window."""
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
-    Gtk = _import_gtk()
+    Gtk, Gdk, Pango = _import_gtk()
+    _apply_ui_font_point_increase(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
 
     window = Gtk.Window(title="d2wc Configurator")
     window.set_default_size(1280, 720)
@@ -90,6 +94,29 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
+
+
+def _apply_ui_font_point_increase(Gtk, Gdk, Pango, point_increase: int) -> None:
+    """Increase the GTK theme font size for this application window."""
+
+    settings = Gtk.Settings.get_default()
+    font_size_pt = DEFAULT_UI_FONT_SIZE_PT
+    if settings is not None:
+        font_name = settings.get_property("gtk-font-name") or ""
+        font_description = Pango.FontDescription(font_name)
+        theme_font_size = font_description.get_size()
+        if theme_font_size > 0:
+            font_size_pt = int(round(theme_font_size / Pango.SCALE))
+
+    provider = Gtk.CssProvider()
+    provider.load_from_data(f"* {{ font-size: {font_size_pt + point_increase}pt; }}".encode("utf-8"))
+    screen = Gdk.Screen.get_default()
+    if screen is not None:
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
 
 
 def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
