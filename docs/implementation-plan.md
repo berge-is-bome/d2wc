@@ -4,7 +4,7 @@
 
 This document turns the current planning documents into an ordered development plan.
 
-The goal is to move from the current Lua-only rules script to a safe GTK configurator, then to event-driven configuration workflows and post-resize automation.
+The goal is to move from the current Lua rules script to a safe GTK configurator, then to event-driven configuration workflows and post-resize automation.
 
 The plan should remain practical and test-driven. Each stage should produce something that can be run, inspected, and corrected before the next stage starts.
 
@@ -36,7 +36,9 @@ The repository currently contains:
 16. Read-only GTK launch proof.
 17. Read-only Qubes/dom0 selected-window geometry proof.
 18. Event-data UI direction notes in [Event-Data GTK UI Direction](event-data-ui-direction.md).
-19. Development status notes in [Development Status](development-status.md).
+19. Dedicated GTK test-config workflow using `~/.config/devilspie2/d2wc-test.lua`.
+20. GTK add/delete form for all six managed sections, scoped to the test config.
+21. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator UI is developed.
 
@@ -61,8 +63,9 @@ The implementation should follow these decisions:
 15. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
 16. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
 17. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
-18. Build the next GTK UI proof around representative Devilspie2/Lua event data, not around live target-selection experiments.
+18. Build the GTK UI around representative Devilspie2/Lua event data, not around live target-selection experiments.
 19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
+20. Use `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target until the real-config write workflow has its own explicit review.
 
 ## Completed stages
 
@@ -171,87 +174,80 @@ Research outcomes:
 
 See [Event-Data GTK UI Direction](event-data-ui-direction.md).
 
-## Future implementation stages
-
 ### Stage 15: event-data GTK UI proof
 
-Build the first useful UI screen around representative event-provided data.
+Complete and merged through PR #19.
+
+Confirmed behavior:
+
+1. Representative event data can be passed through a fixture or command arguments.
+2. GTK displays identity and geometry sections.
+3. No live target-selection experiments are included.
+4. No config writes are included.
+
+### Stage 16: read-only event proposal preview
+
+Complete and merged through PR #20.
+
+Confirmed behavior:
+
+1. GTK displays an event-derived `GEOM` proposal.
+2. GTK displays an event-derived `WORKSPACE_PLACEMENT` proposal.
+3. Optional config read-only inspection reports existing matches.
+4. A copy-proposal button is available.
+5. Vertical resizing works through a scrollable content area.
+
+### Stage 17: test-config GTK UI proof
+
+Complete and merged through PR #21.
+
+Confirmed behavior:
+
+1. `--init-test-config` creates the dedicated test config when missing.
+2. `--test-config` loads the existing test config.
+3. `--replace-test-config` resets the test config from bundled `src/d2wc.lua`.
+4. `--test-config-path` supports disposable paths for tests and experiments.
+5. GTK displays all six managed sections from the test config.
+
+### Stage 18: test-config proposal action buttons
+
+Complete and merged through PR #22.
+
+Confirmed behavior:
+
+1. `Add GEOM` adds the event-derived `GEOM` profile to the test config.
+2. `Add placement` adds the event-derived `WORKSPACE_PLACEMENT` rule to the test config.
+3. `Add both` applies both actions in sequence.
+4. The action-result panel reports success or error and backup path.
+5. The managed-section display refreshes after writes.
+
+### Stage 19: managed-section add/delete UI for the test config
+
+Current branch: `configurator-managed-section-actions`.
 
 Required behavior:
 
-1. Accept representative Devilspie2/Lua event data from a Python fixture or command arguments.
-2. Open GTK with clear sections for identity and geometry.
-3. Display captured event values.
-4. Perform no config writes.
-5. Perform no automatic rule generation.
-6. Avoid live target-selection experiments in this branch.
-7. Keep the UI branch focused on layout and event-data presentation.
+1. Keep all writes scoped to the loaded test config.
+2. Add a GTK managed-section form for all six sections.
+3. Support add and delete operations.
+4. Reuse tested core edit operations and safe-save behavior.
+5. Refresh displayed sections after each write.
+6. Update documentation to match the current workflow.
 
-Suggested branch:
+## Future implementation stages
 
-```text
-configurator-event-data-ui-proof
-```
+### Stage 20: event-data handoff proof from Lua to Python
 
-Representative event data should include:
-
-```lua
-get_class_instance_name()
-get_window_property( '_QUBES_VMNAME' )
-get_screen_geometry()
-get_window_geometry()
-```
-
-Keep the exact known-working Qubes property call form:
-
-```lua
-get_window_property( '_QUBES_VMNAME' )
-```
-
-Purpose:
-
-1. Establish the GTK screen structure.
-2. Make the event-data model visible to the user.
-3. Prepare for later wiring into the already-tested core edit operations.
-
-### Stage 16: event-data handoff proof from Lua to Python
-
-After the UI layout is proven with fixtures or arguments, prove the handoff path from Lua event data to the configurator command.
+After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
 
 Required behavior:
 
 1. Lua captures event data directly from Devilspie2 functions.
 2. Lua passes the event data to the configurator command through a safe handoff mechanism.
 3. GTK displays exactly the event data it received.
-4. No config writes.
-5. No automatic rule generation.
+4. Writes remain scoped to the selected development path until real-config write workflow is reviewed.
 
-### Stage 17: GEOM creation UI preview
-
-Wire displayed event geometry into a first UI preview workflow.
-
-Required behavior:
-
-1. Show current window geometry as `{ x, y, w, h }`.
-2. Let the user enter or accept a suggested `GEOM` profile name.
-3. Warn if the profile already exists.
-4. Preview the Lua change.
-5. Do not write without explicit confirmation.
-6. Use the tested `GEOM` core operations and safe-save helper.
-
-### Stage 18: WORKSPACE_PLACEMENT UI preview
-
-Wire displayed event identity into a first placement-rule workflow.
-
-Required behavior:
-
-1. Select or create a `GEOM` profile.
-2. Apply that profile to a domain, class, or domain/class target.
-3. Preview the generated `WORKSPACE_PLACEMENT` rule.
-4. Do not write without explicit confirmation.
-5. Use the tested placement core operations and safe-save helper.
-
-### Stage 19: suppression for already-known windows
+### Stage 21: suppression for already-known windows
 
 Add logic to avoid automatically opening the configurator for windows that already have a profile or handling rule.
 
@@ -270,17 +266,16 @@ Purpose:
 3. Suppress repeated prompts for already-known windows later.
 4. Make the real application-window configurator flow less noisy over time.
 
-### Stage 20: workspace route creation workflow
+### Stage 22: real-config write review
 
-Implement the UI-facing `WORKSPACE_ROUTES` workflow.
+Before enabling real user config writes in GTK, review:
 
-### Stage 21: pin and exclude workflows
-
-Implement UI-facing `PIN` and `EXCLUDE` workflows.
-
-### Stage 22: left-edge correction workflow
-
-Implement a troubleshooting-oriented `LEFT_EDGE_CORRECTION` workflow.
+1. Which config path is considered the active real user config.
+2. How the UI shows the target path.
+3. Whether real writes require a separate explicit mode.
+4. Whether real writes should require a final confirmation dialog.
+5. How backups are surfaced to the user.
+6. Whether the UI should provide a restore-from-backup workflow.
 
 ### Stage 23: generated split profiles
 
@@ -349,14 +344,13 @@ Review is useful at these points:
 Current branch recommendation:
 
 ```text
-configurator-event-data-ui-proof
+configurator-managed-section-actions
 ```
 
 Likely next tasks:
 
-1. Add a representative event-data model in Python.
-2. Add a fixture or command-argument path to pass event data into the GTK UI.
-3. Build the first GTK screen layout with identity and geometry sections.
-4. Keep the UI proof read-only.
-5. Add formatter and launch tests where practical.
-6. Manually verify the window opens and displays event data on Qubes/XFCE.
+1. Pull the branch and run the full test suite.
+2. Smoke-test `--replace-test-config` from the source checkout.
+3. Add and delete one entry in each managed section through the GTK form.
+4. Confirm the displayed sections refresh after each write.
+5. Confirm backups are created for test-config writes.
