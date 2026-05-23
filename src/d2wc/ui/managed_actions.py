@@ -355,6 +355,117 @@ class _EditorControls:
         self.h_entry = h_entry
 
 
+class _SearchableCombo:
+    def __init__(self, Gtk, placeholder: str, *, width: int = 28) -> None:
+        self.Gtk = Gtk
+        self.placeholder = placeholder
+        self.values: list[str] = []
+        self.active_text = ""
+        self.changed_callbacks: list[Callable[[object], None]] = []
+
+        self.widget = Gtk.Button(label=placeholder)
+        self.widget.set_hexpand(True)
+        self.widget.connect("clicked", lambda _button: self._open_popover())
+
+        self.popover = Gtk.Popover.new(self.widget)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        box.set_margin_top(8)
+        box.set_margin_bottom(8)
+        box.set_margin_start(8)
+        box.set_margin_end(8)
+        self.popover.add(box)
+
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.set_placeholder_text("Filter")
+        self.search_entry.set_width_chars(width)
+        self.search_entry.connect("changed", lambda _entry: self._refresh_list())
+        box.pack_start(self.search_entry, False, False, 0)
+
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        scroller.set_size_request(280, 180)
+        box.pack_start(scroller, True, True, 0)
+
+        self.list_box = Gtk.ListBox()
+        self.list_box.connect("row-activated", self._select_row)
+        scroller.add(self.list_box)
+
+    def append_text(self, value: str) -> None:
+        self.values.append(value)
+
+    def remove_all(self) -> None:
+        self.values = []
+        self.active_text = ""
+        self._update_button_label()
+        self._refresh_list()
+
+    def set_active(self, index: int) -> None:
+        if 0 <= index < len(self.values):
+            self._set_active_text(self.values[index], emit=True)
+        else:
+            self._set_active_text("", emit=True)
+
+    def set_active_text(self, value: str) -> None:
+        if value == "" or value in self.values:
+            self._set_active_text(value, emit=True)
+
+    def get_active_text(self) -> str:
+        return self.active_text
+
+    def set_sensitive(self, sensitive: bool) -> None:
+        self.widget.set_sensitive(sensitive)
+
+    def set_hexpand(self, expand: bool) -> None:
+        self.widget.set_hexpand(expand)
+
+    def connect(self, signal_name: str, callback) -> int:
+        if signal_name == "changed":
+            self.changed_callbacks.append(callback)
+            return len(self.changed_callbacks)
+        return self.widget.connect(signal_name, callback)
+
+    def _open_popover(self) -> None:
+        self.search_entry.set_text("")
+        self._refresh_list()
+        self.popover.show_all()
+        self.popover.popup()
+        self.search_entry.grab_focus()
+
+    def _refresh_list(self) -> None:
+        for child in self.list_box.get_children():
+            self.list_box.remove(child)
+
+        filter_text = self.search_entry.get_text().strip().lower() if hasattr(self, "search_entry") else ""
+        for value in self.values:
+            if filter_text and filter_text not in value.lower():
+                continue
+            row = self.Gtk.ListBoxRow()
+            row._d2wc_value = value
+            label = self.Gtk.Label(label=value or "(none)")
+            label.set_xalign(0)
+            label.set_margin_top(4)
+            label.set_margin_bottom(4)
+            label.set_margin_start(4)
+            label.set_margin_end(4)
+            row.add(label)
+            self.list_box.add(row)
+        self.list_box.show_all()
+
+    def _select_row(self, _list_box, row) -> None:
+        self._set_active_text(getattr(row, "_d2wc_value", ""), emit=True)
+        self.popover.popdown()
+
+    def _set_active_text(self, value: str, *, emit: bool) -> None:
+        self.active_text = value
+        self._update_button_label()
+        if emit:
+            for callback in self.changed_callbacks:
+                callback(self)
+
+    def _update_button_label(self) -> None:
+        self.widget.set_label(self.active_text or self.placeholder)
+
+
 def _rows_for_section(
     snapshot: TestConfigSnapshot | None,
     event_data: WindowEventData | None,
@@ -423,10 +534,10 @@ def _build_row_controls(
     row: ManagedGridRow,
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
-    existing_combo = Gtk.ComboBoxText()
+    existing_combo = _searchable_combo(Gtk, "Window")
     target_entry = _entry(Gtk, "New window", width=28)
     profile_filter_entry = _entry(Gtk, "Filter", width=12)
-    profile_combo = Gtk.ComboBoxText()
+    profile_combo = _searchable_combo(Gtk, "Geometry", width=18)
     new_profile_entry = _entry(Gtk, "New profile", width=18)
     workspace_entry = _entry(Gtk, "Workspace", width=8)
     x_entry = _entry(Gtk, "x", width=6)
@@ -465,13 +576,13 @@ def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
     if column_name == "Action":
         return controls.action_combo
     if column_name == "Window":
-        return controls.existing_combo
+        return controls.existing_combo.widget
     if column_name == "New window":
         return controls.target_entry
     if column_name == "Profile filter":
         return controls.profile_filter_entry
     if column_name == "Geometry":
-        return controls.profile_combo
+        return controls.profile_combo.widget
     if column_name == "New profile":
         return controls.new_profile_entry
     if column_name == "Workspace":
@@ -707,6 +818,10 @@ def _active_action(controls: _EditorControls) -> str:
 
 
 def _set_combo_active_text(combo, value: str) -> None:
+    if hasattr(combo, "set_active_text"):
+        combo.set_active_text(value)
+        return
+
     model = combo.get_model()
     if model is None:
         return
@@ -723,6 +838,10 @@ def _combo_box(Gtk, values: tuple[str, ...]):
     combo.set_active(0)
     combo.set_hexpand(True)
     return combo
+
+
+def _searchable_combo(Gtk, placeholder: str, *, width: int = 28) -> _SearchableCombo:
+    return _SearchableCombo(Gtk, placeholder, width=width)
 
 
 def _reset_combo(combo, values: tuple[str, ...], *, include_blank: bool = False) -> None:
