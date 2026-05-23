@@ -4,13 +4,8 @@ from __future__ import annotations
 
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
-from d2wc.test_config import (
-    TestConfigPrepareResult,
-    TestConfigSnapshot,
-    format_action_result,
-    format_test_config_status,
-)
-from d2wc.ui.managed_actions import build_managed_section_form
+from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
+from d2wc.ui.managed_actions import build_managed_section_editor
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -68,29 +63,24 @@ def run_configurator(
     scroller.add(content)
 
     managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    action_label = _build_text_label(Gtk, format_action_result(None))
-    status_label = _build_text_label(Gtk, _mode_message(test_config_snapshot, prepare_result))
-
-    content.pack_start(
-        build_managed_section_form(
-            Gtk,
-            test_config_snapshot,
-            action_label,
-            status_label,
-            managed_sections_box,
-            _replace_managed_sections,
-        ),
-        False,
-        False,
-        0,
+    editor = build_managed_section_editor(
+        Gtk,
+        test_config_snapshot,
+        managed_sections_box,
+        _replace_managed_sections,
     )
-    content.pack_start(status_label, False, False, 0)
 
+    content.pack_start(editor.widget, False, False, 0)
     content.pack_start(managed_sections_box, False, False, 0)
     _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
+
+    apply_button = Gtk.Button(label="Apply")
+    apply_button.set_sensitive(test_config_snapshot is not None and test_config_snapshot.ok)
+    apply_button.connect("clicked", lambda _button: editor.apply())
+    button_box.pack_start(apply_button, False, False, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -99,25 +89,6 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
-
-
-def _mode_message(
-    snapshot: TestConfigSnapshot | None,
-    prepare_result: TestConfigPrepareResult | None,
-) -> str:
-    if prepare_result is not None and prepare_result.replaced:
-        mode = "Mode: test config replaced/reset"
-    elif prepare_result is not None and prepare_result.created:
-        mode = "Mode: test config created"
-    elif prepare_result is not None and prepare_result.skipped:
-        mode = "Mode: init skipped, existing test config loaded"
-    elif snapshot is not None:
-        mode = "Mode: existing test config loaded"
-    else:
-        mode = "Mode: event preview only"
-
-    status = format_test_config_status(snapshot)
-    return "\n".join([mode, status])
 
 
 def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
