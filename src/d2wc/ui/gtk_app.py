@@ -14,13 +14,9 @@ from d2wc.event_preview import (
 from d2wc.test_config import (
     TestConfigPrepareResult,
     TestConfigSnapshot,
-    add_event_geometry_to_test_config,
-    add_event_placement_to_test_config,
-    add_event_proposal_to_test_config,
     format_action_result,
     format_prepare_result,
     format_test_config_status,
-    load_test_config_snapshot,
 )
 from d2wc.ui.managed_actions import build_managed_section_form
 
@@ -160,16 +156,6 @@ def run_configurator(
     copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
     button_box.pack_start(copy_button, False, False, 0)
 
-    action_buttons = _build_test_config_action_buttons(
-        Gtk,
-        event,
-        test_config_snapshot,
-        action_label,
-        test_config_status_label,
-        managed_sections_box,
-    )
-    button_box.pack_start(action_buttons, False, False, 0)
-
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
     button_box.pack_end(close_button, False, False, 0)
@@ -200,82 +186,6 @@ def _mode_message(
             mode,
         ]
     )
-
-
-def _build_test_config_action_buttons(
-    Gtk,
-    event: WindowEventData,
-    snapshot: TestConfigSnapshot | None,
-    action_label,
-    test_config_status_label,
-    managed_sections_box,
-):
-    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-    can_write_test_config = snapshot is not None and snapshot.ok
-
-    add_geom_button = Gtk.Button(label="Add GEOM")
-    add_geom_button.set_sensitive(can_write_test_config)
-    add_geom_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_geometry_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_geom_button, False, False, 0)
-
-    add_placement_button = Gtk.Button(label="Add placement")
-    add_placement_button.set_sensitive(can_write_test_config)
-    add_placement_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_placement_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_placement_button, False, False, 0)
-
-    add_both_button = Gtk.Button(label="Add both")
-    add_both_button.set_sensitive(can_write_test_config)
-    add_both_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_proposal_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_both_button, False, False, 0)
-
-    return box
-
-
-def _run_test_config_action(
-    Gtk,
-    action_label,
-    test_config_status_label,
-    managed_sections_box,
-    snapshot: TestConfigSnapshot | None,
-    result,
-) -> None:
-    action_label.set_text(format_action_result(result))
-    if snapshot is None:
-        return
-
-    refreshed_snapshot = load_test_config_snapshot(snapshot.path)
-    test_config_status_label.set_text(format_test_config_status(refreshed_snapshot))
-    _replace_managed_sections(Gtk, managed_sections_box, refreshed_snapshot)
 
 
 def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
