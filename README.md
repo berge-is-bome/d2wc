@@ -41,16 +41,17 @@ Latest confirmed local verification is recorded in [`docs/development-status.md`
 
 ```text
 docs/
-  development-status.md          Current PR status, latest local verification, and next work.
-  event-data-ui-direction.md     Current GTK UI direction around Devilspie2 event data.
-  product-development-brief.md   In-depth product and UI direction.
-  lua-configurables.md           User-facing explanation of the Lua configuration sections.
-  lua-design-history.md          Design context recovered from archived pre-repository Lua history.
-  repository-layout.md           Repository structure and development conventions.
+  backup-archives.md            Backup archive behavior for guarded writes.
+  development-status.md         Current PR status, latest local verification, and next work.
+  event-data-ui-direction.md    Current GTK UI direction around Devilspie2 event data.
+  product-development-brief.md  In-depth product and UI direction.
+  lua-configurables.md          User-facing explanation of the Lua configuration sections.
+  lua-design-history.md         Design context recovered from archived pre-repository Lua history.
+  repository-layout.md          Repository structure and development conventions.
 src/
-  d2wc.lua                       Current devilspie2 Lua rules script.
-  d2wc/                          Python configurator core, desktop integration, and GTK UI proof.
-tests/                           Python tests for the configurator core and UI helpers.
+  d2wc.lua                      Current devilspie2 Lua rules script.
+  d2wc/                         Python configurator core, desktop integration, and GTK UI proof.
+tests/                          Python tests for the configurator core and UI helpers.
 ```
 
 ## Local development
@@ -84,6 +85,8 @@ python3 -m pytest
 The `validate` command is read-only. It parses and validates the managed Lua sections but does not modify any file.
 
 The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
+
+Before a guarded write replaces a Lua config, `d2wc` stores the previous config snapshot as a timestamped member inside a per-config `.bak.tgz` archive. See [`docs/backup-archives.md`](docs/backup-archives.md).
 
 ## GTK test-config workflow
 
