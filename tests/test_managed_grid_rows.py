@@ -2,12 +2,12 @@ from pathlib import Path
 
 from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRoute
 from d2wc.event_data import get_event_fixture
-from d2wc.test_config import TestConfigSnapshot
+from d2wc.test_config import TestConfigSnapshot as ConfigSnapshot
 from d2wc.ui.managed_actions import build_configured_grid_rows, build_known_window_grid_rows
 
 
 def test_build_configured_grid_rows_flattens_all_sections() -> None:
-    snapshot = TestConfigSnapshot(
+    snapshot = ConfigSnapshot(
         path=Path("d2wc-test.lua"),
         exists=True,
         config=ManagedConfig(
