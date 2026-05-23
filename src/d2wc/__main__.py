@@ -80,6 +80,12 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         help="Load the dedicated ~/.config/devilspie2/d2wc-test.lua file for UI testing.",
     )
     parser.add_argument(
+        "--test-config-path",
+        type=Path,
+        default=None,
+        help="Optional override for the UI test config path, mainly for tests and manual experiments.",
+    )
+    parser.add_argument(
         "--init-test-config",
         action="store_true",
         help="Create ~/.config/devilspie2/d2wc-test.lua from the bundled src/d2wc.lua if missing.",
@@ -120,11 +126,14 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
 
     prepare_result = None
     if args.init_test_config or args.replace_test_config:
-        prepare_result = prepare_test_config(replace=args.replace_test_config)
+        prepare_result = prepare_test_config(
+            target_path=args.test_config_path,
+            replace=args.replace_test_config,
+        )
 
     test_config_snapshot = None
     if args.test_config or args.init_test_config or args.replace_test_config:
-        test_config_snapshot = load_test_config_snapshot()
+        test_config_snapshot = load_test_config_snapshot(args.test_config_path)
 
     config_awareness = None
     if args.config is not None:
