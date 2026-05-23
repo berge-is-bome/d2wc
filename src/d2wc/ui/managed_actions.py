@@ -24,12 +24,12 @@ SECTION_LABELS = {
 }
 SECTION_BY_LABEL = {label: section for section, label in SECTION_LABELS.items()}
 SECTION_COLUMNS = {
-    "EXCLUDE": ("Action", "Domain", "Class"),
-    "PIN": ("Action", "Domain", "Class"),
-    "WORKSPACE_ROUTES": ("Action", "Domain", "Class", "Workspace"),
-    "GEOM": ("Action", "Window geometry", "New profile", "Coordinates"),
-    "WORKSPACE_PLACEMENT": ("Action", "Domain", "Class", "Window geometry"),
-    "LEFT_EDGE_CORRECTION": ("Action", "Domain", "Class", "Left edge"),
+    "EXCLUDE": ("Action", "Domain", "Application name"),
+    "PIN": ("Action", "Domain", "Application name"),
+    "WORKSPACE_ROUTES": ("Action", "Domain", "Application name", "Workspace"),
+    "GEOM": ("Action", "Profile name", "Coordinates"),
+    "WORKSPACE_PLACEMENT": ("Action", "Domain", "Application name", "Geometry profile"),
+    "LEFT_EDGE_CORRECTION": ("Action", "Domain", "Application name", "Left edge"),
 }
 
 
@@ -556,10 +556,10 @@ def _build_row_controls(
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
     domain_combo = _searchable_combo(Gtk, "Domain", width=18)
-    class_combo = _searchable_combo(Gtk, "Class", width=22)
-    geometry_combo = _searchable_combo(Gtk, "Window geometry", width=18)
+    class_combo = _searchable_combo(Gtk, "Application name", width=22)
+    geometry_combo = _searchable_combo(Gtk, "Geometry profile", width=18)
     left_edge_combo = _combo_box(Gtk, tuple(sorted(LEFT_EDGE_MODES)))
-    new_profile_entry = _entry(Gtk, "New profile", width=18)
+    new_profile_entry = _entry(Gtk, "Profile name", width=18)
     workspace_combo = _combo_box(Gtk, workspace_values)
     x_entry = _entry(Gtk, "x", width=6)
     y_entry = _entry(Gtk, "y", width=6)
@@ -598,11 +598,11 @@ def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
         return controls.action_combo
     if column_name == "Domain":
         return controls.domain_combo.widget
-    if column_name == "Class":
+    if column_name == "Application name":
         return controls.class_combo.widget
-    if column_name == "Window geometry":
+    if column_name == "Geometry profile":
         return controls.geometry_combo.widget
-    if column_name == "New profile":
+    if column_name == "Profile name":
         return controls.new_profile_entry
     if column_name == "Workspace":
         return controls.workspace_combo
@@ -661,7 +661,6 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
     is_geom = section == "GEOM"
     normalized_action = action.lower()
     edits_values = normalized_action in {"add", "modify"}
-    needs_existing = normalized_action in {"modify", "delete"}
     needs_workspace = section == "WORKSPACE_ROUTES" and edits_values
     needs_geometry_profile = section == "WORKSPACE_PLACEMENT" and edits_values
     needs_left_edge = section == "LEFT_EDGE_CORRECTION" and edits_values
@@ -670,7 +669,7 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
     controls.domain_combo.set_sensitive(is_rule_section and edits_values)
     controls.class_combo.set_sensitive(is_rule_section and edits_values)
     controls.workspace_combo.set_sensitive(needs_workspace)
-    controls.geometry_combo.set_sensitive(needs_geometry_profile or (is_geom and needs_existing))
+    controls.geometry_combo.set_sensitive(needs_geometry_profile)
     controls.left_edge_combo.set_sensitive(needs_left_edge)
     controls.new_profile_entry.set_sensitive(edits_geom_values)
     for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
