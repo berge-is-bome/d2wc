@@ -159,7 +159,11 @@ def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionReq
     profile_name = controls.new_profile_entry.get_text().strip() or selected_profile
     target_entry = controls.target_entry.get_text().strip()
 
-    if section == "WORKSPACE_PLACEMENT" and action in {"add", "modify"} and target_entry and " g:" not in f" {target_entry}":
+    if section == "WORKSPACE_PLACEMENT" and action == "modify" and existing_entry:
+        if not profile_name:
+            raise ValueError("WORKSPACE_PLACEMENT modify requires an existing profile selection")
+        target_entry = _replace_rule_profile(existing_entry, profile_name)
+    elif section == "WORKSPACE_PLACEMENT" and action == "add" and target_entry and " g:" not in f" {target_entry}":
         if profile_name:
             target_entry = f"{target_entry} g:{profile_name}"
     if section == "GEOM" and action in {"modify", "delete"} and not profile_name:
@@ -205,12 +209,13 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
     is_geom = section == "GEOM"
     edits_values = action in {"add", "modify"}
     needs_existing = action in {"modify", "delete"}
+    target_editable = is_rule_section and edits_values and not (section == "WORKSPACE_PLACEMENT" and action == "modify")
     needs_workspace = section == "WORKSPACE_ROUTES" and edits_values
     needs_profile = section in {"GEOM", "WORKSPACE_PLACEMENT"} and edits_values
     needs_geometry = is_geom and edits_values
 
     controls.existing_combo.set_sensitive(needs_existing)
-    controls.target_entry.set_sensitive(is_rule_section and edits_values)
+    controls.target_entry.set_sensitive(target_editable)
     controls.workspace_entry.set_sensitive(needs_workspace)
     controls.profile_filter_entry.set_sensitive(needs_profile)
     controls.profile_combo.set_sensitive(needs_profile)
@@ -218,7 +223,7 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
     for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
         entry.set_sensitive(needs_geometry)
 
-    if not is_rule_section or not edits_values:
+    if not target_editable:
         controls.target_entry.set_text("")
     if not needs_workspace:
         controls.workspace_entry.set_text("")
@@ -273,6 +278,12 @@ def _populate_fields_from_existing(snapshot: TestConfigSnapshot | None, controls
         controls.new_profile_entry.set_text(existing)
         _populate_geom_fields_from_profile(snapshot, controls, profile_name=existing)
         return
+    if section == "WORKSPACE_PLACEMENT":
+        controls.target_entry.set_text("")
+        profile_name = _profile_from_rule(existing)
+        if profile_name:
+            _set_combo_active_text(controls.profile_combo, profile_name)
+        return
     if action == "modify":
         controls.target_entry.set_text(existing)
 
@@ -288,6 +299,38 @@ def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, cont
             controls.y_entry.set_text(str(profile.y))
             controls.w_entry.set_text(str(profile.w))
             controls.h_entry.set_text(str(profile.h))
+            return
+
+
+def _profile_from_rule(rule: str) -> str:
+    for token in rule.split():
+        if token.startswith("g:"):
+            return token[2:]
+    return ""
+
+
+def _replace_rule_profile(rule: str, profile_name: str) -> str:
+    tokens = rule.split()
+    replaced = False
+    new_tokens = []
+    for token in tokens:
+        if token.startswith("g:"):
+            new_tokens.append(f"g:{profile_name}")
+            replaced = True
+        else:
+            new_tokens.append(token)
+    if not replaced:
+        new_tokens.append(f"g:{profile_name}")
+    return " ".join(new_tokens)
+
+
+def _set_combo_active_text(combo, value: str) -> None:
+    model = combo.get_model()
+    if model is None:
+        return
+    for index, row in enumerate(model):
+        if row[0] == value:
+            combo.set_active(index)
             return
 
 
