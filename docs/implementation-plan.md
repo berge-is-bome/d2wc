@@ -37,7 +37,7 @@ The repository currently contains:
 17. Read-only Qubes/dom0 selected-window geometry proof.
 18. Event-data UI direction notes in [Event-Data GTK UI Direction](event-data-ui-direction.md).
 19. Dedicated GTK test-config workflow using `~/.config/devilspie2/d2wc-test.lua`.
-20. GTK add/delete form for all six managed sections, scoped to the test config.
+20. GTK managed-section editor for all six managed sections, scoped to the test config.
 21. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator UI is developed.
@@ -55,7 +55,7 @@ The implementation should follow these decisions:
 7. Keep parser/writer/validator logic independent from the UI toolkit.
 8. Make the stable entry point a command that can be assigned to a keyboard shortcut or called from the Lua event context.
 9. Treat tray behavior as optional.
-10. Support source-checkout execution because Qubes dom0 is normally offline.
+10. Support source-checkout execution because Qubes dom0 is often offline.
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 12. Keep real user configuration writes guarded.
 13. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
@@ -134,7 +134,7 @@ Complete and merged through PR #14.
 
 Confirmed behavior:
 
-1. `python -m d2wc configure` opens a GTK window.
+1. `python3 -m d2wc configure` opens a GTK window.
 2. `d2wc configure` opens the same GTK window after editable install refresh.
 3. The window closes cleanly.
 4. No config files are read or written.
@@ -221,22 +221,49 @@ Confirmed behavior:
 4. The action-result panel reports success or error and backup path.
 5. The managed-section display refreshes after writes.
 
-### Stage 19: managed-section add/delete UI for the test config
+### Stage 19: managed-section editor for the test config
 
 Current branch: `configurator-managed-section-actions`.
 
 Required behavior:
 
-1. Keep all writes scoped to the loaded test config.
-2. Add a GTK managed-section form for all six sections.
-3. Support add and delete operations.
-4. Reuse tested core edit operations and safe-save behavior.
-5. Refresh displayed sections after each write.
-6. Update documentation to match the current workflow.
+1. Keep all writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
+2. Add a GTK managed-section editor for all six sections.
+3. Support add, modify, and delete operations.
+4. Use a `Section` selector and `Action` selector.
+5. Use a single `Apply` action next to `Close`.
+6. Reuse tested core edit operations and safe-save behavior.
+7. Refresh displayed sections after each write.
+8. Clear action fields after successful Apply.
+9. Update documentation to match the current workflow.
 
 ## Future implementation stages
 
-### Stage 20: event-data handoff proof from Lua to Python
+### Stage 20: grid-style GTK editor
+
+Build the next GTK UI as a landscape-oriented grid editor.
+
+Required behavior:
+
+1. Top area shows entries already configured in the script.
+2. Bottom area shows known windows that can be configured later.
+3. Each row exposes section, action, existing-entry, target-entry, profile, workspace, and geometry controls.
+4. Row selection reveals row-level apply/cancel behavior.
+5. Configured rows are preselected from the current script contents.
+6. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config workflow is reviewed.
+
+### Stage 21: known-window inventory from Devilspie2 event data
+
+Build the list of known normal windows from Devilspie2/Lua event data.
+
+Required behavior:
+
+1. Lua records windows with `WINDOW_TYPE_NORMAL`.
+2. The GTK UI can display known windows that are not already configured for the selected section.
+3. The inventory excludes already-configured entries where practical.
+4. The first proof may use captured event data fixtures before live handoff is finalized.
+
+### Stage 22: event-data handoff proof from Lua to Python
 
 After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
 
@@ -245,9 +272,9 @@ Required behavior:
 1. Lua captures event data directly from Devilspie2 functions.
 2. Lua passes the event data to the configurator command through a safe handoff mechanism.
 3. GTK displays exactly the event data it received.
-4. Writes remain scoped to the selected development path until real-config write workflow is reviewed.
+4. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config write workflow is reviewed.
 
-### Stage 21: suppression for already-known windows
+### Stage 23: suppression for already-known windows
 
 Add logic to avoid automatically opening the configurator for windows that already have a profile or handling rule.
 
@@ -266,7 +293,18 @@ Purpose:
 3. Suppress repeated prompts for already-known windows later.
 4. Make the real application-window configurator flow less noisy over time.
 
-### Stage 22: real-config write review
+### Stage 24: backup retention or archive review
+
+Review the current timestamped backup strategy before real-config writes are enabled.
+
+Options to evaluate:
+
+1. Keep full timestamped `.bak` files.
+2. Store backups in a single compressed archive.
+3. Store append-only diffs in a single archive file.
+4. Add a retention policy for old backups.
+
+### Stage 25: real-config write review
 
 Before enabling real user config writes in GTK, review:
 
@@ -277,15 +315,15 @@ Before enabling real user config writes in GTK, review:
 5. How backups are surfaced to the user.
 6. Whether the UI should provide a restore-from-backup workflow.
 
-### Stage 23: generated split profiles
+### Stage 26: generated split profiles
 
 Implement generated split-profile support.
 
-### Stage 24: reload or restart managed runtime
+### Stage 27: reload or restart managed runtime
 
 Implement a safe reload or restart path that applies changed Lua config.
 
-### Stage 25: post-resize monitoring proof
+### Stage 28: post-resize monitoring proof
 
 Begin Phase 2 automation by detecting active-window geometry changes and quiet periods.
 
@@ -293,11 +331,11 @@ Important note:
 
 Devilspie2/Lua scripts are event-driven and should not be treated as the live resize monitor. Live move/resize tracking probably belongs in an X11/window-manager layer after a target window is known.
 
-### Stage 26: post-resize configurator entry
+### Stage 29: post-resize configurator entry
 
 Add user-facing post-resize behavior.
 
-### Stage 27: packaging proof
+### Stage 30: packaging proof
 
 Create the first local package proof.
 
@@ -310,7 +348,7 @@ Required behavior:
 5. User config is preserved on uninstall.
 6. Debian packaging remains a later target.
 
-### Stage 28: future Qt/KDE front end
+### Stage 31: future Qt/KDE front end
 
 Keep the architecture UI-toolkit-neutral enough that a future Qt front end can reuse the same backend.
 
@@ -344,13 +382,14 @@ Review is useful at these points:
 Current branch recommendation:
 
 ```text
-configurator-managed-section-actions
+configurator-grid-editor-ui
 ```
 
-Likely next tasks:
+Likely next tasks after PR #23 merges:
 
-1. Pull the branch and run the full test suite.
-2. Smoke-test `--replace-test-config` from the source checkout.
-3. Add and delete one entry in each managed section through the GTK form.
-4. Confirm the displayed sections refresh after each write.
-5. Confirm backups are created for test-config writes.
+1. Start the grid-style GTK editor branch from updated `main`.
+2. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
+3. Build the top configured-entries area.
+4. Build the bottom known-window area from fixtures first.
+5. Add row-level apply/cancel behavior.
+6. Defer real-config writes.
