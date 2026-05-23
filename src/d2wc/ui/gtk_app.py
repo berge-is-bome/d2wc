@@ -1,27 +1,11 @@
-"""GTK configurator proof for Devilspie2 event data and test config display."""
+"""GTK configurator proof for Devilspie2 test config editing."""
 
 from __future__ import annotations
 
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
-from d2wc.event_preview import (
-    EventConfigAwareness,
-    build_event_rule_preview,
-    format_event_config_awareness,
-    format_event_rule_preview,
-    proposal_clipboard_text,
-)
-from d2wc.test_config import (
-    TestConfigPrepareResult,
-    TestConfigSnapshot,
-    add_event_geometry_to_test_config,
-    add_event_placement_to_test_config,
-    add_event_proposal_to_test_config,
-    format_action_result,
-    format_prepare_result,
-    format_test_config_status,
-    load_test_config_snapshot,
-)
+from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
+from d2wc.ui.managed_actions import build_managed_section_editor
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -39,28 +23,26 @@ def _import_gtk():
 
     try:
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk, Gdk
+        from gi.repository import Gtk
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk
+    return Gtk
 
 
 def run_configurator(
     event_data: WindowEventData | None = None,
-    config_awareness: EventConfigAwareness | None = None,
+    config_awareness=None,
     test_config_snapshot: TestConfigSnapshot | None = None,
     prepare_result: TestConfigPrepareResult | None = None,
 ) -> int:
     """Open the GTK configurator proof window."""
 
-    event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
-    preview = build_event_rule_preview(event)
-    clipboard_text = proposal_clipboard_text(preview, config_awareness)
-    Gtk, Gdk = _import_gtk()
+    _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
+    Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
     window.set_default_size(900, 620)
@@ -69,16 +51,6 @@ def run_configurator(
 
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
-
-    title = Gtk.Label()
-    title.set_markup("<b>d2wc Configurator</b>")
-    title.set_xalign(0)
-    outer.pack_start(title, False, False, 0)
-
-    message = Gtk.Label(label=_mode_message(test_config_snapshot, prepare_result))
-    message.set_xalign(0)
-    message.set_line_wrap(True)
-    outer.pack_start(message, False, False, 0)
 
     scroller = Gtk.ScrolledWindow()
     scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
@@ -90,70 +62,25 @@ def run_configurator(
     content.set_margin_end(8)
     scroller.add(content)
 
-    content.pack_start(_build_section_frame(Gtk, "Identity", format_event_identity(event)), False, False, 0)
-    content.pack_start(_build_section_frame(Gtk, "Geometry", format_event_geometry(event)), False, False, 0)
-    content.pack_start(_build_section_frame(Gtk, "Read-only proposal", format_event_rule_preview(preview)), False, False, 0)
-    content.pack_start(
-        _build_section_frame(Gtk, "Existing config status", format_event_config_awareness(config_awareness)),
-        False,
-        False,
-        0,
-    )
-
-    test_config_status_label = _build_text_label(Gtk, format_test_config_status(test_config_snapshot))
-    content.pack_start(
-        _wrap_label_in_frame(Gtk, "Test config status", test_config_status_label),
-        False,
-        False,
-        0,
-    )
-    content.pack_start(
-        _build_section_frame(Gtk, "Test config prepare result", format_prepare_result(prepare_result)),
-        False,
-        False,
-        0,
-    )
-
     managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+    editor = build_managed_section_editor(
+        Gtk,
+        test_config_snapshot,
+        managed_sections_box,
+        _replace_managed_sections,
+    )
+
+    content.pack_start(editor.widget, False, False, 0)
     content.pack_start(managed_sections_box, False, False, 0)
     _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
-
-    content.pack_start(
-        _build_section_frame(
-            Gtk,
-            "Configuration options",
-            "This UI branch may prepare, replace, or edit only ~/.config/devilspie2/d2wc-test.lua.\n"
-            "The real user config remains out of scope for automatic writes.",
-        ),
-        False,
-        False,
-        0,
-    )
-
-    action_label = _build_text_label(Gtk, format_action_result(None))
-    outer.pack_start(
-        _wrap_label_in_frame(Gtk, "Last test-config action", action_label),
-        False,
-        False,
-        0,
-    )
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
-    copy_button = Gtk.Button(label="Copy proposal")
-    copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
-    button_box.pack_start(copy_button, False, False, 0)
-
-    action_buttons = _build_test_config_action_buttons(
-        Gtk,
-        event,
-        test_config_snapshot,
-        action_label,
-        test_config_status_label,
-        managed_sections_box,
-    )
-    button_box.pack_start(action_buttons, False, False, 0)
+    apply_button = Gtk.Button(label="Apply")
+    apply_button.set_sensitive(test_config_snapshot is not None and test_config_snapshot.ok)
+    apply_button.connect("clicked", lambda _button: editor.apply())
+    button_box.pack_start(apply_button, False, False, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
@@ -162,105 +89,6 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
-
-
-def _mode_message(
-    snapshot: TestConfigSnapshot | None,
-    prepare_result: TestConfigPrepareResult | None,
-) -> str:
-    if prepare_result is not None and prepare_result.replaced:
-        mode = "Mode: test config replaced/reset"
-    elif prepare_result is not None and prepare_result.created:
-        mode = "Mode: test config created"
-    elif prepare_result is not None and prepare_result.skipped:
-        mode = "Mode: init skipped, existing test config loaded"
-    elif snapshot is not None:
-        mode = "Mode: existing test config loaded"
-    else:
-        mode = "Mode: event preview only"
-
-    return "\n".join(
-        [
-            "Devilspie2 event-data and test-config UI proof.",
-            mode,
-        ]
-    )
-
-
-def _build_test_config_action_buttons(
-    Gtk,
-    event: WindowEventData,
-    snapshot: TestConfigSnapshot | None,
-    action_label,
-    test_config_status_label,
-    managed_sections_box,
-):
-    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-    can_write_test_config = snapshot is not None and snapshot.ok
-
-    add_geom_button = Gtk.Button(label="Add GEOM")
-    add_geom_button.set_sensitive(can_write_test_config)
-    add_geom_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_geometry_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_geom_button, False, False, 0)
-
-    add_placement_button = Gtk.Button(label="Add placement")
-    add_placement_button.set_sensitive(can_write_test_config)
-    add_placement_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_placement_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_placement_button, False, False, 0)
-
-    add_both_button = Gtk.Button(label="Add both")
-    add_both_button.set_sensitive(can_write_test_config)
-    add_both_button.connect(
-        "clicked",
-        lambda _button: _run_test_config_action(
-            Gtk,
-            action_label,
-            test_config_status_label,
-            managed_sections_box,
-            snapshot,
-            add_event_proposal_to_test_config(snapshot.path, event) if snapshot is not None else None,
-        ),
-    )
-    box.pack_start(add_both_button, False, False, 0)
-
-    return box
-
-
-def _run_test_config_action(
-    Gtk,
-    action_label,
-    test_config_status_label,
-    managed_sections_box,
-    snapshot: TestConfigSnapshot | None,
-    result,
-) -> None:
-    action_label.set_text(format_action_result(result))
-    if snapshot is None:
-        return
-
-    refreshed_snapshot = load_test_config_snapshot(snapshot.path)
-    test_config_status_label.set_text(format_test_config_status(refreshed_snapshot))
-    _replace_managed_sections(Gtk, managed_sections_box, refreshed_snapshot)
 
 
 def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
@@ -322,43 +150,6 @@ def _build_text_label(Gtk, body: str):
     return label
 
 
-def _copy_text_to_clipboard(Gtk, Gdk, text: str) -> None:
-    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-    clipboard.set_text(text, -1)
-    clipboard.store()
-
-
-def format_event_identity(event: WindowEventData) -> str:
-    """Format event-provided identity values for the GTK proof window."""
-
-    return "\n".join(
-        [
-            f"Domain: {_value_or_unknown(event.display_domain)}",
-            f"Application name: {_value_or_unknown(event.application_name)}",
-            f"Window name: {_value_or_unknown(event.window_name)}",
-            f"Window Type: {_value_or_unknown(event.window_type)}",
-            f"Class instance name: {_value_or_unknown(event.class_instance_name)}",
-            f"Window class: {_value_or_unknown(event.window_class)}",
-        ]
-    )
-
-
-def format_event_geometry(event: WindowEventData) -> str:
-    """Format event-provided geometry values for the GTK proof window."""
-
-    screen = event.screen_geometry
-    window = event.window_geometry
-
-    return "\n".join(
-        [
-            f"Screen Geometry: x = {_value_or_unknown_float(screen.width)} y = {_value_or_unknown_float(screen.height)}",
-            f"Window geometry:  x = {_value_or_unknown_float(window.x)} y = {_value_or_unknown_float(window.y)} w = {_value_or_unknown_float(window.w)} h = {_value_or_unknown_float(window.h)}",
-            f"Geometry: x={_value_or_unknown_float(window.x)} y={_value_or_unknown_float(window.y)} w={_value_or_unknown_float(window.w)} h={_value_or_unknown_float(window.h)}",
-            f"geometry {_value_or_unknown(window.size_text)}",
-        ]
-    )
-
-
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
     """Format selected-window geometry kept for the completed PR #15 diagnostic proof."""
 
@@ -390,12 +181,6 @@ def _value_or_unknown(value: str | None) -> str:
     if value == "":
         return "empty"
     return value
-
-
-def _value_or_unknown_float(value: float | None) -> str:
-    if value is None:
-        return "unknown"
-    return str(value)
 
 
 def _value_or_unknown_int(value: int | None) -> str:

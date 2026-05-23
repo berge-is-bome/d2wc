@@ -2,11 +2,11 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` is intended to make Linux window placement easier to configure by combining a `devilspie2` Lua rules script with a small configurator UI. The current implementation is the active Lua rules engine plus a Python configurator core proof with parser, validator, renderer, guarded CLI edit commands, safe-save behavior, the read-only GTK launch proof, and a read-only Qubes/dom0 selected-window geometry proof.
+`d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, and a GTK test-config editor.
 
 ## Current status
 
-The repository now starts from the current `d2wc` Lua script version `0.1.12.3`.
+The repository starts from the current `d2wc` Lua script version `0.1.12.3`.
 
 The active Lua script supports:
 
@@ -16,7 +16,7 @@ The active Lua script supports:
 4. Applying named geometry profiles to matching windows.
 5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
 
-The Python core currently supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for all managed Lua sections:
+The Python core supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for all managed Lua sections:
 
 1. `GEOM`
 2. `WORKSPACE_PLACEMENT`
@@ -25,11 +25,17 @@ The Python core currently supports validation, render preview, safe-save behavio
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The GTK proof can open a read-only window launched by `python -m d2wc configure` or `d2wc configure`. The most recent merged desktop proof confirmed Qubes/dom0 selected-window geometry capture with `xwininfo -frame`. That proof is useful as a diagnostic, but it is no longer the active UI direction.
+The GTK UI currently uses this dedicated test config:
 
-The active next direction is to build the GTK configurator around event-provided Devilspie2/Lua data. See [`docs/event-data-ui-direction.md`](docs/event-data-ui-direction.md).
+```text
+~/.config/devilspie2/d2wc-test.lua
+```
 
-Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md). The latest reported result after PR #15 manual work was the selected-window geometry proof working from dom0.
+The UI can prepare, load, replace, display, and edit that test config. It uses a managed-section editor with `Section`, `Action`, existing-entry, target-entry, profile, workspace, and geometry fields, plus a single `Apply` action. The editor supports add, modify, and delete for all six managed sections.
+
+The real user config is not the GTK write target at this stage. The active direction is still to build around event-provided Devilspie2/Lua data. See [`docs/event-data-ui-direction.md`](docs/event-data-ui-direction.md).
+
+Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md).
 
 ## Repository layout
 
@@ -44,7 +50,7 @@ docs/
 src/
   d2wc.lua                       Current devilspie2 Lua rules script.
   d2wc/                          Python configurator core, desktop integration, and GTK UI proof.
-tests/                           Python tests for the configurator core and desktop proof helpers.
+tests/                           Python tests for the configurator core and UI helpers.
 ```
 
 ## Local development
@@ -52,68 +58,82 @@ tests/                           Python tests for the configurator core and desk
 Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
 
 ```bash
-python -m pip install -e .
+python3 -m pip install -e .
 ```
 
 Re-run the editable install command after switching to a branch that changes `[project.scripts]`; otherwise the generated `d2wc` console wrapper may still point at the previously installed entry point.
 
-For normal source-checkout testing:
+For normal source-checkout testing after editable install:
 
 ```bash
-python -m d2wc --help
-python -m d2wc validate --config src/d2wc.lua
-python -m d2wc render --config src/d2wc.lua --stdout
-python -m pytest
+python3 -m d2wc --help
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m d2wc render --config src/d2wc.lua --stdout
+python3 -m pytest
 ```
 
 When renderer behavior changes, use the stronger renderer verification path:
 
 ```bash
-python -m d2wc validate --config src/d2wc.lua
-python -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-python -m d2wc validate --config /tmp/d2wc-rendered.lua
-python -m pytest
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
+python3 -m d2wc validate --config /tmp/d2wc-rendered.lua
+python3 -m pytest
 ```
 
 The `validate` command is read-only. It parses and validates the managed Lua sections but does not modify any file.
 
 The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
 
-The GTK proof can be launched directly from the source checkout with:
+## GTK test-config workflow
+
+Launch the GTK configurator after installing the current checkout:
 
 ```bash
-python -m d2wc configure
+python3 -m d2wc configure
 ```
 
-or, after refreshing the editable install:
+For UI development, use the dedicated test config commands:
 
 ```bash
-d2wc configure
+python3 -m d2wc configure --init-test-config
+python3 -m d2wc configure --test-config
+python3 -m d2wc configure --replace-test-config
 ```
 
-For a dom0 archive test without editable installation, use:
+Command meanings:
 
-```bash
-PYTHONPATH=src python3 -m d2wc configure
-```
+1. `--init-test-config` creates `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua` if it is missing, then loads it.
+2. `--test-config` loads the existing `~/.config/devilspie2/d2wc-test.lua` without replacing it.
+3. `--replace-test-config` replaces `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua`, then loads it.
+4. `--test-config-path <path>` overrides the test config path for disposable automated tests and isolated manual experiments.
 
-The GTK proof is read-only. It does not read or write config files.
+`d2wc` uses `~/.config/devilspie2/d2wc-test.lua` as the GTK test-config path. Devilspie2 loads Lua scripts from `~/.config/devilspie2/`; users with custom Devilspie2 layouts need to adapt their own runtime setup accordingly.
+
+Current GTK test-config features:
+
+1. Managed-section editor at the top of the window.
+2. `Section` selector for all six managed sections.
+3. `Action` selector for `Add`, `Modify`, and `Delete`.
+4. Section/action-aware editable fields.
+5. Single `Apply` button next to `Close`.
+6. Display of the current managed-section contents below the editor.
+7. Automatic reload of displayed test-config sections after each successful edit.
+8. Action result text with success/error details and backup path.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
 ## Development direction
 
-The CLI/core editing proof phase is complete for the managed Lua sections. The next development phase is the event-data GTK UI proof.
+The CLI/core editing proof phase is complete for the managed Lua sections. The GTK development phase is focused on a test-config UI that exercises the same tested core edit operations safely before enabling real user config writes.
 
-The immediate goal is intentionally small:
+Current UI priorities:
 
-1. Accept representative Devilspie2/Lua event data from a Python fixture or command arguments.
-2. Open GTK with clear sections for identity and geometry.
-3. Display the captured event values.
-4. Perform no config writes.
-5. Perform no automatic rule generation.
-6. Avoid live target-selection experiments in this branch.
-7. Later UI stages can wire displayed event data into the already-tested `GEOM` and `WORKSPACE_PLACEMENT` core edit operations first.
+1. Keep the test-config editor safe and clear.
+2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
+3. Build the next spreadsheet-style editor on a follow-up branch.
+4. Keep real config writes behind an explicit future design review.
+5. Later, wire Lua event handoff and suppression for already-known windows.
 
 Important direction notes:
 
@@ -121,12 +141,5 @@ Important direction notes:
 2. If the user chooses the configurator from a window event, GTK should open with the data captured from that Lua event.
 3. Duplicate configurator launches for intermediary events are acceptable for now.
 4. Later suppression logic should avoid automatically opening the configurator for windows that already have a profile or handling rule.
-
-Planned longer-term entry points remain:
-
-1. Command or keyboard shortcut to open the configurator for event-provided window data.
-2. Optional system tray menu for setup or troubleshooting.
-3. Optional direct `Configure` flow after a user resizes a window and releases the primary mouse button.
-4. Optional small pointer-anchored menu after resize with `Cancel` and `Configure`.
 
 The ordered future roadmap is maintained in [`docs/implementation-plan.md`](docs/implementation-plan.md).
