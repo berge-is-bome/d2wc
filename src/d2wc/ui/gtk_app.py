@@ -20,6 +20,7 @@ from d2wc.test_config import (
     format_action_result,
     format_prepare_result,
     format_test_config_status,
+    load_test_config_snapshot,
 )
 
 
@@ -98,8 +99,10 @@ def run_configurator(
         False,
         0,
     )
+
+    test_config_status_label = _build_text_label(Gtk, format_test_config_status(test_config_snapshot))
     content.pack_start(
-        _build_section_frame(Gtk, "Test config status", format_test_config_status(test_config_snapshot)),
+        _wrap_label_in_frame(Gtk, "Test config status", test_config_status_label),
         False,
         False,
         0,
@@ -111,10 +114,10 @@ def run_configurator(
         0,
     )
 
-    action_label = _build_text_label(Gtk, format_action_result(None))
-    content.pack_start(_wrap_label_in_frame(Gtk, "Test config action result", action_label), False, False, 0)
+    managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+    content.pack_start(managed_sections_box, False, False, 0)
+    _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
 
-    _pack_managed_sections(Gtk, content, test_config_snapshot)
     content.pack_start(
         _build_section_frame(
             Gtk,
@@ -127,6 +130,14 @@ def run_configurator(
         0,
     )
 
+    action_label = _build_text_label(Gtk, format_action_result(None))
+    outer.pack_start(
+        _wrap_label_in_frame(Gtk, "Last test-config action", action_label),
+        False,
+        False,
+        0,
+    )
+
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
@@ -134,7 +145,14 @@ def run_configurator(
     copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
     button_box.pack_start(copy_button, False, False, 0)
 
-    action_buttons = _build_test_config_action_buttons(Gtk, event, test_config_snapshot, action_label)
+    action_buttons = _build_test_config_action_buttons(
+        Gtk,
+        event,
+        test_config_snapshot,
+        action_label,
+        test_config_status_label,
+        managed_sections_box,
+    )
     button_box.pack_start(action_buttons, False, False, 0)
 
     close_button = Gtk.Button(label="Close")
@@ -169,7 +187,14 @@ def _mode_message(
     )
 
 
-def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: TestConfigSnapshot | None, action_label):
+def _build_test_config_action_buttons(
+    Gtk,
+    event: WindowEventData,
+    snapshot: TestConfigSnapshot | None,
+    action_label,
+    test_config_status_label,
+    managed_sections_box,
+):
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     can_write_test_config = snapshot is not None and snapshot.ok
 
@@ -178,7 +203,11 @@ def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: Tes
     add_geom_button.connect(
         "clicked",
         lambda _button: _run_test_config_action(
+            Gtk,
             action_label,
+            test_config_status_label,
+            managed_sections_box,
+            snapshot,
             add_event_geometry_to_test_config(snapshot.path, event) if snapshot is not None else None,
         ),
     )
@@ -189,7 +218,11 @@ def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: Tes
     add_placement_button.connect(
         "clicked",
         lambda _button: _run_test_config_action(
+            Gtk,
             action_label,
+            test_config_status_label,
+            managed_sections_box,
+            snapshot,
             add_event_placement_to_test_config(snapshot.path, event) if snapshot is not None else None,
         ),
     )
@@ -200,7 +233,11 @@ def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: Tes
     add_both_button.connect(
         "clicked",
         lambda _button: _run_test_config_action(
+            Gtk,
             action_label,
+            test_config_status_label,
+            managed_sections_box,
+            snapshot,
             add_event_proposal_to_test_config(snapshot.path, event) if snapshot is not None else None,
         ),
     )
@@ -209,11 +246,31 @@ def _build_test_config_action_buttons(Gtk, event: WindowEventData, snapshot: Tes
     return box
 
 
-def _run_test_config_action(action_label, result) -> None:
+def _run_test_config_action(
+    Gtk,
+    action_label,
+    test_config_status_label,
+    managed_sections_box,
+    snapshot: TestConfigSnapshot | None,
+    result,
+) -> None:
     action_label.set_text(format_action_result(result))
+    if snapshot is None:
+        return
+
+    refreshed_snapshot = load_test_config_snapshot(snapshot.path)
+    test_config_status_label.set_text(format_test_config_status(refreshed_snapshot))
+    _replace_managed_sections(Gtk, managed_sections_box, refreshed_snapshot)
 
 
-def _pack_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
+def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
+    for child in managed_sections_box.get_children():
+        managed_sections_box.remove(child)
+    _populate_managed_sections(Gtk, managed_sections_box, snapshot)
+    managed_sections_box.show_all()
+
+
+def _populate_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
     if snapshot is None:
         content.pack_start(
             _build_section_frame(Gtk, "Managed sections", "No test config loaded. Use --test-config or --init-test-config."),
