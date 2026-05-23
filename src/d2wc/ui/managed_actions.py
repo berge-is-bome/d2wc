@@ -857,6 +857,15 @@ def _searchable_combo(Gtk, placeholder: str, *, width: int = 28) -> _SearchableC
     return _SearchableCombo(Gtk, placeholder, width=width)
 
 
+def _reset_combo(combo, values: tuple[str, ...], *, include_blank: bool = False) -> None:
+    combo.remove_all()
+    if include_blank:
+        combo.append_text("")
+    for value in values:
+        combo.append_text(value)
+    combo.set_active(0)
+
+
 def _entry(Gtk, placeholder: str, *, width: int | None = None):
     entry = Gtk.Entry()
     entry.set_placeholder_text(placeholder)
