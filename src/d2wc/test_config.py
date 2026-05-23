@@ -67,6 +67,7 @@ class TestConfigActionResult:
     action: str
     path: Path | None = None
     backup_path: Path | None = None
+    backup_member: str | None = None
     message: str = ""
 
 
@@ -176,6 +177,7 @@ def add_event_geometry_to_test_config(
         action="add GEOM",
         path=result.config_path,
         backup_path=result.backup_path,
+        backup_member=result.backup_member,
         message=f"Added GEOM profile: {profile.name}",
     )
 
@@ -212,6 +214,7 @@ def add_event_placement_to_test_config(
         action="add WORKSPACE_PLACEMENT",
         path=result.config_path,
         backup_path=result.backup_path,
+        backup_member=result.backup_member,
         message=f"Added WORKSPACE_PLACEMENT rule: {preview.placement_rule}",
     )
 
@@ -289,7 +292,9 @@ def format_action_result(result: TestConfigActionResult | tuple[TestConfigAction
     if result.path is not None:
         lines.append(f"Target: {result.path}")
     if result.backup_path is not None:
-        lines.append(f"Backup: {result.backup_path}")
+        lines.append(f"Backup archive: {result.backup_path}")
+    if result.backup_member is not None:
+        lines.append(f"Backup member: {result.backup_member}")
     return "\n".join(lines)
 
 

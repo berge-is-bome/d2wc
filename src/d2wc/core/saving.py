@@ -8,14 +8,14 @@ flag.
 from __future__ import annotations
 
 import os
-import shutil
+import tarfile
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import BinaryIO, TextIO
 
-from d2wc.core.backup import build_backup_path
+from d2wc.core.backup import build_backup_paths
 from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.rendering import RenderValidationError, render_source
 from d2wc.core.validation import ValidationResult, validate_managed_blocks
@@ -39,6 +39,7 @@ class SavePreview:
 
     config_path: Path
     backup_path: Path
+    backup_member: str
     bytes_written: int
     validation: ValidationResult
 
@@ -49,6 +50,7 @@ class SaveResult:
 
     config_path: Path
     backup_path: Path
+    backup_member: str
     bytes_written: int
     validation: ValidationResult
 
@@ -102,11 +104,12 @@ def preview_source_save_config(
     if not source_validation.ok:
         raise SaveValidationError(source_validation)
 
-    backup_path = _next_available_path(build_backup_path(config_path, backup_dir=backup_dir, when=when))
+    backup_path, backup_member = build_backup_paths(config_path, backup_dir=backup_dir, when=when)
 
     return SavePreview(
         config_path=config_path,
         backup_path=backup_path,
+        backup_member=backup_member,
         bytes_written=len(rendered_source.encode("utf-8")),
         validation=source_validation,
     )
@@ -183,7 +186,7 @@ def save_source_config(
         if not staged_validation.ok:
             raise SaveValidationError(staged_validation)
 
-        backup_path = create_backup(config_path, backup_dir=backup_dir, when=when)
+        backup_path, backup_member = create_backup(config_path, backup_dir=backup_dir, when=when)
         os.replace(staged_path, config_path)
         staged_path = None
         _fsync_directory(config_path.parent)
@@ -195,33 +198,62 @@ def save_source_config(
     return SaveResult(
         config_path=config_path,
         backup_path=backup_path,
+        backup_member=backup_member,
         bytes_written=len(rendered_source.encode("utf-8")),
         validation=staged_validation,
     )
 
 
-def create_backup(config_path: Path, backup_dir: Path | None = None, when: datetime | None = None) -> Path:
-    """Create a non-overwriting timestamped backup and return its path.
-
-    The backup file is fsynced before this function returns, and the backup
-    directory is fsynced after the new backup name is created.
-    """
+def create_backup(config_path: Path, backup_dir: Path | None = None, when: datetime | None = None) -> tuple[Path, str]:
+    """Create or update a backup archive and return archive path and member name."""
 
     config_path = Path(config_path)
-    base_backup_path = build_backup_path(config_path, backup_dir=backup_dir, when=when)
-    backup_path = _next_available_path(base_backup_path)
-    _ensure_directory(backup_path.parent)
+    archive_path, backup_member = build_backup_paths(config_path, backup_dir=backup_dir, when=when)
+    _ensure_directory(archive_path.parent)
+    staged_archive_path: Path | None = None
 
     try:
-        with config_path.open("rb") as source_file, backup_path.open("xb") as backup_file:
-            shutil.copyfileobj(source_file, backup_file)
-            _fsync_file(backup_file)
+        fd, staged_name = tempfile.mkstemp(prefix=f".{archive_path.name}.", suffix=".tmp", dir=archive_path.parent)
+        os.close(fd)
+        staged_archive_path = Path(staged_name)
+        with tarfile.open(staged_archive_path, mode="w:gz") as new_tar:
+            existing_member_names: set[str] = set()
+            if archive_path.exists():
+                with tarfile.open(archive_path, mode="r:gz") as old_tar:
+                    for member in old_tar.getmembers():
+                        if not member.isfile():
+                            continue
+                        existing_member_names.add(member.name)
+                        member_stream = old_tar.extractfile(member)
+                        if member_stream is None:
+                            continue
+                        new_tar.addfile(member, member_stream)
+            backup_member = _next_available_backup_member_name(backup_member, existing_member_names)
+            tar_info = tarfile.TarInfo(name=backup_member)
+            tar_info.size = config_path.stat().st_size
+            with config_path.open("rb") as source_file:
+                new_tar.addfile(tar_info, source_file)
+        with staged_archive_path.open("rb") as staged_archive:
+            _fsync_file(staged_archive)
+        os.replace(staged_archive_path, archive_path)
+        staged_archive_path = None
     except Exception:
-        backup_path.unlink(missing_ok=True)
+        if staged_archive_path is not None:
+            staged_archive_path.unlink(missing_ok=True)
         raise
 
-    _fsync_directory(backup_path.parent)
-    return backup_path
+    _fsync_directory(archive_path.parent)
+    return archive_path, backup_member
+
+
+def _next_available_backup_member_name(member_name: str, existing_names: set[str]) -> str:
+    if member_name not in existing_names:
+        return member_name
+    for index in range(1, 1000):
+        candidate = f"{member_name}.{index}"
+        if candidate not in existing_names:
+            return candidate
+    raise SaveConfigError(f"could not find available backup member name for {member_name}")
 
 
 def _write_staged_file(config_path: Path, rendered_source: str) -> Path:
@@ -279,15 +311,3 @@ def _fsync_directory(directory: Path) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
-
-
-def _next_available_path(path: Path) -> Path:
-    if not path.exists():
-        return path
-
-    for index in range(1, 1000):
-        candidate = path.with_name(f"{path.name}.{index}")
-        if not candidate.exists():
-            return candidate
-
-    raise SaveConfigError(f"could not find available backup path for {path}")

@@ -137,7 +137,8 @@ def _run_left_edge_edit(
             return 2
 
         print(f"Config: {preview.config_path}")
-        print(f"Planned backup: {preview.backup_path}")
+        print(f"Planned backup archive: {preview.backup_path}")
+        print(f"Planned backup member: {preview.backup_member}")
         print(f"Planned LEFT_EDGE_CORRECTION {operation}: {rule_text}")
         if old_rule_text is not None:
             print(f"Old rule: {old_rule_text}")
@@ -161,6 +162,7 @@ def _run_left_edge_edit(
         return 2
 
     print(f"Config: {result.config_path}")
-    print(f"Backup: {result.backup_path}")
+    print(f"Backup archive: {result.backup_path}")
+    print(f"Backup member: {result.backup_member}")
     print(f"OK: LEFT_EDGE_CORRECTION rule {success_verb}: {rule_text}")
     return 0

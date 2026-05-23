@@ -119,7 +119,7 @@ Current GTK test-config features:
 5. Single `Apply` button next to `Close`.
 6. Display of the current managed-section contents below the editor.
 7. Automatic reload of displayed test-config sections after each successful edit.
-8. Action result text with success/error details and backup path.
+8. Action result text with success/error details and backup archive path and member name.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
