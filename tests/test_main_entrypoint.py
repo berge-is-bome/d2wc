@@ -109,17 +109,13 @@ local LEFT_EDGE_CORRECTION = {
         encoding="utf-8",
     )
 
-    def fake_default_test_config_path():
-        return test_config_path
-
     def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
         calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
         return 0
 
     monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
-    monkeypatch.setattr("d2wc.test_config.default_test_config_path", fake_default_test_config_path)
 
-    exit_code = __main__.main(["configure", "--test-config"])
+    exit_code = __main__.main(["configure", "--test-config", "--test-config-path", str(test_config_path)])
 
     assert exit_code == 0
     assert len(calls) == 1
