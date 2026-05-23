@@ -97,7 +97,7 @@ The GTK test-config workflow currently supports:
 4. `--test-config-path`
 5. Managed-section add, modify, and delete for all six sections.
 6. Section/action-aware fields.
-7. Visible action result text with backup paths.
+7. Visible action result text with backup archive path and member names.
 8. Automatic reload of displayed test-config sections after writes.
 
 See [Event-Data GTK UI Direction](event-data-ui-direction.md) for the full direction and Devilspie2 function references.
@@ -217,7 +217,7 @@ All six managed Lua sections now have the same core editing proof pattern:
 4. Preview by default.
 5. Write only when `--write` is supplied.
 6. Route writes through the safe-save helper.
-7. Create timestamped backups on successful writes.
+7. Create timestamped backup members stored in .bak.tgz archives on successful writes.
 8. Re-validate rendered output after edits.
 9. Leave the original config unchanged after failed edits.
 10. Preserve comments and blank lines where practical.

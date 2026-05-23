@@ -2,6 +2,7 @@ from pathlib import Path
 
 from d2wc.cli import main
 from d2wc.core.rendering import render_source
+from d2wc.core.backup import extract_backup_member_text, list_backup_members
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -70,11 +71,11 @@ def test_cli_save_without_write_previews_and_does_not_modify_config(tmp_path, ca
 
     assert exit_code == 0
     assert f"Config: {config_path}" in captured.out
-    assert "Planned backup:" in captured.out
+    assert "Planned backup archive:" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert "Run again with --write to save." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
     assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
 
 
@@ -94,13 +95,12 @@ def test_cli_save_preview_uses_explicit_backup_directory_without_creating_it(tmp
 
     captured = capsys.readouterr()
     output_lines = captured.out.splitlines()
-    planned_backup_lines = [line for line in output_lines if line.startswith("Planned backup: ")]
+    planned_backup_lines = [line for line in output_lines if line.startswith("Planned backup archive: ")]
 
     assert exit_code == 0
     assert len(planned_backup_lines) == 1
-    planned_backup = planned_backup_lines[0].removeprefix("Planned backup: ")
-    assert planned_backup.startswith(str(backup_dir / "d2wc.lua."))
-    assert planned_backup.endswith(".bak")
+    planned_backup = planned_backup_lines[0].removeprefix("Planned backup archive: ")
+    assert planned_backup == str(backup_dir / "d2wc.lua.bak.tgz")
     assert not backup_dir.exists()
 
 
@@ -114,8 +114,8 @@ def test_cli_save_write_saves_config_and_prints_backup_path(tmp_path, capsys) ->
     assert exit_code == 0
     assert f"Config: {config_path}" in captured.out
     assert "OK: config saved." in captured.out
-    assert "Backup:" in captured.out
-    assert list(tmp_path.glob("d2wc.lua.*.bak"))
+    assert "Backup archive:" in captured.out
+    assert list(tmp_path.glob("d2wc.lua.bak.tgz"))
 
 
 def test_cli_save_write_uses_explicit_backup_directory(tmp_path, capsys) -> None:
@@ -137,7 +137,7 @@ def test_cli_save_write_uses_explicit_backup_directory(tmp_path, capsys) -> None
 
     assert exit_code == 0
     assert "OK: config saved." in captured.out
-    assert list(backup_dir.glob("d2wc.lua.*.bak"))
+    assert list(backup_dir.glob("d2wc.lua.bak.tgz"))
 
 
 def test_cli_save_write_rejects_invalid_config_and_leaves_file_unchanged(tmp_path, capsys) -> None:
@@ -160,7 +160,7 @@ local LEFT_EDGE_CORRECTION = {}
     assert "cannot save invalid config" in captured.out
     assert "EXCLUDE: rule must include d: or c:: g:half_left" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_save_preview_rejects_invalid_config_and_leaves_file_unchanged(tmp_path, capsys) -> None:
@@ -183,7 +183,7 @@ local LEFT_EDGE_CORRECTION = {}
     assert "cannot preview invalid config" in captured.out
     assert "EXCLUDE: rule must include d: or c:: g:half_left" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_save_write_reports_save_failure_and_leaves_file_unchanged(tmp_path, capsys) -> None:
@@ -240,7 +240,7 @@ def test_cli_add_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
     assert "Geometry: x=10 y=20 w=300 h=400" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
     assert not list(tmp_path.glob(".d2wc.lua.*.tmp"))
 
 
@@ -269,14 +269,14 @@ def test_cli_add_geom_write_updates_config_and_creates_backup(tmp_path, capsys) 
 
     captured = capsys.readouterr()
     saved = config_path.read_text(encoding="utf-8")
-    backups = list(tmp_path.glob("d2wc.lua.*.bak"))
+    backups = list(tmp_path.glob("d2wc.lua.bak.tgz"))
 
     assert exit_code == 0
     assert "OK: GEOM profile added: custom_left" in captured.out
-    assert "Backup:" in captured.out
+    assert "Backup archive:" in captured.out
     assert "custom_left" in saved
     assert backups
-    assert backups[0].read_text(encoding="utf-8") == original
+    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_geom_rejects_duplicate(tmp_path, capsys) -> None:
@@ -308,7 +308,7 @@ def test_cli_add_geom_rejects_duplicate(tmp_path, capsys) -> None:
     assert "geometry profile already exists: half_left" in captured.out
     assert "Use modify-geom" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_modify_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
@@ -340,7 +340,7 @@ def test_cli_modify_geom_preview_does_not_modify_config(tmp_path, capsys) -> Non
     assert "Geometry: x=10 y=20 w=300 h=400" in captured.out
     assert "Preview only: no files were modified." in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_modify_geom_write_updates_existing_profile(tmp_path, capsys) -> None:
@@ -404,7 +404,7 @@ def test_cli_modify_geom_rejects_missing_profile(tmp_path, capsys) -> None:
     assert exit_code == 2
     assert "geometry profile not found: not_there" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_delete_geom_preview_does_not_modify_config(tmp_path, capsys) -> None:
@@ -498,7 +498,7 @@ local LEFT_EDGE_CORRECTION = {}
     assert "still used by WORKSPACE_PLACEMENT: half_left" in captured.out
     assert "Remove or change the WORKSPACE_PLACEMENT rule" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
 
 
 def test_cli_add_geom_rejects_invalid_profile(tmp_path, capsys) -> None:
@@ -528,4 +528,4 @@ def test_cli_add_geom_rejects_invalid_profile(tmp_path, capsys) -> None:
     assert exit_code == 2
     assert "width must be at least 10" in captured.out
     assert config_path.read_text(encoding="utf-8") == original
-    assert not list(tmp_path.glob("*.bak"))
+    assert not list(tmp_path.glob("*.bak*"))
