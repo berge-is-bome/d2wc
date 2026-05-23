@@ -5,10 +5,21 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
+from pathlib import Path
 
 from d2wc.cli import main as cli_main
-from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, get_event_fixture
+from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
+from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
+
+
+@dataclass(frozen=True)
+class ConfigureInput:
+    """Parsed read-only configurator input."""
+
+    event_data: WindowEventData
+    config_awareness: EventConfigAwareness | None = None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -26,13 +37,14 @@ def _run_configure(argv: Sequence[str]) -> int:
     try:
         if not argv:
             return run_configurator()
-        return run_configurator(_parse_event_data_args(argv))
+        configure_input = _parse_configure_args(argv)
+        return run_configurator(configure_input.event_data, configure_input.config_awareness)
     except GtkConfiguratorImportError as exc:
         print(f"ERROR: {exc}")
         return 2
 
 
-def _parse_event_data_args(argv: Sequence[str]):
+def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     parser = argparse.ArgumentParser(
         prog="d2wc configure",
         description="Open the read-only GTK event-data UI proof.",
@@ -42,6 +54,12 @@ def _parse_event_data_args(argv: Sequence[str]):
         choices=EVENT_FIXTURE_NAMES,
         default=DEFAULT_EVENT_FIXTURE,
         help="Representative Devilspie2 event-data fixture to display.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Optional d2wc.lua path to inspect read-only for existing matching rules.",
     )
     parser.add_argument("--domain", default=None, help="Event domain from _QUBES_VMNAME.")
     parser.add_argument("--application-name", default=None, help="Event application name.")
@@ -57,7 +75,7 @@ def _parse_event_data_args(argv: Sequence[str]):
     parser.add_argument("--window-height", type=float, default=None, help="Event window height.")
 
     args = parser.parse_args(list(argv))
-    return get_event_fixture(args.event_fixture).with_overrides(
+    event_data = get_event_fixture(args.event_fixture).with_overrides(
         domain=args.domain,
         application_name=args.application_name,
         window_name=args.window_name,
@@ -71,6 +89,24 @@ def _parse_event_data_args(argv: Sequence[str]):
         window_width=args.window_width,
         window_height=args.window_height,
     )
+
+    config_awareness = None
+    if args.config is not None:
+        config_awareness = _read_config_awareness(args.config, event_data)
+
+    return ConfigureInput(event_data=event_data, config_awareness=config_awareness)
+
+
+def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> EventConfigAwareness:
+    try:
+        source = config_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        return EventConfigAwareness(
+            status="error",
+            warnings=(f"Could not read config file read-only: {exc}",),
+        )
+
+    return build_event_config_awareness(source, build_event_rule_preview(event_data))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
+from d2wc.event_preview import (
+    EventConfigAwareness,
+    build_event_rule_preview,
+    format_event_config_awareness,
+    format_event_rule_preview,
+    proposal_clipboard_text,
+)
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -21,24 +28,29 @@ def _import_gtk():
 
     try:
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk
+        from gi.repository import Gtk, Gdk
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk
+    return Gtk, Gdk
 
 
-def run_configurator(event_data: WindowEventData | None = None) -> int:
+def run_configurator(
+    event_data: WindowEventData | None = None,
+    config_awareness: EventConfigAwareness | None = None,
+) -> int:
     """Open the read-only GTK configurator proof window."""
 
     event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
-    Gtk = _import_gtk()
+    preview = build_event_rule_preview(event)
+    clipboard_text = proposal_clipboard_text(preview, config_awareness)
+    Gtk, Gdk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(640, 460)
+    window.set_default_size(760, 520)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -53,16 +65,33 @@ def run_configurator(event_data: WindowEventData | None = None) -> int:
     message = Gtk.Label(
         label=(
             "Devilspie2 event-data UI proof.\n"
-            "The values below are read-only and no config files are read or written."
+            "The values, proposal, and config status below are read-only."
         )
     )
     message.set_xalign(0)
     message.set_line_wrap(True)
     outer.pack_start(message, False, False, 0)
 
-    outer.pack_start(_build_section_frame(Gtk, "Identity", format_event_identity(event)), False, False, 0)
-    outer.pack_start(_build_section_frame(Gtk, "Geometry", format_event_geometry(event)), False, False, 0)
-    outer.pack_start(
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_hexpand(True)
+    scroller.set_vexpand(True)
+    outer.pack_start(scroller, True, True, 0)
+
+    content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+    content.set_margin_end(8)
+    scroller.add(content)
+
+    content.pack_start(_build_section_frame(Gtk, "Identity", format_event_identity(event)), False, False, 0)
+    content.pack_start(_build_section_frame(Gtk, "Geometry", format_event_geometry(event)), False, False, 0)
+    content.pack_start(_build_section_frame(Gtk, "Read-only proposal", format_event_rule_preview(preview)), False, False, 0)
+    content.pack_start(
+        _build_section_frame(Gtk, "Existing config status", format_event_config_awareness(config_awareness)),
+        False,
+        False,
+        0,
+    )
+    content.pack_start(
         _build_section_frame(
             Gtk,
             "Configuration options",
@@ -74,9 +103,16 @@ def run_configurator(event_data: WindowEventData | None = None) -> int:
         0,
     )
 
+    button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    outer.pack_end(button_box, False, False, 0)
+
+    copy_button = Gtk.Button(label="Copy proposal")
+    copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
+    button_box.pack_start(copy_button, False, False, 0)
+
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
-    outer.pack_end(close_button, False, False, 0)
+    button_box.pack_end(close_button, False, False, 0)
 
     window.show_all()
     Gtk.main()
@@ -99,6 +135,12 @@ def _build_section_frame(Gtk, title: str, body: str):
     frame.add(label)
 
     return frame
+
+
+def _copy_text_to_clipboard(Gtk, Gdk, text: str) -> None:
+    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+    clipboard.set_text(text, -1)
+    clipboard.store()
 
 
 def format_event_identity(event: WindowEventData) -> str:
