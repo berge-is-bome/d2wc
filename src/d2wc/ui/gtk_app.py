@@ -1,4 +1,4 @@
-"""Minimal read-only GTK configurator proof for Devilspie2 event data."""
+"""GTK configurator proof for Devilspie2 event data and test config display."""
 
 from __future__ import annotations
 
@@ -10,6 +10,12 @@ from d2wc.event_preview import (
     format_event_config_awareness,
     format_event_rule_preview,
     proposal_clipboard_text,
+)
+from d2wc.test_config import (
+    TestConfigPrepareResult,
+    TestConfigSnapshot,
+    format_prepare_result,
+    format_test_config_status,
 )
 
 
@@ -41,8 +47,10 @@ def _import_gtk():
 def run_configurator(
     event_data: WindowEventData | None = None,
     config_awareness: EventConfigAwareness | None = None,
+    test_config_snapshot: TestConfigSnapshot | None = None,
+    prepare_result: TestConfigPrepareResult | None = None,
 ) -> int:
-    """Open the read-only GTK configurator proof window."""
+    """Open the GTK configurator proof window."""
 
     event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
     preview = build_event_rule_preview(event)
@@ -50,7 +58,7 @@ def run_configurator(
     Gtk, Gdk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(760, 520)
+    window.set_default_size(900, 620)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
@@ -64,8 +72,8 @@ def run_configurator(
 
     message = Gtk.Label(
         label=(
-            "Devilspie2 event-data UI proof.\n"
-            "The values, proposal, and config status below are read-only."
+            "Devilspie2 event-data and test-config UI proof.\n"
+            "The event values and managed-section display are safe UI development surfaces."
         )
     )
     message.set_xalign(0)
@@ -92,11 +100,24 @@ def run_configurator(
         0,
     )
     content.pack_start(
+        _build_section_frame(Gtk, "Test config status", format_test_config_status(test_config_snapshot)),
+        False,
+        False,
+        0,
+    )
+    content.pack_start(
+        _build_section_frame(Gtk, "Test config prepare result", format_prepare_result(prepare_result)),
+        False,
+        False,
+        0,
+    )
+    _pack_managed_sections(Gtk, content, test_config_snapshot)
+    content.pack_start(
         _build_section_frame(
             Gtk,
             "Configuration options",
-            "Rule creation is intentionally disabled in this proof.\n"
-            "Later stages can wire this event data into tested GEOM and WORKSPACE_PLACEMENT edits first.",
+            "This UI branch may prepare or replace only ~/.config/devilspie2/d2wc-test.lua.\n"
+            "The real user config remains out of scope for automatic writes.",
         ),
         False,
         False,
@@ -117,6 +138,34 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
+
+
+def _pack_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
+    if snapshot is None:
+        content.pack_start(
+            _build_section_frame(Gtk, "Managed sections", "No test config loaded. Use --test-config or --init-test-config."),
+            False,
+            False,
+            0,
+        )
+        return
+
+    if not snapshot.ok:
+        content.pack_start(
+            _build_section_frame(Gtk, "Managed sections", "Managed sections are unavailable until the test config is valid."),
+            False,
+            False,
+            0,
+        )
+        return
+
+    for section in snapshot.sections:
+        content.pack_start(
+            _build_section_frame(Gtk, section.name, section.display_text),
+            False,
+            False,
+            0,
+        )
 
 
 def _build_section_frame(Gtk, title: str, body: str):
