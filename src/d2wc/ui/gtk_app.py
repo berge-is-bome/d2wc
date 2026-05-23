@@ -9,7 +9,6 @@ from d2wc.event_preview import (
     build_event_rule_preview,
     format_event_config_awareness,
     format_event_rule_preview,
-    proposal_clipboard_text,
 )
 from d2wc.test_config import (
     TestConfigPrepareResult,
@@ -36,14 +35,14 @@ def _import_gtk():
 
     try:
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk, Gdk
+        from gi.repository import Gtk
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk
+    return Gtk
 
 
 def run_configurator(
@@ -56,8 +55,7 @@ def run_configurator(
 
     event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
     preview = build_event_rule_preview(event)
-    clipboard_text = proposal_clipboard_text(preview, config_awareness)
-    Gtk, Gdk = _import_gtk()
+    Gtk = _import_gtk()
 
     window = Gtk.Window(title="d2wc Configurator")
     window.set_default_size(900, 620)
@@ -152,10 +150,6 @@ def run_configurator(
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
-    copy_button = Gtk.Button(label="Copy proposal")
-    copy_button.connect("clicked", lambda _button: _copy_text_to_clipboard(Gtk, Gdk, clipboard_text))
-    button_box.pack_start(copy_button, False, False, 0)
-
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
     button_box.pack_end(close_button, False, False, 0)
@@ -245,12 +239,6 @@ def _build_text_label(Gtk, body: str):
     label.set_margin_start(8)
     label.set_margin_end(8)
     return label
-
-
-def _copy_text_to_clipboard(Gtk, Gdk, text: str) -> None:
-    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-    clipboard.set_text(text, -1)
-    clipboard.store()
 
 
 def format_event_identity(event: WindowEventData) -> str:
