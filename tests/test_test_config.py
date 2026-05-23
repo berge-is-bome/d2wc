@@ -191,4 +191,5 @@ def test_format_action_result(tmp_path) -> None:
     assert "Status: ok" in text
     assert "Added GEOM profile: event_example" in text
     assert f"Target: {path}" in text
-    assert "Backup:" in text
+    assert "Backup archive:" in text
+    assert "Backup member:" in text

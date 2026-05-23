@@ -217,15 +217,18 @@ def create_backup(config_path: Path, backup_dir: Path | None = None, when: datet
         os.close(fd)
         staged_archive_path = Path(staged_name)
         with tarfile.open(staged_archive_path, mode="w:gz") as new_tar:
+            existing_member_names: set[str] = set()
             if archive_path.exists():
                 with tarfile.open(archive_path, mode="r:gz") as old_tar:
                     for member in old_tar.getmembers():
                         if not member.isfile():
                             continue
+                        existing_member_names.add(member.name)
                         member_stream = old_tar.extractfile(member)
                         if member_stream is None:
                             continue
                         new_tar.addfile(member, member_stream)
+            backup_member = _next_available_backup_member_name(backup_member, existing_member_names)
             tar_info = tarfile.TarInfo(name=backup_member)
             tar_info.size = config_path.stat().st_size
             with config_path.open("rb") as source_file:
@@ -241,6 +244,16 @@ def create_backup(config_path: Path, backup_dir: Path | None = None, when: datet
 
     _fsync_directory(archive_path.parent)
     return archive_path, backup_member
+
+
+def _next_available_backup_member_name(member_name: str, existing_names: set[str]) -> str:
+    if member_name not in existing_names:
+        return member_name
+    for index in range(1, 1000):
+        candidate = f"{member_name}.{index}"
+        if candidate not in existing_names:
+            return candidate
+    raise SaveConfigError(f"could not find available backup member name for {member_name}")
 
 
 def _write_staged_file(config_path: Path, rendered_source: str) -> Path:
@@ -298,4 +311,3 @@ def _fsync_directory(directory: Path) -> None:
         os.fsync(fd)
     finally:
         os.close(fd)
-

@@ -60,7 +60,8 @@ def test_cli_add_left_edge_write_updates_config_and_creates_backup(tmp_path, cap
     assert "Backup archive:" in captured.out
     assert f'"{TEST_LEFT_EDGE_RULE}",' in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_left_edge_rejects_duplicate_target(tmp_path, capsys) -> None:

@@ -133,6 +133,25 @@ def test_create_backup_does_not_overwrite_existing_backup(tmp_path: Path) -> Non
     assert list_backup_members(backup_path) == [first_member, backup_member]
 
 
+def test_create_backup_uses_suffix_for_duplicate_member_name(tmp_path: Path) -> None:
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text("current", encoding="utf-8")
+
+    first_path, first_member = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+    second_path, second_member = create_backup(
+        config_path,
+        when=datetime(2026, 5, 20, 15, 30, 0),
+    )
+
+    assert first_path == second_path
+    assert first_member == "d2wc.lua.2026-05-20-153000.bak"
+    assert second_member == "d2wc.lua.2026-05-20-153000.bak.1"
+    assert list_backup_members(first_path) == [first_member, second_member]
+
+
 def test_create_backup_fsyncs_backup_file_and_directory(tmp_path: Path, monkeypatch) -> None:
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text("original", encoding="utf-8")

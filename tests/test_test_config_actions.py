@@ -48,6 +48,7 @@ def test_add_modify_and_delete_exclude(tmp_path) -> None:
     )
 
     assert add_result.ok
+    assert add_result.backup_member is not None
     assert modify_result.ok
     assert delete_result.ok
     snapshot = load_test_config_snapshot(path)

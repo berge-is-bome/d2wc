@@ -63,7 +63,8 @@ def test_cli_add_pin_write_updates_config_and_creates_backup(tmp_path, capsys) -
     assert "Backup archive:" in captured.out
     assert f'"{TEST_PIN_RULE}",' in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_pin_rejects_duplicate(tmp_path, capsys) -> None:
@@ -192,7 +193,8 @@ def test_cli_add_exclude_write_updates_config_and_creates_backup(tmp_path, capsy
     assert "Backup archive:" in captured.out
     assert f'"{TEST_EXCLUDE_RULE}",' in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_modify_exclude_preview_reports_old_rule(tmp_path, capsys) -> None:

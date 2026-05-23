@@ -108,6 +108,7 @@ def apply_managed_section_action(config_path: Path, request: ManagedSectionActio
         action=action,
         path=result.config_path,
         backup_path=result.backup_path,
+        backup_member=result.backup_member,
         message=_success_message(request),
     )
 

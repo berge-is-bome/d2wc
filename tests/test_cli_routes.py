@@ -74,7 +74,8 @@ def test_cli_add_route_write_updates_config_and_creates_backup(tmp_path, capsys)
     assert "OK: WORKSPACE_ROUTES rule added: workspace=3 rule=d:test c:krusader" in captured.out
     assert '[3] = { "d:test c:krusader", },' in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_route_rejects_duplicate_target(tmp_path, capsys) -> None:

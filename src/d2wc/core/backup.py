@@ -32,7 +32,16 @@ def list_backup_members(archive_path: Path) -> list[str]:
     """List archived backup member names in the archive order."""
 
     with tarfile.open(archive_path, mode="r:gz") as tar:
-        return [member.name for member in tar.getmembers() if member.isfile()]
+        members: list[str] = []
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+            try:
+                _validate_member_name(member.name)
+            except ValueError:
+                continue
+            members.append(member.name)
+        return members
 
 
 def extract_backup_member_bytes(archive_path: Path, member_name: str) -> bytes:

@@ -276,7 +276,8 @@ def test_cli_add_geom_write_updates_config_and_creates_backup(tmp_path, capsys) 
     assert "Backup archive:" in captured.out
     assert "custom_left" in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_geom_rejects_duplicate(tmp_path, capsys) -> None:

@@ -63,7 +63,8 @@ def test_cli_add_placement_write_updates_config_and_creates_backup(tmp_path, cap
     assert "Backup archive:" in captured.out
     assert '"d:personal c:testapp g:centered_mid",' in saved
     assert backups
-    members = list_backup_members(backups[0]); assert extract_backup_member_text(backups[0], members[-1]) == original
+    members = list_backup_members(backups[0])
+    assert extract_backup_member_text(backups[0], members[-1]) == original
 
 
 def test_cli_add_placement_rejects_duplicate_target(tmp_path, capsys) -> None:
