@@ -8,7 +8,6 @@ from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 
 UI_FONT_POINT_INCREASE = 2
-DEFAULT_UI_FONT_SIZE_PT = 10
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -101,14 +100,16 @@ def _apply_ui_font_point_increase(Gtk, Gdk, Pango, point_increase: int) -> None:
     """Increase the GTK theme font size for this application window."""
 
     settings = Gtk.Settings.get_default()
-    font_size_pt = DEFAULT_UI_FONT_SIZE_PT
-    if settings is not None:
-        font_name = settings.get_property("gtk-font-name") or ""
-        font_description = Pango.FontDescription(font_name)
-        theme_font_size = font_description.get_size()
-        if theme_font_size > 0:
-            font_size_pt = int(round(theme_font_size / Pango.SCALE))
+    if settings is None:
+        return
 
+    font_name = settings.get_property("gtk-font-name") or ""
+    font_description = Pango.FontDescription(font_name)
+    theme_font_size = font_description.get_size()
+    if theme_font_size <= 0:
+        return
+
+    font_size_pt = int(round(theme_font_size / Pango.SCALE))
     provider = Gtk.CssProvider()
     provider.load_from_data(f"* {{ font-size: {font_size_pt + point_increase}pt; }}".encode("utf-8"))
     screen = Gdk.Screen.get_default()
