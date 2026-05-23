@@ -22,6 +22,7 @@ from d2wc.test_config import (
     format_test_config_status,
     load_test_config_snapshot,
 )
+from d2wc.ui.managed_actions import build_managed_section_form
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -118,6 +119,21 @@ def run_configurator(
     content.pack_start(managed_sections_box, False, False, 0)
     _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
 
+    action_label = _build_text_label(Gtk, format_action_result(None))
+    content.pack_start(
+        build_managed_section_form(
+            Gtk,
+            test_config_snapshot,
+            action_label,
+            test_config_status_label,
+            managed_sections_box,
+            _replace_managed_sections,
+        ),
+        False,
+        False,
+        0,
+    )
+
     content.pack_start(
         _build_section_frame(
             Gtk,
@@ -130,7 +146,6 @@ def run_configurator(
         0,
     )
 
-    action_label = _build_text_label(Gtk, format_action_result(None))
     outer.pack_start(
         _wrap_label_in_frame(Gtk, "Last test-config action", action_label),
         False,
