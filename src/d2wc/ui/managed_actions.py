@@ -146,6 +146,8 @@ def _run_editor_action(
     refreshed_snapshot = load_test_config_snapshot(snapshot.path)
     state["snapshot"] = refreshed_snapshot
     refresh_sections(Gtk, sections_box, refreshed_snapshot)
+    if result.ok:
+        _clear_action_fields(controls)
     _refresh_dynamic_choices(refreshed_snapshot, controls)
 
 
@@ -175,6 +177,17 @@ def _request_from_controls(controls: _EditorControls) -> ManagedSectionActionReq
         w=_optional_int(controls.w_entry.get_text()),
         h=_optional_int(controls.h_entry.get_text()),
     )
+
+
+def _clear_action_fields(controls: _EditorControls) -> None:
+    controls.existing_combo.set_active(0)
+    controls.target_entry.set_text("")
+    controls.profile_filter_entry.set_text("")
+    controls.profile_combo.set_active(0)
+    controls.new_profile_entry.set_text("")
+    controls.workspace_entry.set_text("")
+    for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
+        entry.set_text("")
 
 
 def _refresh_dynamic_choices(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
