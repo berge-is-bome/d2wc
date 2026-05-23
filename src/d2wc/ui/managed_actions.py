@@ -5,11 +5,9 @@ from __future__ import annotations
 from d2wc.test_config import TestConfigSnapshot, format_action_result, format_test_config_status, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 
-EDITOR_OPERATIONS = ("add", "modify", "delete")
-
 
 def build_managed_section_form(Gtk, snapshot: TestConfigSnapshot | None, action_label, status_label, sections_box, refresh_sections):
-    """Build a managed-section editor for the dedicated test config."""
+    """Build the main managed-section editor for the dedicated test config."""
 
     frame = Gtk.Frame(label="Managed section editor")
     frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
@@ -24,7 +22,6 @@ def build_managed_section_form(Gtk, snapshot: TestConfigSnapshot | None, action_
     frame.add(grid)
 
     section_combo = _combo_box(Gtk, MANAGED_ACTION_SECTIONS)
-    operation_combo = _combo_box(Gtk, EDITOR_OPERATIONS)
     existing_combo = Gtk.ComboBoxText()
     target_entry = _entry(Gtk, "Target entry, e.g. d:work c:example")
     profile_filter_entry = _entry(Gtk, "Filter profiles")
@@ -37,29 +34,30 @@ def build_managed_section_form(Gtk, snapshot: TestConfigSnapshot | None, action_
     h_entry = _entry(Gtk, "h", width=6)
 
     _grid_attach_labeled(Gtk, grid, 0, "Section", section_combo)
-    _grid_attach_labeled(Gtk, grid, 1, "Operation", operation_combo)
-    _grid_attach_labeled(Gtk, grid, 2, "Existing entry", existing_combo)
-    _grid_attach_labeled(Gtk, grid, 3, "Target entry", target_entry)
-    _grid_attach_labeled(Gtk, grid, 4, "Profile filter", profile_filter_entry)
-    _grid_attach_labeled(Gtk, grid, 5, "Existing profile", profile_combo)
-    _grid_attach_labeled(Gtk, grid, 6, "New profile", new_profile_entry)
-    _grid_attach_labeled(Gtk, grid, 7, "Workspace", workspace_entry)
-    _grid_attach_labeled(Gtk, grid, 8, "Geometry", _geometry_box(Gtk, x_entry, y_entry, w_entry, h_entry))
+    _grid_attach_labeled(Gtk, grid, 1, "Existing entry", existing_combo)
+    _grid_attach_labeled(Gtk, grid, 2, "Target entry", target_entry)
+    _grid_attach_labeled(Gtk, grid, 3, "Profile filter", profile_filter_entry)
+    _grid_attach_labeled(Gtk, grid, 4, "Existing profile", profile_combo)
+    _grid_attach_labeled(Gtk, grid, 5, "New profile", new_profile_entry)
+    _grid_attach_labeled(Gtk, grid, 6, "Workspace", workspace_entry)
+    _grid_attach_labeled(Gtk, grid, 7, "Geometry", _geometry_box(Gtk, x_entry, y_entry, w_entry, h_entry))
 
     hint = Gtk.Label(
         label=(
-            "Target entry is the d2wc target text for EXCLUDE, PIN, WORKSPACE_ROUTES, "
-            "WORKSPACE_PLACEMENT, and LEFT_EDGE_CORRECTION.\n"
-            "Use Existing entry for modify/delete. Use Existing profile or New profile for GEOM."
+            "Save adds a new entry when Existing entry is blank, and modifies the selected entry when Existing entry is set.\n"
+            "Delete removes the selected Existing entry. Only fields relevant to the selected section are editable."
         )
     )
     hint.set_xalign(0)
     hint.set_line_wrap(True)
-    grid.attach(hint, 0, 9, 2, 1)
+    grid.attach(hint, 0, 8, 2, 1)
+
+    action_label.set_xalign(0)
+    action_label.set_line_wrap(True)
+    grid.attach(action_label, 0, 9, 2, 1)
 
     controls = _EditorControls(
         section_combo=section_combo,
-        operation_combo=operation_combo,
         existing_combo=existing_combo,
         target_entry=target_entry,
         profile_filter_entry=profile_filter_entry,
@@ -74,13 +72,12 @@ def build_managed_section_form(Gtk, snapshot: TestConfigSnapshot | None, action_
 
     _refresh_dynamic_choices(Gtk, snapshot, controls)
     section_combo.connect("changed", lambda _combo: _refresh_dynamic_choices(Gtk, snapshot, controls))
-    operation_combo.connect("changed", lambda _combo: _refresh_dynamic_choices(Gtk, snapshot, controls))
     profile_filter_entry.connect("changed", lambda _entry: _refresh_profile_choices(snapshot, controls))
     existing_combo.connect("changed", lambda _combo: _populate_fields_from_existing(snapshot, controls))
     profile_combo.connect("changed", lambda _combo: _populate_geom_fields_from_profile(snapshot, controls))
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-    save_button = Gtk.Button(label="Save selected operation")
+    save_button = Gtk.Button(label="Save")
     add_button = Gtk.Button(label="Add")
     modify_button = Gtk.Button(label="Modify")
     delete_button = Gtk.Button(label="Delete")
@@ -122,7 +119,6 @@ class _EditorControls:
         self,
         *,
         section_combo,
-        operation_combo,
         existing_combo,
         target_entry,
         profile_filter_entry,
@@ -135,7 +131,6 @@ class _EditorControls:
         h_entry,
     ) -> None:
         self.section_combo = section_combo
-        self.operation_combo = operation_combo
         self.existing_combo = existing_combo
         self.target_entry = target_entry
         self.profile_filter_entry = profile_filter_entry
@@ -179,11 +174,11 @@ def _run_editor_action(
 
 def _request_from_controls(controls: _EditorControls, *, forced_operation: str | None = None) -> ManagedSectionActionRequest:
     section = controls.section_combo.get_active_text() or ""
-    operation = forced_operation or controls.operation_combo.get_active_text() or ""
     existing_entry = controls.existing_combo.get_active_text() or ""
     selected_profile = controls.profile_combo.get_active_text() or ""
     profile_name = controls.new_profile_entry.get_text().strip() or selected_profile
     target_entry = controls.target_entry.get_text().strip()
+    operation = forced_operation or ("modify" if existing_entry else "add")
 
     if section == "WORKSPACE_PLACEMENT" and target_entry and " g:" not in f" {target_entry}":
         if profile_name:
@@ -207,15 +202,38 @@ def _request_from_controls(controls: _EditorControls, *, forced_operation: str |
 
 def _refresh_dynamic_choices(Gtk, snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
     section = controls.section_combo.get_active_text() or ""
-    operation = controls.operation_combo.get_active_text() or ""
     entries = _entries_for_section(snapshot, section)
-    _reset_combo(controls.existing_combo, entries)
+    _reset_combo(controls.existing_combo, entries, include_blank=True)
     _refresh_profile_choices(snapshot, controls)
-    controls.existing_combo.set_sensitive(operation in {"modify", "delete"} and bool(entries))
-    controls.profile_filter_entry.set_sensitive(section in {"GEOM", "WORKSPACE_PLACEMENT"})
-    controls.profile_combo.set_sensitive(section in {"GEOM", "WORKSPACE_PLACEMENT"})
-    controls.new_profile_entry.set_sensitive(section in {"GEOM", "WORKSPACE_PLACEMENT"})
+    _set_field_sensitivity(section, controls)
     _populate_fields_from_existing(snapshot, controls)
+
+
+def _set_field_sensitivity(section: str, controls: _EditorControls) -> None:
+    is_rule_section = section in {"EXCLUDE", "PIN", "WORKSPACE_ROUTES", "WORKSPACE_PLACEMENT", "LEFT_EDGE_CORRECTION"}
+    is_geom = section == "GEOM"
+    needs_workspace = section == "WORKSPACE_ROUTES"
+    needs_profile = section in {"GEOM", "WORKSPACE_PLACEMENT"}
+    needs_geometry = section == "GEOM"
+
+    controls.target_entry.set_sensitive(is_rule_section)
+    controls.workspace_entry.set_sensitive(needs_workspace)
+    controls.profile_filter_entry.set_sensitive(needs_profile)
+    controls.profile_combo.set_sensitive(needs_profile)
+    controls.new_profile_entry.set_sensitive(needs_profile)
+    for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
+        entry.set_sensitive(needs_geometry)
+
+    if not is_rule_section:
+        controls.target_entry.set_text("")
+    if not needs_workspace:
+        controls.workspace_entry.set_text("")
+    if not needs_profile:
+        controls.profile_filter_entry.set_text("")
+        controls.new_profile_entry.set_text("")
+    if not is_geom:
+        for entry in (controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
+            entry.set_text("")
 
 
 def _entries_for_section(snapshot: TestConfigSnapshot | None, section: str) -> tuple[str, ...]:
@@ -242,7 +260,7 @@ def _refresh_profile_choices(snapshot: TestConfigSnapshot | None, controls: _Edi
     filter_text = controls.profile_filter_entry.get_text().strip().lower()
     if filter_text:
         profiles = tuple(profile for profile in profiles if filter_text in profile.lower())
-    _reset_combo(controls.profile_combo, profiles)
+    _reset_combo(controls.profile_combo, profiles, include_blank=True)
 
 
 def _profile_names(snapshot: TestConfigSnapshot | None) -> tuple[str, ...]:
@@ -254,22 +272,21 @@ def _profile_names(snapshot: TestConfigSnapshot | None) -> tuple[str, ...]:
 def _populate_fields_from_existing(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
     section = controls.section_combo.get_active_text() or ""
     existing = controls.existing_combo.get_active_text() or ""
-    operation = controls.operation_combo.get_active_text() or ""
-    if operation not in {"modify", "delete"} or not existing:
+    if not existing:
         return
     if section == "GEOM":
         controls.new_profile_entry.set_text(existing)
-        _populate_geom_fields_from_profile(snapshot, controls)
+        _populate_geom_fields_from_profile(snapshot, controls, profile_name=existing)
         return
     controls.target_entry.set_text(existing)
 
 
-def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
+def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls, *, profile_name: str | None = None) -> None:
     if snapshot is None or snapshot.config is None:
         return
-    profile_name = controls.profile_combo.get_active_text() or controls.existing_combo.get_active_text() or ""
+    active_profile = profile_name or controls.profile_combo.get_active_text() or controls.existing_combo.get_active_text() or ""
     for profile in snapshot.config.geom:
-        if profile.name == profile_name:
+        if profile.name == active_profile:
             controls.new_profile_entry.set_text(profile.name)
             controls.x_entry.set_text(str(profile.x))
             controls.y_entry.set_text(str(profile.y))
@@ -283,20 +300,23 @@ def _combo_box(Gtk, values: tuple[str, ...]):
     for value in values:
         combo.append_text(value)
     combo.set_active(0)
+    combo.set_hexpand(True)
     return combo
 
 
-def _reset_combo(combo, values: tuple[str, ...]) -> None:
+def _reset_combo(combo, values: tuple[str, ...], *, include_blank: bool = False) -> None:
     combo.remove_all()
+    if include_blank:
+        combo.append_text("")
     for value in values:
         combo.append_text(value)
-    if values:
-        combo.set_active(0)
+    combo.set_active(0)
 
 
 def _entry(Gtk, placeholder: str, *, width: int | None = None):
     entry = Gtk.Entry()
     entry.set_placeholder_text(placeholder)
+    entry.set_hexpand(True)
     if width is not None:
         entry.set_width_chars(width)
     return entry
@@ -311,8 +331,9 @@ def _grid_attach_labeled(Gtk, grid, row: int, label_text: str, widget) -> None:
 
 def _geometry_box(Gtk, x_entry, y_entry, w_entry, h_entry):
     box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+    box.set_hexpand(True)
     for entry in (x_entry, y_entry, w_entry, h_entry):
-        box.pack_start(entry, False, False, 0)
+        box.pack_start(entry, True, True, 0)
     return box
 
 
