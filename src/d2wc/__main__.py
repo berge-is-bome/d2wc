@@ -11,15 +11,23 @@ from pathlib import Path
 from d2wc.cli import main as cli_main
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
 from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
+from d2wc.test_config import (
+    TestConfigPrepareResult,
+    TestConfigSnapshot,
+    load_test_config_snapshot,
+    prepare_test_config,
+)
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
 
 
 @dataclass(frozen=True)
 class ConfigureInput:
-    """Parsed read-only configurator input."""
+    """Parsed configurator input."""
 
     event_data: WindowEventData
     config_awareness: EventConfigAwareness | None = None
+    test_config_snapshot: TestConfigSnapshot | None = None
+    prepare_result: TestConfigPrepareResult | None = None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -38,7 +46,12 @@ def _run_configure(argv: Sequence[str]) -> int:
         if not argv:
             return run_configurator()
         configure_input = _parse_configure_args(argv)
-        return run_configurator(configure_input.event_data, configure_input.config_awareness)
+        return run_configurator(
+            configure_input.event_data,
+            configure_input.config_awareness,
+            configure_input.test_config_snapshot,
+            configure_input.prepare_result,
+        )
     except GtkConfiguratorImportError as exc:
         print(f"ERROR: {exc}")
         return 2
@@ -47,7 +60,7 @@ def _run_configure(argv: Sequence[str]) -> int:
 def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     parser = argparse.ArgumentParser(
         prog="d2wc configure",
-        description="Open the read-only GTK event-data UI proof.",
+        description="Open the GTK event-data and test-config UI proof.",
     )
     parser.add_argument(
         "--event-fixture",
@@ -60,6 +73,27 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         type=Path,
         default=None,
         help="Optional d2wc.lua path to inspect read-only for existing matching rules.",
+    )
+    parser.add_argument(
+        "--test-config",
+        action="store_true",
+        help="Load the dedicated ~/.config/devilspie2/d2wc-test.lua file for UI testing.",
+    )
+    parser.add_argument(
+        "--test-config-path",
+        type=Path,
+        default=None,
+        help="Optional override for the UI test config path, mainly for tests and manual experiments.",
+    )
+    parser.add_argument(
+        "--init-test-config",
+        action="store_true",
+        help="Create ~/.config/devilspie2/d2wc-test.lua from the bundled src/d2wc.lua if missing.",
+    )
+    parser.add_argument(
+        "--replace-test-config",
+        action="store_true",
+        help="Replace ~/.config/devilspie2/d2wc-test.lua from the bundled src/d2wc.lua.",
     )
     parser.add_argument("--domain", default=None, help="Event domain from _QUBES_VMNAME.")
     parser.add_argument("--application-name", default=None, help="Event application name.")
@@ -90,11 +124,29 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         window_height=args.window_height,
     )
 
+    prepare_result = None
+    if args.init_test_config or args.replace_test_config:
+        prepare_result = prepare_test_config(
+            target_path=args.test_config_path,
+            replace=args.replace_test_config,
+        )
+
+    test_config_snapshot = None
+    if args.test_config or args.init_test_config or args.replace_test_config:
+        test_config_snapshot = load_test_config_snapshot(args.test_config_path)
+
     config_awareness = None
     if args.config is not None:
         config_awareness = _read_config_awareness(args.config, event_data)
+    elif test_config_snapshot is not None and test_config_snapshot.path.exists():
+        config_awareness = _read_config_awareness(test_config_snapshot.path, event_data)
 
-    return ConfigureInput(event_data=event_data, config_awareness=config_awareness)
+    return ConfigureInput(
+        event_data=event_data,
+        config_awareness=config_awareness,
+        test_config_snapshot=test_config_snapshot,
+        prepare_result=prepare_result,
+    )
 
 
 def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> EventConfigAwareness:
