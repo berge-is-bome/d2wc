@@ -1,0 +1,90 @@
+# Backup Archives
+
+## Purpose
+
+`d2wc` creates backups before guarded writes replace a Lua config file.
+
+The active Lua file is not compressed and is not moved into an archive. Only backup snapshots are stored in the backup archive.
+
+## Archive location
+
+For a config file named:
+
+```text
+~/.config/devilspie2/d2wc.lua
+```
+
+`d2wc` stores backup snapshots in:
+
+```text
+~/.config/devilspie2/d2wc.lua.bak.tgz
+```
+
+For the GTK test config:
+
+```text
+~/.config/devilspie2/d2wc-test.lua
+```
+
+`d2wc` stores backup snapshots in:
+
+```text
+~/.config/devilspie2/d2wc-test.lua.bak.tgz
+```
+
+If `--backup-dir` is supplied, the archive is created in that directory and keeps the same filename pattern:
+
+```text
+<backup-dir>/<config-filename>.bak.tgz
+```
+
+## Archive members
+
+Each successful write adds a timestamped backup member to the archive.
+
+Example members:
+
+```text
+d2wc.lua.2026-05-20-153000.bak
+d2wc.lua.2026-05-20-153001.bak
+d2wc.lua.2026-05-20-153002.bak
+```
+
+If more than one backup is created during the same second, `d2wc` keeps member names unique by adding a suffix:
+
+```text
+d2wc.lua.2026-05-20-153000.bak
+d2wc.lua.2026-05-20-153000.bak.1
+```
+
+## Save order
+
+The safe-save path keeps the existing conservative order:
+
+1. Validate the supplied rendered source in memory.
+2. Write the replacement config to a temporary file in the target directory.
+3. Sync the temporary file.
+4. Validate the staged temporary file.
+5. Create or update the backup archive.
+6. Sync the backup archive and archive directory.
+7. Atomically replace the target config with the staged file.
+8. Sync the target directory.
+
+If backup archive creation fails, `d2wc` leaves the active config unchanged.
+
+## Archive update behavior
+
+A new backup is added by building a temporary archive in the same directory, copying existing regular-file members into it, adding the new timestamped backup member, syncing the temporary archive, and atomically replacing the previous archive.
+
+This keeps the archive transportable while preserving the safe-save model.
+
+## Current scope
+
+Current behavior is intentionally limited:
+
+1. Backup archives are created only as part of guarded writes.
+2. The GTK UI still writes only to `~/.config/devilspie2/d2wc-test.lua`.
+3. Real-config GTK writes remain out of scope.
+4. Backup retention is not implemented yet.
+5. Diff-based backups are not implemented.
+6. User-facing restore commands and GTK restore UI are not implemented yet.
