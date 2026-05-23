@@ -57,14 +57,6 @@ def run_configurator(
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
 
-    title = Gtk.Label()
-    title.set_markup("<b>d2wc Configurator</b>")
-    title.set_xalign(0)
-    outer.pack_start(title, False, False, 0)
-
-    status_label = _build_text_label(Gtk, _mode_message(test_config_snapshot, prepare_result))
-    outer.pack_start(status_label, False, False, 0)
-
     scroller = Gtk.ScrolledWindow()
     scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
     scroller.set_hexpand(True)
@@ -77,6 +69,7 @@ def run_configurator(
 
     managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     action_label = _build_text_label(Gtk, format_action_result(None))
+    status_label = _build_text_label(Gtk, _mode_message(test_config_snapshot, prepare_result))
 
     content.pack_start(
         build_managed_section_form(
@@ -91,6 +84,7 @@ def run_configurator(
         False,
         0,
     )
+    content.pack_start(status_label, False, False, 0)
 
     content.pack_start(managed_sections_box, False, False, 0)
     _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
