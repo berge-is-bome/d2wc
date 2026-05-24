@@ -7,6 +7,7 @@ from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fi
 from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 
+CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
 UI_FONT_POINT_INCREASE = 2
 
 
@@ -26,14 +27,14 @@ def _import_gtk():
     try:
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gdk, Gtk, Pango
+        from gi.repository import Gdk, GLib, Gtk, Pango
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk, Pango
+    return Gtk, Gdk, GLib, Pango
 
 
 def run_configurator(
@@ -45,10 +46,12 @@ def run_configurator(
     """Open the GTK configurator proof window."""
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
-    Gtk, Gdk, Pango = _import_gtk()
+    Gtk, Gdk, GLib, Pango = _import_gtk()
+    _set_configurator_window_class(Gdk, GLib)
     _apply_ui_font_point_increase(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
 
     window = Gtk.Window(title="d2wc Configurator")
+    window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
     window.set_default_size(1280, 720)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
@@ -90,6 +93,13 @@ def run_configurator(
     window.show_all()
     Gtk.main()
     return 0
+
+
+def _set_configurator_window_class(Gdk, GLib) -> None:
+    """Publish a stable X11/WM class for Devilspie2 matching."""
+
+    GLib.set_prgname(CONFIGURATOR_WINDOW_CLASS)
+    Gdk.set_program_class(CONFIGURATOR_WINDOW_CLASS)
 
 
 def _apply_ui_font_point_increase(Gtk, Gdk, Pango, point_increase: int) -> None:
