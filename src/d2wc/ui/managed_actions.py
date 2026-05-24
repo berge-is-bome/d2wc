@@ -14,6 +14,23 @@ from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActi
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
 FALLBACK_WORKSPACES = ("1", "2", "3", "4")
+ROW_CSS = """
+.d2wc-row-add {
+  background-color: #5b2bd6;
+  border-radius: 8px;
+  padding: 6px;
+}
+.d2wc-row-modify {
+  background-color: #16865a;
+  border-radius: 8px;
+  padding: 6px;
+}
+.d2wc-row-delete {
+  background-color: #b3264a;
+  border-radius: 8px;
+  padding: 6px;
+}
+"""
 SECTION_LABELS = {
     "EXCLUDE": "Exclude",
     "PIN": "Pin",
@@ -31,14 +48,59 @@ SECTION_COLUMNS = {
     "WORKSPACE_PLACEMENT": ("Action", "Machine", "Application", "Geometry profile"),
     "LEFT_EDGE_CORRECTION": ("Action", "Machine", "Application", "Left edge"),
 }
+WORKFLOW_HELP = {
+    "EXCLUDE": (
+        "Exclude\n\n"
+        "Use this workflow for windows that d2wc should ignore completely. "
+        "Excluded windows skip workspace routing, pinning, geometry, and left-edge correction.\n\n"
+        "A machine-only rule affects every application from that machine. "
+        "An application-only rule affects that application on every machine. "
+        "Using both narrows the match to that application on that machine."
+    ),
+    "PIN": (
+        "Pin\n\n"
+        "Use this workflow for windows that should appear on all workspaces. "
+        "Pinned windows are made sticky by Devilspie2.\n\n"
+        "This is useful for small utility windows, monitors, or panels that should stay visible "
+        "while you move between workspaces."
+    ),
+    "WORKSPACE_ROUTES": (
+        "Workspace routes\n\n"
+        "Use this workflow to send matching windows to a workspace. "
+        "The workspace list is read from X11 when possible, with a fallback of 1 through 4.\n\n"
+        "A route can be broad, such as all windows from a machine, or narrow, such as one "
+        "application on one machine."
+    ),
+    "GEOM": (
+        "Window geometry\n\n"
+        "Use this workflow to create or edit named geometry profiles. "
+        "A profile stores x, y, width, and height values.\n\n"
+        "Geometry profiles do not target windows by themselves. They become active when a "
+        "workspace placement rule selects the profile."
+    ),
+    "WORKSPACE_PLACEMENT": (
+        "Workspace placement\n\n"
+        "Use this workflow to assign a window or group of windows to a named geometry profile. "
+        "This is where machine, application, and geometry profile come together.\n\n"
+        "If the Machine field shows All, the rule has no machine/domain part and applies to "
+        "the selected application across all machines."
+    ),
+    "LEFT_EDGE_CORRECTION": (
+        "Left edge correction\n\n"
+        "Use this workflow for windows that do not land exactly on the left edge after "
+        "Devilspie2 applies geometry.\n\n"
+        "This is a correction layer for edge alignment problems, not a general geometry profile."
+    ),
+}
 
 
 @dataclass(frozen=True)
 class ManagedSectionEditor:
-    """Managed-section editor widget plus the Apply callback."""
+    """Managed-section editor widget plus callbacks used by the GTK shell."""
 
     widget: object
     apply: Callable[[], None]
+    show_help: Callable[[], None]
 
 
 @dataclass(frozen=True)
@@ -232,15 +294,12 @@ def build_managed_section_editor(
 ) -> ManagedSectionEditor:
     """Build the section-focused managed editor for the dedicated test config."""
 
-    frame = Gtk.Frame(label="Managed section editor")
-    frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
-
     main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
     main_box.set_margin_top(8)
     main_box.set_margin_bottom(8)
     main_box.set_margin_start(8)
     main_box.set_margin_end(8)
-    frame.add(main_box)
+    _install_row_css(Gtk, main_box)
 
     state: dict[str, object] = {
         "snapshot": snapshot,
@@ -279,7 +338,7 @@ def build_managed_section_editor(
         rows = _rows_for_section(current_snapshot(), event_data, section, show_not_configured)
         if rows:
             rows_box.pack_start(
-                _build_section_rows_grid(
+                _build_section_rows_panel(
                     Gtk,
                     current_snapshot(),
                     section,
@@ -306,17 +365,17 @@ def build_managed_section_editor(
     def apply_row_action(controls: _EditorControls) -> None:
         snapshot_value = current_snapshot()
         if snapshot_value is None:
-            _show_message(Gtk, frame, "No test config is loaded.")
+            _show_message(Gtk, main_box, "No test config is loaded.")
             return
 
         try:
             request = _request_from_controls(controls)
         except ValueError as exc:
-            _show_message(Gtk, frame, str(exc))
+            _show_message(Gtk, main_box, str(exc))
             return
 
         result = apply_managed_section_action(snapshot_value.path, request)
-        _show_message(Gtk, frame, format_action_result(result))
+        _show_message(Gtk, main_box, format_action_result(result))
         refreshed_snapshot = load_test_config_snapshot(snapshot_value.path)
         state["snapshot"] = refreshed_snapshot
         if result.ok:
@@ -332,11 +391,14 @@ def build_managed_section_editor(
         mode_button.set_label("Configured" if state["show_not_configured"] else "Not configured")
         refresh_editor_rows()
 
+    def show_help() -> None:
+        _show_message(Gtk, main_box, WORKFLOW_HELP[current_section()])
+
     section_combo.connect("changed", lambda _combo: refresh_editor_rows())
     mode_button.connect("clicked", lambda _button: toggle_mode())
     refresh_editor_rows()
 
-    return ManagedSectionEditor(widget=frame, apply=apply_first_row)
+    return ManagedSectionEditor(widget=main_box, apply=apply_first_row, show_help=show_help)
 
 
 class _EditorControls:
@@ -506,7 +568,7 @@ def _blank_add_row(section: str) -> ManagedGridRow:
     return ManagedGridRow(source="configured", section=section, action="Add")
 
 
-def _build_section_rows_grid(
+def _build_section_rows_panel(
     Gtk,
     snapshot: TestConfigSnapshot | None,
     section: str,
@@ -522,32 +584,56 @@ def _build_section_rows_grid(
     scroller.set_vexpand(True)
     scroller.set_size_request(-1, 260)
 
-    grid = Gtk.Grid()
-    grid.set_row_spacing(6)
-    grid.set_column_spacing(8)
-    grid.set_margin_top(8)
-    grid.set_margin_bottom(8)
-    grid.set_margin_start(8)
-    grid.set_margin_end(8)
-    scroller.add(grid)
+    panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    panel.set_margin_top(8)
+    panel.set_margin_bottom(8)
+    panel.set_margin_start(8)
+    panel.set_margin_end(8)
+    scroller.add(panel)
 
     columns = SECTION_COLUMNS[section]
-    for column_index, column_name in enumerate(columns):
+    header = Gtk.Grid()
+    header.set_column_homogeneous(True)
+    header.set_column_spacing(8)
+    for column_index, column_name in enumerate((*columns, "")):
         label = Gtk.Label(label=column_name)
-        label.set_xalign(0)
-        grid.attach(label, column_index, 0, 1, 1)
+        label.set_xalign(0.5)
+        label.set_justify(Gtk.Justification.CENTER)
+        header.attach(label, column_index, 0, 1, 1)
+    panel.pack_start(header, False, False, 0)
 
-    for row_index, row in enumerate(rows, start=1):
+    for row in rows:
         controls = _build_row_controls(Gtk, snapshot, section, row, event_data, workspace_values)
         row_controls.append(controls)
-        for column_index, column_name in enumerate(columns):
-            grid.attach(_widget_for_column(Gtk, controls, column_name), column_index, row_index, 1, 1)
-
-        apply_button = Gtk.Button(label="Apply")
-        apply_button.connect("clicked", lambda _button, row_controls=controls: apply_row_action(row_controls))
-        grid.attach(apply_button, len(columns), row_index, 1, 1)
+        panel.pack_start(_build_action_row(Gtk, columns, controls, apply_row_action), False, False, 0)
 
     return scroller
+
+
+def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, apply_row_action):
+    row_box = Gtk.EventBox()
+    row_box.set_visible_window(True)
+    row_box.set_above_child(False)
+    _set_action_row_style(row_box, _active_action(controls))
+
+    grid = Gtk.Grid()
+    grid.set_column_homogeneous(True)
+    grid.set_column_spacing(8)
+    grid.set_margin_top(6)
+    grid.set_margin_bottom(6)
+    grid.set_margin_start(6)
+    grid.set_margin_end(6)
+    row_box.add(grid)
+
+    for column_index, column_name in enumerate(columns):
+        grid.attach(_widget_for_column(Gtk, controls, column_name), column_index, 0, 1, 1)
+
+    apply_button = Gtk.Button(label="Apply")
+    apply_button.connect("clicked", lambda _button: apply_row_action(controls))
+    grid.attach(apply_button, len(columns), 0, 1, 1)
+
+    controls.action_combo.connect("changed", lambda _combo: _set_action_row_style(row_box, _active_action(controls)))
+    return row_box
 
 
 def _build_row_controls(
@@ -764,6 +850,19 @@ def _workspace_values() -> tuple[str, ...]:
     if count < 1:
         return FALLBACK_WORKSPACES
     return tuple(str(workspace) for workspace in range(1, count + 1))
+
+
+def _install_row_css(Gtk, widget) -> None:
+    provider = Gtk.CssProvider()
+    provider.load_from_data(ROW_CSS.encode("utf-8"))
+    widget.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+
+def _set_action_row_style(row_box, action: str) -> None:
+    style = row_box.get_style_context()
+    for css_class in ("d2wc-row-add", "d2wc-row-modify", "d2wc-row-delete"):
+        style.remove_class(css_class)
+    style.add_class(f"d2wc-row-{action.lower()}")
 
 
 def _rule_parts(rule: str) -> _RuleParts:
