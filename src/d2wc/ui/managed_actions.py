@@ -8,6 +8,7 @@ from typing import Callable
 
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 from d2wc.event_data import WindowEventData
+from d2wc.event_inventory import KnownWindowTarget
 from d2wc.event_preview import build_event_rule_preview
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
@@ -251,9 +252,14 @@ def build_configured_grid_rows(snapshot: TestConfigSnapshot | None) -> tuple[Man
     return tuple(rows)
 
 
-def build_known_window_grid_rows(event_data: WindowEventData | None) -> tuple[ManagedGridRow, ...]:
-    """Build not-configured rows from currently available event data."""
+def build_known_window_grid_rows(
+    event_data: WindowEventData | None = None,
+    inventory_targets: tuple[KnownWindowTarget, ...] = (),
+) -> tuple[ManagedGridRow, ...]:
+    """Build not-configured rows from inventory targets or available event data."""
 
+    if inventory_targets:
+        return _known_window_target_grid_rows(inventory_targets)
     if event_data is None:
         return ()
 
@@ -310,6 +316,47 @@ def build_known_window_grid_rows(event_data: WindowEventData | None) -> tuple[Ma
         ),
     ]
     return tuple(row for row in rows if _row_has_candidate_value(row))
+
+
+def _known_window_target_grid_rows(targets: tuple[KnownWindowTarget, ...]) -> tuple[ManagedGridRow, ...]:
+    rows: list[ManagedGridRow] = []
+    for target in targets:
+        target_rule = target.rule
+        rows.extend(
+            (
+                ManagedGridRow(
+                    source="not configured",
+                    section="EXCLUDE",
+                    action="Add",
+                    target_entry=target_rule,
+                ),
+                ManagedGridRow(
+                    source="not configured",
+                    section="PIN",
+                    action="Add",
+                    target_entry=target_rule,
+                ),
+                ManagedGridRow(
+                    source="not configured",
+                    section="WORKSPACE_ROUTES",
+                    action="Add",
+                    target_entry=target_rule,
+                ),
+                ManagedGridRow(
+                    source="not configured",
+                    section="WORKSPACE_PLACEMENT",
+                    action="Add",
+                    target_entry=target_rule,
+                ),
+                ManagedGridRow(
+                    source="not configured",
+                    section="LEFT_EDGE_CORRECTION",
+                    action="Add",
+                    target_entry=f"{target_rule} le:pos1",
+                ),
+            )
+        )
+    return tuple(rows)
 
 
 def build_managed_section_editor(
