@@ -2,13 +2,14 @@
 
 ## Current repository status
 
-Current repository status for PR #23:
+Current repository status after PR #23 and during known-window inventory parser work:
 
 ```text
-Main: 4d2134fdab1e53932cb5e6548b834a5f97db9518
-Latest merged proof: PR #22, test-config proposal action buttons
-Current draft PR: PR #23, managed-section test-config actions
-Current branch: configurator-managed-section-actions
+Main: 7f4c0141b9a7a7220109ce43c2d65860a6f946dd
+Latest merged proof: PR #23, managed-section test-config actions
+Current known-window inventory branch: configurator-known-window-inventory
+Current parser PR: PR #26, known-window inventory parser foundation
+Parallel grid editor branch: configurator-grid-editor-ui
 Tracking issue: #17, Build GTK configurator UI around Devilspie2 event data
 Draft research PR: PR #16, Devilspie2 window probe proof
 ```
@@ -31,6 +32,20 @@ The GTK UI has moved beyond read-only display into a dedicated test-config edito
 The real user config remains out of scope for automatic GTK writes.
 
 ## Latest confirmed local verification
+
+Verification reported on PR #26:
+
+```bash
+python3 -m d2wc validate --config src/d2wc.lua
+python3 -m pytest
+```
+
+Result:
+
+```text
+The PR branch validation passed.
+The full pytest suite passed locally with the known-window inventory parser tests included.
+```
 
 Verification reported on PR #23:
 
@@ -74,20 +89,12 @@ The GTK event proposal preview and vertical resize behavior worked as expected.
 
 ## Current UI direction
 
-The current branch is:
+The active implementation direction is split across separate branches:
 
-```text
-configurator-managed-section-actions
-```
+1. `configurator-grid-editor-ui` for the workflow-focused grid editor polish.
+2. `configurator-known-window-inventory` for known-window inventory parsing, cleanup, and later UI row-source integration.
 
-Scope for this branch:
-
-1. Keep all GTK writes scoped to the dedicated test config.
-2. Add a managed-section editor that can add, modify, and delete entries in all six managed sections.
-3. Use a single `Apply` action next to `Close`.
-4. Reuse the existing tested core edit operations and safe-save helper.
-5. Refresh the displayed managed sections after each test-config write.
-6. Update repository documentation to describe the current test-config workflow.
+The first known-window inventory slice adds a parser/model/test foundation only. It does not yet wire live `devilspie2 --debug` capture or GTK Not configured population.
 
 The GTK test-config workflow currently supports:
 
@@ -101,6 +108,31 @@ The GTK test-config workflow currently supports:
 8. Automatic reload of displayed test-config sections after writes.
 
 See [Event-Data GTK UI Direction](event-data-ui-direction.md) for the full direction and Devilspie2 function references.
+
+## Known-window inventory parser foundation
+
+The first parser slice adds `src/d2wc/event_inventory.py` and `tests/test_event_inventory.py`.
+
+Current behavior:
+
+1. Parse captured Devilspie2 debug/event text into `KnownWindowCandidate` records.
+2. Accept structured keys such as `_QUBES_VMNAME`, `application_name`, `wm_class_instance`, and `window_type`.
+3. Accept documented human-readable labels such as `Domain:`, `Application name:`, `Window Type:`, and `Class instance name:`.
+4. Keep only `WINDOW_TYPE_NORMAL` records.
+5. Normalize an empty Qubes VM name to `dom0`.
+6. Normalize machine/domain text to lowercase.
+7. Derive an application token from the rightmost class-instance segment after `:`.
+8. Preserve the raw class instance value and source block for debugging.
+
+Not included yet:
+
+1. Starting or managing a live `devilspie2 --debug` process.
+2. Capturing a long-running event stream.
+3. Deduplicating repeated candidates.
+4. Feeding GTK Not configured rows.
+5. Populating Machine/Application dropdowns.
+6. Suppressing candidates already configured for the selected workflow.
+7. Handling quoted or whitespace-containing rule tokens in the grammar.
 
 ## Useful Devilspie2 event data
 
@@ -152,6 +184,7 @@ The current Python core supports:
 17. Dedicated test-config preparation and loading.
 18. Test-config-only generic add, modify, and delete backend for all six managed sections.
 19. GTK managed-section editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
+20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 
 ## Test command guidance
 
@@ -258,6 +291,7 @@ Useful research outcomes:
 9. PR #15: selected-window geometry diagnostic proof.
 10. PR #19: event-data GTK UI proof.
 11. PR #20: read-only event proposal preview.
-12. PR #21: test-config configurator UI proof.
+12. PR #21: test-config GTK UI proof.
 13. PR #22: test-config proposal action buttons.
 14. PR #23: managed-section test-config actions.
+15. PR #26: known-window inventory parser foundation.
