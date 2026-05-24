@@ -13,7 +13,6 @@ from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
-FALLBACK_WORKSPACES = ("1", "2", "3", "4")
 ROW_CSS = """
 eventbox.d2wc-row-add,
 .d2wc-row-add {
@@ -29,6 +28,30 @@ eventbox.d2wc-row-delete,
 .d2wc-row-delete {
   background-color: #cf2d56;
   border-radius: 8px;
+}
+button.d2wc-apply-add,
+.d2wc-apply-add {
+  background-image: none;
+  background-color: #159b63;
+  color: #ffffff;
+}
+button.d2wc-apply-modify,
+.d2wc-apply-modify {
+  background-image: none;
+  background-color: #6a35e8;
+  color: #ffffff;
+}
+button.d2wc-apply-delete,
+.d2wc-apply-delete {
+  background-image: none;
+  background-color: #cf2d56;
+  color: #ffffff;
+}
+button.d2wc-apply-dirty,
+.d2wc-apply-dirty {
+  background-image: none;
+  background-color: #e0a323;
+  color: #1d1d1d;
 }
 """
 SECTION_LABELS = {
@@ -67,7 +90,7 @@ WORKFLOW_HELP = {
     "WORKSPACE_ROUTES": (
         "Workspace routes\n\n"
         "Use this workflow to send matching windows to a workspace. "
-        "The workspace list is read from X11 when possible, with a fallback of 1 through 4.\n\n"
+        "The workspace list is read from X11.\n\n"
         "A route can be broad, such as all windows from a machine, or narrow, such as one "
         "application on one machine."
     ),
@@ -432,6 +455,10 @@ class _EditorControls:
         self.y_entry = y_entry
         self.w_entry = w_entry
         self.h_entry = h_entry
+        self.apply_button = None
+        self.undo_button = None
+        self.initial_values: tuple[str, ...] = ()
+        self.is_restoring = False
 
 
 class _SearchableCombo:
@@ -593,12 +620,12 @@ def _build_section_rows_panel(
     scroller.add(panel)
 
     columns = SECTION_COLUMNS[section]
-    column_size_groups = _column_size_groups(Gtk, len(columns) + 1)
+    column_size_groups = _column_size_groups(Gtk, len(columns) + 2)
     header = Gtk.Grid()
     header.set_hexpand(True)
     header.set_column_homogeneous(False)
     header.set_column_spacing(8)
-    for column_index, column_name in enumerate((*columns, "")):
+    for column_index, column_name in enumerate((*columns, "", "")):
         label = Gtk.Label(label=column_name)
         label.set_xalign(0.5)
         label.set_justify(Gtk.Justification.CENTER)
@@ -653,7 +680,14 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     grid.attach(apply_button, len(columns), 0, 1, 1)
 
+    undo_button = Gtk.Button(label="Undo")
+    undo_button.set_hexpand(False)
+    column_size_groups[len(columns) + 1].add_widget(undo_button)
+    undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
+    grid.attach(undo_button, len(columns) + 1, 0, 1, 1)
+
     controls.action_combo.connect("changed", lambda _combo: _set_action_row_style(row_box, _active_action(controls)))
+    _initialize_row_state(controls, apply_button, undo_button)
     return row_box
 
 
@@ -793,6 +827,100 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
         entry.set_sensitive(edits_geom_values)
 
 
+def _initialize_row_state(controls: _EditorControls, apply_button, undo_button) -> None:
+    controls.apply_button = apply_button
+    controls.undo_button = undo_button
+    controls.initial_values = _control_values(controls)
+    undo_button.set_sensitive(False)
+    _set_apply_button_style(apply_button, _active_action(controls), dirty=False)
+    _connect_dirty_tracking(controls)
+
+
+def _connect_dirty_tracking(controls: _EditorControls) -> None:
+    callback = lambda _widget: _refresh_row_dirty_state(controls)
+    for combo in (
+        controls.action_combo,
+        controls.domain_combo,
+        controls.class_combo,
+        controls.geometry_combo,
+        controls.left_edge_combo,
+        controls.workspace_combo,
+    ):
+        combo.connect("changed", callback)
+    for entry in (controls.new_profile_entry, controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry):
+        entry.connect("changed", callback)
+
+
+def _refresh_row_dirty_state(controls: _EditorControls) -> None:
+    if controls.is_restoring:
+        return
+    dirty = _control_values(controls) != controls.initial_values
+    if controls.undo_button is not None:
+        controls.undo_button.set_sensitive(dirty)
+    if controls.apply_button is not None:
+        _set_apply_button_style(controls.apply_button, _active_action(controls), dirty=dirty)
+
+
+def _restore_initial_values(controls: _EditorControls) -> None:
+    controls.is_restoring = True
+    _restore_control_values(controls, controls.initial_values)
+    _set_field_sensitivity(controls.section, _active_action(controls), controls)
+    controls.is_restoring = False
+    _refresh_row_dirty_state(controls)
+
+
+def _control_values(controls: _EditorControls) -> tuple[str, ...]:
+    return (
+        controls.action_combo.get_active_text() or "",
+        controls.domain_combo.placeholder,
+        controls.domain_combo.get_active_text() or "",
+        controls.class_combo.placeholder,
+        controls.class_combo.get_active_text() or "",
+        controls.geometry_combo.placeholder,
+        controls.geometry_combo.get_active_text() or "",
+        controls.left_edge_combo.get_active_text() or "",
+        controls.new_profile_entry.get_text(),
+        controls.workspace_combo.get_active_text() or "",
+        controls.x_entry.get_text(),
+        controls.y_entry.get_text(),
+        controls.w_entry.get_text(),
+        controls.h_entry.get_text(),
+    )
+
+
+def _restore_control_values(controls: _EditorControls, values: tuple[str, ...]) -> None:
+    (
+        action,
+        domain_placeholder,
+        domain,
+        class_placeholder,
+        class_name,
+        geometry_placeholder,
+        geometry_profile,
+        left_edge_mode,
+        profile_name,
+        workspace,
+        x_value,
+        y_value,
+        w_value,
+        h_value,
+    ) = values
+    controls.domain_combo.set_placeholder(domain_placeholder)
+    controls.class_combo.set_placeholder(class_placeholder)
+    controls.geometry_combo.set_placeholder(geometry_placeholder)
+    _set_combo_active_text(controls.action_combo, action)
+    _set_combo_active_text(controls.domain_combo, domain)
+    _set_combo_active_text(controls.class_combo, class_name)
+    _set_combo_active_text(controls.geometry_combo, geometry_profile)
+    _set_combo_active_text(controls.left_edge_combo, left_edge_mode)
+    controls.new_profile_entry.set_text(profile_name)
+    _set_combo_active_text(controls.workspace_combo, workspace)
+    controls.x_entry.set_text(x_value)
+    controls.y_entry.set_text(y_value)
+    controls.w_entry.set_text(w_value)
+    controls.h_entry.set_text(h_value)
+
+
 def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
     if controls.section != "GEOM" or snapshot is None or snapshot.config is None:
         return
@@ -864,18 +992,18 @@ def _workspace_values() -> tuple[str, ...]:
             timeout=2,
         )
     except (OSError, subprocess.SubprocessError):
-        return FALLBACK_WORKSPACES
+        return ()
 
     if result.returncode != 0:
-        return FALLBACK_WORKSPACES
+        return ()
 
     try:
         count = int(result.stdout.rsplit("=", 1)[-1].strip())
     except ValueError:
-        return FALLBACK_WORKSPACES
+        return ()
 
     if count < 1:
-        return FALLBACK_WORKSPACES
+        return ()
     return tuple(str(workspace) for workspace in range(1, count + 1))
 
 
@@ -894,6 +1022,18 @@ def _set_action_row_style(row_box, action: str) -> None:
     for css_class in ("d2wc-row-add", "d2wc-row-modify", "d2wc-row-delete"):
         style.remove_class(css_class)
     style.add_class(f"d2wc-row-{action.lower()}")
+
+
+def _set_apply_button_style(apply_button, action: str, *, dirty: bool) -> None:
+    style = apply_button.get_style_context()
+    for css_class in (
+        "d2wc-apply-add",
+        "d2wc-apply-modify",
+        "d2wc-apply-delete",
+        "d2wc-apply-dirty",
+    ):
+        style.remove_class(css_class)
+    style.add_class("d2wc-apply-dirty" if dirty else f"d2wc-apply-{action.lower()}")
 
 
 def _column_size_groups(Gtk, count: int):
@@ -1037,14 +1177,6 @@ def _text_label(Gtk, text: str):
     label.set_selectable(True)
     label.set_line_wrap(True)
     return label
-
-
-def _geometry_box(Gtk, x_entry, y_entry, w_entry, h_entry):
-    box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
-    box.set_hexpand(True)
-    for entry in (x_entry, y_entry, w_entry, h_entry):
-        box.pack_start(entry, True, True, 0)
-    return box
 
 
 def _geometry_text(x: object, y: object, w: object, h: object) -> str:
