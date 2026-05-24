@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import re
 
 _NORMAL_WINDOW_TYPE = "WINDOW_TYPE_NORMAL"
-_KEY_VALUE_PATTERN = re.compile(r"([A-Za-z0-9_.-]+)\s*[:=]\s*([^,;\n\r]+)")
+_KEY_VALUE_PATTERN = re.compile(r"^\s*([^:=]+?)\s*[:=]\s*(.*?)\s*$")
 
 
 @dataclass(frozen=True)
@@ -70,14 +70,15 @@ def _extract_event_fields(block: str) -> dict[str, str]:
     fields: dict[str, str] = {}
     for line in block.splitlines():
         lower = line.lower()
-        for key, value in _KEY_VALUE_PATTERN.findall(line):
-            canonical = _canonical_key(key)
-            if canonical is None:
-                continue
-            normalized_value = _clean_value(value)
-            if normalized_value == "":
-                normalized_value = "dom0" if canonical in {"machine", "domain"} else ""
-            fields[canonical] = normalized_value
+        match = _KEY_VALUE_PATTERN.match(line)
+        if match:
+            raw_key, value = match.groups()
+            canonical = _canonical_key(raw_key)
+            if canonical is not None:
+                normalized_value = _clean_value(value)
+                if normalized_value == "":
+                    normalized_value = "dom0" if canonical in {"machine", "domain"} else ""
+                fields[canonical] = normalized_value
 
         if "window_type" not in fields and "window_type_normal" in lower:
             fields["window_type"] = _NORMAL_WINDOW_TYPE
@@ -92,7 +93,7 @@ def _extract_event_fields(block: str) -> dict[str, str]:
 
 
 def _canonical_key(key: str) -> str | None:
-    normalized = key.strip().lower().replace("-", "_").replace(".", "_")
+    normalized = key.strip().lower().replace("-", "_").replace(".", "_").replace(" ", "_")
     aliases = {
         "machine": "machine",
         "domain": "domain",
@@ -100,10 +101,14 @@ def _canonical_key(key: str) -> str | None:
         "vmname": "machine",
         "application": "application",
         "application_name": "application",
+        "window_name": "window_name",
         "class_instance_name": "class_instance_name",
         "class_instance": "class_instance_name",
         "wm_class_instance": "class_instance_name",
+        "window_class": "window_class",
         "window_type": "window_type",
+        "screen_geometry": "screen_geometry",
+        "window_geometry": "window_geometry",
     }
     return aliases.get(normalized)
 
