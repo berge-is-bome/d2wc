@@ -380,6 +380,7 @@ def build_managed_section_editor(
     Gtk,
     snapshot: TestConfigSnapshot | None,
     event_data: WindowEventData | None = None,
+    inventory_targets: tuple[KnownWindowTarget, ...] = (),
 ) -> ManagedSectionEditor:
     """Build the section-focused managed editor for the dedicated test config."""
 
@@ -424,7 +425,7 @@ def build_managed_section_editor(
 
         section = current_section()
         show_not_configured = bool(state["show_not_configured"])
-        rows = _rows_for_section(current_snapshot(), event_data, section, show_not_configured)
+        rows = _rows_for_section(current_snapshot(), event_data, inventory_targets, section, show_not_configured)
         if rows:
             rows_box.pack_start(
                 _build_section_rows_panel(
@@ -435,6 +436,7 @@ def build_managed_section_editor(
                     row_controls,
                     apply_row_action,
                     event_data,
+                    inventory_targets,
                     workspace_values,
                 ),
                 True,
@@ -650,9 +652,12 @@ class _SearchableCombo:
 def _rows_for_section(
     snapshot: TestConfigSnapshot | None,
     event_data: WindowEventData | None,
+    inventory_targets: tuple[KnownWindowTarget, ...],
     section: str,
     show_not_configured: bool,
 ) -> tuple[ManagedGridRow, ...]:
+    if show_not_configured and inventory_targets:
+        return build_available_known_window_grid_rows(snapshot, section, inventory_targets)
     if show_not_configured:
         return tuple(row for row in build_known_window_grid_rows(event_data) if row.section == section)
 
@@ -674,6 +679,7 @@ def _build_section_rows_panel(
     row_controls: list[_EditorControls],
     apply_row_action,
     event_data: WindowEventData | None,
+    inventory_targets: tuple[KnownWindowTarget, ...],
     workspace_values: tuple[str, ...],
 ):
     scroller = Gtk.ScrolledWindow()
@@ -708,7 +714,7 @@ def _build_section_rows_panel(
     panel.pack_start(header, False, True, 0)
 
     for row in rows:
-        controls = _build_row_controls(Gtk, snapshot, section, row, event_data, workspace_values)
+        controls = _build_row_controls(Gtk, snapshot, section, row, event_data, inventory_targets, workspace_values)
         row_controls.append(controls)
         panel.pack_start(
             _build_action_row(Gtk, columns, controls, apply_row_action, column_size_groups),
@@ -776,6 +782,7 @@ def _build_row_controls(
     section: str,
     row: ManagedGridRow,
     event_data: WindowEventData | None,
+    inventory_targets: tuple[KnownWindowTarget, ...],
     workspace_values: tuple[str, ...],
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
@@ -806,8 +813,8 @@ def _build_row_controls(
         h_entry=h_entry,
     )
 
-    _reset_combo(domain_combo, _domain_values(snapshot, event_data), include_blank=True)
-    _reset_combo(class_combo, _class_values(snapshot, event_data), include_blank=True)
+    _reset_combo(domain_combo, _domain_values(snapshot, event_data, inventory_targets), include_blank=True)
+    _reset_combo(class_combo, _class_values(snapshot, event_data, inventory_targets), include_blank=True)
     _reset_combo(geometry_combo, _profile_names(snapshot), include_blank=True)
     _populate_controls_from_grid_row(controls, row)
 
@@ -1038,8 +1045,13 @@ def _populate_controls_from_grid_row(controls: _EditorControls, row: ManagedGrid
     _set_geometry_fields_from_text(controls, row.geometry)
 
 
-def _domain_values(snapshot: TestConfigSnapshot | None, event_data: WindowEventData | None) -> tuple[str, ...]:
+def _domain_values(
+    snapshot: TestConfigSnapshot | None,
+    event_data: WindowEventData | None,
+    inventory_targets: tuple[KnownWindowTarget, ...] = (),
+) -> tuple[str, ...]:
     values = {_rule_parts(row.target_entry or row.existing_entry).domain for row in build_configured_grid_rows(snapshot)}
+    values.update(target.machine for target in inventory_targets)
     event_domain = event_data.display_domain.lower() if event_data and event_data.display_domain else ""
     if event_domain:
         values.add(event_domain)
@@ -1047,8 +1059,13 @@ def _domain_values(snapshot: TestConfigSnapshot | None, event_data: WindowEventD
     return tuple(sorted(values))
 
 
-def _class_values(snapshot: TestConfigSnapshot | None, event_data: WindowEventData | None) -> tuple[str, ...]:
+def _class_values(
+    snapshot: TestConfigSnapshot | None,
+    event_data: WindowEventData | None,
+    inventory_targets: tuple[KnownWindowTarget, ...] = (),
+) -> tuple[str, ...]:
     values = {_rule_parts(row.target_entry or row.existing_entry).class_name for row in build_configured_grid_rows(snapshot)}
+    values.update(target.application for target in inventory_targets)
     event_class = _class_from_event(event_data)
     if event_class:
         values.add(event_class)
