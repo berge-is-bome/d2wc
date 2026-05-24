@@ -30,14 +30,25 @@ detect_user_shell() {
   basename -- "$shell_path"
 }
 
+remove_managed_path_block() {
+  local config_file="$1"
+  local tmp_file
+
+  tmp_file="$(mktemp)"
+  awk \
+    -v start="$PATH_BLOCK_START" \
+    -v end="$PATH_BLOCK_END" \
+    '$0 == start { skip = 1; next } $0 == end { skip = 0; next } !skip { print }' \
+    "$config_file" > "$tmp_file"
+  cat "$tmp_file" > "$config_file"
+  rm -f -- "$tmp_file"
+}
+
 ensure_bash_local_bin_path() {
   local bashrc="$HOME/.bashrc"
 
   touch "$bashrc"
-  if grep -Fqx "$PATH_BLOCK_START" "$bashrc"; then
-    echo "Bash PATH already configured in: $bashrc"
-    return
-  fi
+  remove_managed_path_block "$bashrc"
 
   cat >> "$bashrc" <<'EOF'
 
@@ -49,7 +60,7 @@ esac
 # <<< d2wc local bin <<<
 EOF
 
-  echo "Added $HOME/.local/bin to PATH in: $bashrc"
+  echo "Configured $HOME/.local/bin in: $bashrc"
 }
 
 ensure_fish_local_bin_path() {
@@ -58,10 +69,7 @@ ensure_fish_local_bin_path() {
 
   mkdir -p -- "$fish_config_dir"
   touch "$fish_config"
-  if grep -Fqx "$PATH_BLOCK_START" "$fish_config"; then
-    echo "Fish PATH already configured in: $fish_config"
-    return
-  fi
+  remove_managed_path_block "$fish_config"
 
   cat >> "$fish_config" <<'EOF'
 
@@ -74,7 +82,7 @@ end
 # <<< d2wc local bin <<<
 EOF
 
-  echo "Added $HOME/.local/bin to PATH in: $fish_config"
+  echo "Configured $HOME/.local/bin in: $fish_config"
 }
 
 ensure_local_bin_path_for_user_shell() {
