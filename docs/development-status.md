@@ -34,11 +34,11 @@ PR #26: Add initial known-window inventory parser for Devilspie2 event/debug tex
 Merge commit: bcb152c81f85e79c0927991fd81351f0e3f71321
 ```
 
-The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, pure grid row helpers, bounded inventory capture, a continuous debug-output stream parser, and manual GTK inventory refresh.
+The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, pure grid row helpers, bounded inventory capture, a continuous debug-output stream parser, and automatic GTK inventory dropdown updates.
 
 ## Latest confirmed local verification
 
-Latest verification reported on `configurator-known-window-inventory` after removing the Not configured mode and using inventory as Add-row dropdown values:
+Latest verification reported on `configurator-known-window-inventory` after wiring the automatic GTK inventory monitor:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -130,7 +130,7 @@ d2wc-configurator
 ```
 
 16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
-17. Manual `Refresh inventory` button captures current known-window targets and adds their machine/application values to the top `Add` row dropdowns.
+17. Automatic inventory monitor captures startup and later known-window targets and adds their machine/application values to the top `Add` row dropdowns.
 
 ## Known-window inventory parser, capture, stream, and row source
 
@@ -171,12 +171,14 @@ Current row-source behavior:
 Current GTK integration behavior:
 
 1. The managed editor accepts prepared inventory targets.
-2. The manual `Refresh inventory` button runs bounded read-only inventory capture.
-3. Captured targets are merged into editor state without visible duplicate rows.
-4. The separate Not configured mode has been removed.
-5. Each workflow uses one top `Add` row and configured rows below it.
-6. Captured inventory values appear in the Machine/Application dropdowns for the top `Add` row.
-7. Continuous GTK live refresh remains out of scope.
+2. The inventory monitor starts automatically when the GTK configurator opens.
+3. Startup debug output populates the initial Machine/Application dropdown values.
+4. Later debug-output events add newly seen domain/class values while the configurator remains open.
+5. Captured targets are merged into editor state without visible duplicate rows.
+6. The separate Not configured mode has been removed.
+7. Each workflow uses one top `Add` row and configured rows below it.
+8. Captured inventory values appear in the Machine/Application dropdowns for the top `Add` row.
+9. The monitor is stopped when the GTK window closes.
 
 Current refactor state:
 
@@ -216,7 +218,7 @@ The current Python core supports:
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 21. Known-window row-source helpers for Not configured target workflows.
 22. Bounded and continuous known-window inventory capture helpers.
-23. Manual GTK inventory refresh into Add-row dropdown values.
+23. Automatic GTK inventory monitor into Add-row dropdown values.
 
 ## Active next work
 
@@ -224,11 +226,10 @@ Known-window inventory is the active branch work.
 
 Expected next slice:
 
-1. Manually smoke-test `Refresh inventory` in the GTK configurator.
-2. Confirm captured domain/class targets appear in the Machine/Application dropdowns of the top `Add` row.
-3. Confirm the old Not configured button/view is gone.
-4. Confirm failures from the capture command use a blocking error dialog.
-5. Defer continuous GTK background monitoring until lifecycle and notification behavior are designed.
+1. Decide whether this branch is PR-ready as the known-window inventory implementation slice.
+2. If continuing before PR, refine monitor UX details such as status visibility and non-blocking error reporting.
+3. Keep real config writes out of scope.
+4. Keep restore and notification settings as separate future work.
 
 ## Future restore work
 
