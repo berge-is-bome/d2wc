@@ -7,6 +7,10 @@ from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fi
 from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 
+CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
+UI_FONT_POINT_INCREASE = 2
+TOAST_OPACITY = 0.5
+
 
 class GtkConfiguratorImportError(RuntimeError):
     """Raised when GTK/PyGObject cannot be imported."""
@@ -23,14 +27,15 @@ def _import_gtk():
 
     try:
         gi.require_version("Gtk", "3.0")
-        from gi.repository import Gtk
+        gi.require_version("Gdk", "3.0")
+        from gi.repository import Gdk, GLib, Gtk, Pango
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk
+    return Gtk, Gdk, GLib, Pango
 
 
 def run_configurator(
@@ -42,112 +47,91 @@ def run_configurator(
     """Open the GTK configurator proof window."""
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
-    Gtk = _import_gtk()
+    Gtk, Gdk, GLib, Pango = _import_gtk()
+    _set_configurator_window_class(Gdk, GLib)
+    _apply_ui_css(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
 
     window = Gtk.Window(title="d2wc Configurator")
-    window.set_default_size(900, 620)
+    window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
+    window.set_default_size(1280, 720)
     window.set_border_width(18)
     window.connect("destroy", Gtk.main_quit)
 
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
 
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_hexpand(True)
-    scroller.set_vexpand(True)
-    outer.pack_start(scroller, True, True, 0)
-
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    content.set_margin_end(8)
-    scroller.add(content)
+    content.set_hexpand(True)
+    content.set_vexpand(True)
+    outer.pack_start(content, True, True, 0)
 
-    managed_sections_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
-    editor = build_managed_section_editor(
-        Gtk,
-        test_config_snapshot,
-        managed_sections_box,
-        _replace_managed_sections,
-    )
-
-    content.pack_start(editor.widget, False, False, 0)
-    content.pack_start(managed_sections_box, False, False, 0)
-    _populate_managed_sections(Gtk, managed_sections_box, test_config_snapshot)
+    editor = build_managed_section_editor(Gtk, test_config_snapshot, _event)
+    content.pack_start(editor.widget, True, True, 0)
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
-    apply_button = Gtk.Button(label="Apply")
-    apply_button.set_sensitive(test_config_snapshot is not None and test_config_snapshot.ok)
-    apply_button.connect("clicked", lambda _button: editor.apply())
-    button_box.pack_start(apply_button, False, False, 0)
+    menu_button = Gtk.MenuButton(label="Menu")
+    menu = Gtk.Menu()
+    help_item = Gtk.MenuItem(label="Help")
+    help_item.connect("activate", lambda _item: editor.show_help())
+    menu.append(help_item)
+    menu.show_all()
+    menu_button.set_popup(menu)
+    button_box.pack_start(menu_button, False, False, 0)
 
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
     button_box.pack_end(close_button, False, False, 0)
 
+    def handle_key_press(_window, event) -> bool:
+        if event.keyval == Gdk.KEY_F1:
+            editor.show_help()
+            return True
+        return False
+
+    window.connect("key-press-event", handle_key_press)
     window.show_all()
     Gtk.main()
     return 0
 
 
-def _replace_managed_sections(Gtk, managed_sections_box, snapshot: TestConfigSnapshot | None) -> None:
-    for child in managed_sections_box.get_children():
-        managed_sections_box.remove(child)
-    _populate_managed_sections(Gtk, managed_sections_box, snapshot)
-    managed_sections_box.show_all()
+def _set_configurator_window_class(Gdk, GLib) -> None:
+    """Publish a stable X11/WM class for Devilspie2 matching."""
+
+    GLib.set_prgname(CONFIGURATOR_WINDOW_CLASS)
+    Gdk.set_program_class(CONFIGURATOR_WINDOW_CLASS)
 
 
-def _populate_managed_sections(Gtk, content, snapshot: TestConfigSnapshot | None) -> None:
-    if snapshot is None:
-        content.pack_start(
-            _build_section_frame(Gtk, "Managed sections", "No test config loaded. Use --test-config or --init-test-config."),
-            False,
-            False,
-            0,
-        )
+def _apply_ui_css(Gtk, Gdk, Pango, point_increase: int) -> None:
+    """Apply application-scoped GTK CSS tweaks."""
+
+    settings = Gtk.Settings.get_default()
+    if settings is None:
         return
 
-    if not snapshot.ok:
-        content.pack_start(
-            _build_section_frame(Gtk, "Managed sections", "Managed sections are unavailable until the test config is valid."),
-            False,
-            False,
-            0,
-        )
+    font_name = settings.get_property("gtk-font-name") or ""
+    font_description = Pango.FontDescription(font_name)
+    theme_font_size = font_description.get_size()
+    if theme_font_size <= 0:
         return
 
-    for section in snapshot.sections:
-        content.pack_start(
-            _build_section_frame(Gtk, section.name, section.display_text),
-            False,
-            False,
-            0,
+    font_size_pt = int(round(theme_font_size / Pango.SCALE))
+    provider = Gtk.CssProvider()
+    provider.load_from_data(
+        (
+            f"* {{ font-size: {font_size_pt + point_increase}pt; }}\n"
+            f"infobar {{ opacity: {TOAST_OPACITY}; padding: 2px; }}\n"
+            "infobar label { padding: 2px 6px; }\n"
+        ).encode("utf-8")
+    )
+    screen = Gdk.Screen.get_default()
+    if screen is not None:
+        Gtk.StyleContext.add_provider_for_screen(
+            screen,
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
-
-
-def _build_section_frame(Gtk, title: str, body: str):
-    return _wrap_label_in_frame(Gtk, title, _build_text_label(Gtk, body))
-
-
-def _wrap_label_in_frame(Gtk, title: str, label):
-    frame = Gtk.Frame(label=title)
-    frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
-    frame.add(label)
-    return frame
-
-
-def _build_text_label(Gtk, body: str):
-    label = Gtk.Label(label=body)
-    label.set_xalign(0)
-    label.set_yalign(0)
-    label.set_selectable(True)
-    label.set_line_wrap(True)
-    label.set_margin_top(8)
-    label.set_margin_bottom(8)
-    label.set_margin_start(8)
-    label.set_margin_end(8)
-    return label
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
