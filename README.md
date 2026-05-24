@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-`d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, and a GTK test-config editor.
+`d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, a GTK test-config editor, and the first known-window inventory parser foundation.
 
 ## Current status
 
@@ -24,6 +24,8 @@ The Python core supports validation, render preview, safe-save behavior, and gua
 4. `PIN`
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
+
+The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, and derives an application token from the class instance value. This is a parser/model/test slice only. It does not yet start `devilspie2 --debug`, capture live process output, deduplicate a long-running inventory, or populate GTK rows.
 
 The GTK UI currently uses this dedicated test config:
 
@@ -126,6 +128,23 @@ Current GTK test-config features:
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
+## Known-window inventory parser
+
+The first known-window inventory slice is intentionally narrow and testable. `parse_known_window_candidates()` accepts captured Devilspie2 debug/event text and returns normalized `KnownWindowCandidate` records.
+
+The parser currently supports both structured key names and the human-readable labels used by the documented manual probe, including:
+
+1. `Domain:`
+2. `Application name:`
+3. `Window name:`
+4. `Window Type:`
+5. `Class instance name:`
+6. `Window class:`
+7. `Screen Geometry:`
+8. `Window geometry:`
+
+This parser is a foundation for the future Not configured view. It does not yet provide a live process-capture loop or GTK row population.
+
 ## Development direction
 
 The CLI/core editing proof phase is complete for the managed Lua sections. The GTK development phase is focused on a test-config UI that exercises the same tested core edit operations safely before enabling real user config writes.
@@ -135,8 +154,9 @@ Current UI priorities:
 1. Keep the test-config editor safe and clear.
 2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
 3. Build the next spreadsheet-style editor on a follow-up branch.
-4. Keep real config writes behind an explicit future design review.
-5. Later, wire Lua event handoff and suppression for already-known windows.
+4. Build the known-window inventory from parsed Devilspie2 debug/event output before live process capture is wired deeply into the UI.
+5. Keep real config writes behind an explicit future design review.
+6. Later, wire Lua event handoff and suppression for already-known windows.
 
 Important direction notes:
 
