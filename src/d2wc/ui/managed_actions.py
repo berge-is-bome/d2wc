@@ -13,6 +13,8 @@ from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
+SUCCESS_TOAST_MESSAGE = "Operation completed successfully."
+FALLBACK_WORKSPACES = ("1",)
 ROW_CSS = """
 eventbox.d2wc-row-add,
 .d2wc-row-add {
@@ -400,7 +402,7 @@ def build_managed_section_editor(
         result = apply_managed_section_action(snapshot_value.path, request)
         result_text = format_action_result(result)
         if result.ok:
-            _show_toast(Gtk, main_box, result_text)
+            _show_toast(Gtk, main_box, SUCCESS_TOAST_MESSAGE)
         else:
             _show_message(Gtk, main_box, result_text)
         refreshed_snapshot = load_test_config_snapshot(snapshot_value.path)
@@ -1006,18 +1008,18 @@ def _workspace_values() -> tuple[str, ...]:
             timeout=2,
         )
     except (OSError, subprocess.SubprocessError):
-        return ()
+        return FALLBACK_WORKSPACES
 
     if result.returncode != 0:
-        return ()
+        return FALLBACK_WORKSPACES
 
     try:
         count = int(result.stdout.rsplit("=", 1)[-1].strip())
     except ValueError:
-        return ()
+        return FALLBACK_WORKSPACES
 
     if count < 1:
-        return ()
+        return FALLBACK_WORKSPACES
     return tuple(str(workspace) for workspace in range(1, count + 1))
 
 
