@@ -308,19 +308,34 @@ Current behavior:
 8. Avoid persistent changes to the user's real Devilspie2 config.
 9. Keep GTK live refresh out of this stage.
 
-### Stage 24: GTK inventory refresh integration
+### Stage 24: manual GTK inventory refresh integration
 
-Wire the tested capture and stream layer into GTK after capture itself is stable.
+Complete on the `configurator-known-window-inventory` branch.
+
+Current behavior:
+
+1. Provide a manual `Refresh inventory` button in the managed editor.
+2. Run bounded read-only inventory capture when requested.
+3. Merge captured targets into editor state while preserving first-seen order.
+4. Feed captured targets into the Not configured row source.
+5. Keep target suppression section-aware.
+6. Switch the editor to Not configured mode after refresh.
+7. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
+8. Avoid an unreviewed long-running background UX.
+
+### Stage 25: continuous GTK inventory monitor lifecycle
+
+Wire the continuous stream layer into GTK after the manual refresh path is manually verified.
 
 Required behavior:
 
-1. Keep initial integration manually triggered or otherwise bounded.
-2. Feed captured targets into the Not configured row source.
-3. Keep target suppression section-aware.
-4. Avoid an unreviewed long-running background UX until lifecycle and notification behavior are designed.
+1. Define when the monitor starts and stops.
+2. Define how new targets are surfaced without interrupting active edits.
+3. Define notification behavior for newly seen unconfigured windows.
+4. Keep target suppression section-aware.
 5. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
 
-### Stage 25: event-data handoff proof from Lua to Python
+### Stage 26: event-data handoff proof from Lua to Python
 
 After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
 
@@ -331,7 +346,7 @@ Required behavior:
 3. GTK displays exactly the event data it received.
 4. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config write workflow is reviewed.
 
-### Stage 26: suppression for already-known windows
+### Stage 27: suppression for already-known windows
 
 Add logic to avoid automatically opening the configurator for windows that already have a profile or handling rule.
 
@@ -350,7 +365,7 @@ Purpose:
 3. Suppress repeated prompts for already-known windows later.
 4. Make the real application-window configurator flow less noisy over time.
 
-### Stage 27: applied-write restore and backup recovery
+### Stage 28: applied-write restore and backup recovery
 
 Add a user-facing restore workflow for changes that have already been applied to the test config or, later, the real config.
 
@@ -365,7 +380,7 @@ Required behavior:
 7. Keep the restore workflow scoped to `~/.config/devilspie2/d2wc-test.lua` until real-config writes are explicitly reviewed.
 8. Document how restore interacts with backup retention before enabling it for real config writes.
 
-### Stage 28: real-config write review
+### Stage 29: real-config write review
 
 Do not enable real user config writes until this review is complete.
 
@@ -376,6 +391,6 @@ Required behavior:
 3. Define recovery behavior.
 4. Confirm whether writes go directly to the active script or through a staged promotion flow.
 
-### Stage 29: generated split profiles
+### Stage 30: generated split profiles
 
 Implement generated split-profile support.

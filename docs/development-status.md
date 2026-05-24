@@ -18,7 +18,7 @@ Current branch scope:
 ```
 
 3. Keep real user config writes out of scope.
-4. Build the known-window inventory in small testable slices before live capture is wired into the UI.
+4. Build the known-window inventory in small testable slices before continuous captured inventory is fully wired into the UI.
 
 Current merged baseline:
 
@@ -34,11 +34,11 @@ PR #26: Add initial known-window inventory parser for Devilspie2 event/debug tex
 Merge commit: bcb152c81f85e79c0927991fd81351f0e3f71321
 ```
 
-The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, pure grid row helpers, bounded inventory capture, and a continuous debug-output stream parser.
+The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, pure grid row helpers, bounded inventory capture, a continuous debug-output stream parser, and manual GTK inventory refresh.
 
 ## Latest confirmed local verification
 
-Latest verification reported on `configurator-known-window-inventory` after adding continuous inventory stream parsing:
+Latest verification reported on `configurator-known-window-inventory` after adding manual GTK inventory refresh:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -48,7 +48,7 @@ python3 -m pytest
 Result:
 
 ```text
-280 passed
+281 passed
 ```
 
 Manual GTK verification previously reported after PR #27:
@@ -130,6 +130,7 @@ d2wc-configurator
 ```
 
 16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
+17. Manual `Refresh inventory` button captures current known-window targets and opens the Not configured view.
 
 ## Known-window inventory parser, capture, stream, and row source
 
@@ -172,6 +173,15 @@ Current row-source behavior:
    5. `LEFT_EDGE_CORRECTION`
 6. Do not create `GEOM` rows from inventory targets, because the inventory target only carries machine/application data.
 
+Current GTK integration behavior:
+
+1. The managed editor accepts prepared inventory targets.
+2. The manual `Refresh inventory` button runs bounded read-only inventory capture.
+3. Captured targets are merged into editor state without visible duplicate rows.
+4. The UI switches to Not configured mode after refresh.
+5. Current workflow rows are rebuilt through the existing section-aware suppression layer.
+6. Continuous GTK live refresh remains out of scope.
+
 Current refactor state:
 
 1. `src/d2wc/ui/grid_rows.py` contains the pure row models and row builders.
@@ -210,6 +220,7 @@ The current Python core supports:
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 21. Known-window row-source helpers for Not configured target workflows.
 22. Bounded and continuous known-window inventory capture helpers.
+23. Manual GTK inventory refresh into Not configured rows.
 
 ## Active next work
 
@@ -217,11 +228,11 @@ Known-window inventory is the active branch work.
 
 Expected next slice:
 
-1. Wire captured inventory targets into GTK Not configured rows.
-2. Keep target suppression section-aware.
-3. Keep the integration manually triggered or otherwise bounded at first.
-4. Keep real config writes out of scope.
-5. Avoid an unreviewed long-running background UX until the lifecycle and notification behavior are designed.
+1. Manually smoke-test `Refresh inventory` in the GTK configurator.
+2. Confirm captured domain/class targets appear in Not configured workflows.
+3. Confirm already configured targets are suppressed for the selected workflow.
+4. Confirm failures from the capture command use a blocking error dialog.
+5. Defer continuous GTK background monitoring until lifecycle and notification behavior are designed.
 
 ## Future restore work
 

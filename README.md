@@ -33,7 +33,7 @@ The capture and stream layer in `src/d2wc/event_inventory_capture.py` uses a tem
 
 The pure row-building layer for the GTK grid now lives in `src/d2wc/ui/grid_rows.py`. It converts configured test-config entries, event proposals, and known-window inventory targets into `ManagedGridRow` values. `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly, row controls, Apply/Undo behavior, toasts, and dialogs.
 
-The known-window inventory work does not yet wire continuous captured inventory into GTK live refresh.
+The GTK editor now includes a manual `Refresh inventory` button. It runs the bounded read-only inventory capture, merges newly captured targets into editor state, switches to the Not configured view, and refreshes the current workflow rows. Continuous GTK live refresh is still future work.
 
 The GTK UI currently uses this dedicated test config:
 
@@ -142,6 +142,7 @@ Current GTK test-config features:
 9. Action-based row coloring for add, modify, and delete rows.
 10. Per-workflow help from the `Menu` button or `F1`.
 11. Stable GTK/X11 class for Devilspie2 matching: `d2wc-configurator`.
+12. Manual `Refresh inventory` action for captured known-window targets.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
@@ -164,7 +165,7 @@ The inventory row-source layer converts parsed observations into one selectable 
 
 The capture layer currently supports both a bounded startup inventory snapshot and a continuous stream parser. Startup output creates the initial known-window inventory. Later debug output can add newly opened domain/class pairs while the monitor is running.
 
-The next safe slice is GTK integration for captured inventory. That should feed captured targets into the existing Not configured row source without enabling real config writes or a long-running unreviewed background UX.
+The first GTK integration slice is manual inventory refresh. It feeds captured targets into the existing Not configured row source without enabling real config writes or a long-running unreviewed background UX.
 
 ## Development direction
 
@@ -175,7 +176,7 @@ Current UI priorities:
 1. Keep the test-config editor safe and clear.
 2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
 3. Continue refining the workflow-focused grid editor behavior on top of the PR #27 baseline when needed.
-4. Wire captured known-window inventory into the GTK Not configured row source.
+4. Manually smoke-test captured known-window inventory in the GTK Not configured row source.
 5. Keep real config writes behind an explicit future design review.
 6. Later, wire Lua event handoff and suppression for already-known windows.
 
