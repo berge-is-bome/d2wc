@@ -4,6 +4,7 @@ from d2wc.event_inventory import (
     KnownWindowTarget,
     build_available_known_window_targets,
     build_known_window_targets,
+    merge_known_window_targets,
     parse_known_window_candidates,
 )
 
@@ -121,6 +122,17 @@ def test_build_known_window_targets_skips_whitespace_tokens() -> None:
     assert build_known_window_targets(candidates) == (
         KnownWindowTarget(machine="work", application="navigator"),
     )
+
+
+def test_merge_known_window_targets_preserves_first_seen_order() -> None:
+    personal_navigator = KnownWindowTarget(machine="personal", application="navigator")
+    work_terminal = KnownWindowTarget(machine="work", application="terminal")
+    work_navigator = KnownWindowTarget(machine="work", application="navigator")
+
+    assert merge_known_window_targets(
+        (personal_navigator, work_terminal),
+        (work_terminal, work_navigator, personal_navigator),
+    ) == (personal_navigator, work_terminal, work_navigator)
 
 
 def test_build_available_known_window_targets_suppresses_section_matches() -> None:
