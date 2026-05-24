@@ -57,10 +57,11 @@ Manual GTK verification reported:
 2. The row colour styling works.
 3. Wrapped rows now have aligned columns through GTK size groups.
 4. The configurator publishes the stable window class `d2wc-configurator`.
-5. The workspace selector reflects the current XFCE workspace count from X11.
+5. The workspace selector reflects the current X11 workspace count when available, with a fallback to workspace 1.
 6. Dirty rows split the action area into amber `Undo` and action-coloured `Apply` halves.
 7. `Undo` restores unsaved row edits.
 8. `Apply` remains available for dirty rows.
+9. Successful apply actions show a compact translucent toast instead of a blocking dialog.
 
 Earlier verification for PR #23:
 
@@ -92,7 +93,7 @@ The GTK test-config editor currently supports:
    6. `Profile name`
    7. `X`, `Y`, `W`, and `H`
 5. Searchable popup selectors for longer value lists.
-6. Workspace dropdown populated from the current X11 workspace count.
+6. Workspace dropdown populated from the current X11 workspace count when available, with a fallback to workspace 1.
 7. Row-level `Apply` actions.
 8. Row-level unsaved-edit detection.
 9. Dirty-row split action area:

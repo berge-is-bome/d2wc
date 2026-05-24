@@ -122,8 +122,8 @@ Current GTK test-config features:
 3. Row-level `Action` selector for `Add`, `Modify`, and `Delete`.
 4. Split rule fields such as `Machine`, `Application`, `Geometry profile`, `Workspace`, and `Left edge`.
 5. Searchable popup selectors for longer value lists.
-6. Workspace dropdown populated from the X11 workspace count when available, with a fallback of 1 through 4.
-7. Row-level `Apply` buttons.
+6. Workspace dropdown populated from the X11 workspace count when available, with a fallback to workspace 1.
+7. Row-level `Apply` buttons with compact success toasts.
 8. Action-based row coloring for add, modify, and delete rows.
 9. Per-workflow help from the `Menu` button or `F1`.
 
