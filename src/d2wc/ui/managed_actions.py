@@ -564,12 +564,12 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
     action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
     action_box.set_hexpand(False)
-    action_box.set_size_request(112, -1)
+    action_box.set_size_request(224, -1)
     column_size_groups[len(columns)].add_widget(action_box)
 
     undo_button = Gtk.Button(label="Undo")
     undo_button.set_hexpand(True)
-    undo_button.set_size_request(56, -1)
+    undo_button.set_size_request(112, -1)
     undo_button.set_no_show_all(True)
     undo_button.get_style_context().add_class("d2wc-row-action-button")
     undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
@@ -577,7 +577,7 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
     apply_button = Gtk.Button(label="Apply")
     apply_button.set_hexpand(True)
-    apply_button.set_size_request(56, -1)
+    apply_button.set_size_request(112, -1)
     apply_button.get_style_context().add_class("d2wc-row-action-button")
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     action_box.pack_start(apply_button, True, True, 0)
