@@ -34,11 +34,11 @@ PR #26: Add initial known-window inventory parser for Devilspie2 event/debug tex
 Merge commit: bcb152c81f85e79c0927991fd81351f0e3f71321
 ```
 
-The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, and the pure grid row helper split.
+The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, pure grid row helpers, bounded inventory capture, and a continuous debug-output stream parser.
 
 ## Latest confirmed local verification
 
-Latest verification reported on `configurator-known-window-inventory` after splitting grid row helpers:
+Latest verification reported on `configurator-known-window-inventory` after adding continuous inventory stream parsing:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -48,7 +48,7 @@ python3 -m pytest
 Result:
 
 ```text
-275 passed
+280 passed
 ```
 
 Manual GTK verification previously reported after PR #27:
@@ -131,7 +131,7 @@ d2wc-configurator
 
 16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
 
-## Known-window inventory parser and row source
+## Known-window inventory parser, capture, stream, and row source
 
 The first parser slice added `src/d2wc/event_inventory.py` and `tests/test_event_inventory.py`.
 
@@ -145,6 +145,18 @@ Current parser behavior:
 6. Normalize machine/domain text to lowercase.
 7. Derive an application token from the rightmost class-instance segment after `:`.
 8. Preserve the raw class instance value and source block for debugging.
+
+Current capture and stream behavior:
+
+1. `src/d2wc/event_inventory_capture.py` writes a temporary read-only Devilspie2 probe script.
+2. The probe script prints only the values needed for inventory: domain/machine, window type, and class instance name.
+3. The active user `d2wc.lua` rules script is not used for inventory capture.
+4. The bounded snapshot helper captures startup output and turns it into candidates and targets.
+5. `KnownWindowInventoryStreamParser` parses continuous debug output block by block.
+6. Startup output creates the initial inventory.
+7. Later debug output can add newly opened domain/class pairs while the monitor is running.
+8. Repeated observations are kept internal and do not produce visible duplicate targets.
+9. Stream behavior is tested with mocked process/output objects, so pytest does not require real Devilspie2.
 
 Current row-source behavior:
 
@@ -168,10 +180,9 @@ Current refactor state:
 
 Not included yet:
 
-1. Starting or managing a live `devilspie2 --debug` process.
-2. Capturing a long-running event stream.
-3. Auto-refreshing GTK from live captured inventory.
-4. Handling quoted or whitespace-containing rule tokens in the grammar.
+1. Auto-refreshing GTK from live captured inventory.
+2. UI lifecycle controls for starting/stopping the long-running monitor.
+3. Handling quoted or whitespace-containing rule tokens in the grammar.
 
 ## Current safe capability
 
@@ -198,6 +209,7 @@ The current Python core supports:
 19. Workflow-focused GTK grid editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 21. Known-window row-source helpers for Not configured target workflows.
+22. Bounded and continuous known-window inventory capture helpers.
 
 ## Active next work
 
@@ -205,11 +217,11 @@ Known-window inventory is the active branch work.
 
 Expected next slice:
 
-1. Add a bounded read-only `devilspie2 --debug` capture layer.
-2. Use a temporary probe Lua script that prints only the values needed for inventory.
-3. Parse captured output through `parse_known_window_candidates()`.
-4. Convert parsed observations into `KnownWindowTarget` values.
-5. Keep GTK live refresh out of scope until capture is tested independently.
+1. Wire captured inventory targets into GTK Not configured rows.
+2. Keep target suppression section-aware.
+3. Keep the integration manually triggered or otherwise bounded at first.
+4. Keep real config writes out of scope.
+5. Avoid an unreviewed long-running background UX until the lifecycle and notification behavior are designed.
 
 ## Future restore work
 
@@ -284,7 +296,8 @@ Known behavior:
 3. Capturing the first debug output is not target selection.
 4. Capturing the next event after startup is unreliable because menus and launchers can generate intermediary events.
 5. The current `d2wc.lua` already filters non-normal windows with `WINDOW_TYPE_NORMAL`.
-6. The known-window inventory branch should treat this as list building, not single target selection.
+6. The known-window inventory branch treats this as list building, not single target selection.
+7. For the inventory monitor, startup output builds the initial list and later output adds newly opened domain/class targets.
 
 ## Historical Lua script preservation
 

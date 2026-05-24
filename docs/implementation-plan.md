@@ -69,7 +69,7 @@ The implementation should follow these decisions:
 19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
 20. Use `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target until the real-config write workflow has its own explicit review.
 21. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
-22. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded live capture third, GTK live refresh last.
+22. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
 
 ## Completed stages
 
@@ -292,32 +292,32 @@ The row-source logic now lives in `src/d2wc/ui/grid_rows.py`, while `src/d2wc/ui
 
 ## Future implementation stages
 
-### Stage 23: bounded live `devilspie2 --debug` inventory capture
+### Stage 23: bounded and continuous `devilspie2 --debug` inventory capture
 
-Add the live process-capture layer after the parser and row-source logic are tested.
+Complete on the `configurator-known-window-inventory` branch.
 
-Required behavior:
+Current behavior:
 
 1. Use a temporary read-only probe Lua script rather than the active `d2wc.lua` rules script.
 2. Print only the values needed for inventory, currently domain/machine, class instance, and window type.
-3. Run `devilspie2 --debug` for a bounded capture period.
+3. Provide a bounded startup snapshot helper for initial inventory capture.
 4. Treat startup output as inventory input, not as target selection.
-5. Continue parsing later event output into candidates where practical.
-6. Terminate the process cleanly.
-7. Return raw text or parsed `KnownWindowTarget` values through a core API.
-8. Avoid blocking GTK responsiveness.
-9. Avoid persistent changes to the user's real Devilspie2 config.
+5. Provide `KnownWindowInventoryStreamParser` for continuous debug output.
+6. Allow later debug output to add newly opened domain/class pairs while the monitor is running.
+7. Return parsed `KnownWindowTarget` values through core APIs.
+8. Avoid persistent changes to the user's real Devilspie2 config.
+9. Keep GTK live refresh out of this stage.
 
 ### Stage 24: GTK inventory refresh integration
 
-Wire the tested bounded capture layer into GTK after capture itself is stable.
+Wire the tested capture and stream layer into GTK after capture itself is stable.
 
 Required behavior:
 
 1. Keep initial integration manually triggered or otherwise bounded.
 2. Feed captured targets into the Not configured row source.
 3. Keep target suppression section-aware.
-4. Avoid long-running background behavior until the UX is explicitly reviewed.
+4. Avoid an unreviewed long-running background UX until lifecycle and notification behavior are designed.
 5. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
 
 ### Stage 25: event-data handoff proof from Lua to Python
