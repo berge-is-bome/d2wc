@@ -34,24 +34,24 @@ PR #26: Add initial known-window inventory parser for Devilspie2 event/debug tex
 Merge commit: bcb152c81f85e79c0927991fd81351f0e3f71321
 ```
 
-The branch now includes both the latest grid editor UI work and the known-window inventory parser foundation.
+The branch now includes the latest grid editor UI work, the known-window inventory parser foundation, target grouping/suppression helpers, and the pure grid row helper split.
 
 ## Latest confirmed local verification
 
-Verification reported after merging PR #27 into `main` and then into `configurator-known-window-inventory`:
+Latest verification reported on `configurator-known-window-inventory` after splitting grid row helpers:
 
 ```bash
+python3 -m d2wc validate --config src/d2wc.lua
 python3 -m pytest
-python3 -m d2wc configure --test-config
 ```
 
-Latest confirmed pytest result:
+Result:
 
 ```text
-266 passed
+275 passed
 ```
 
-Manual GTK verification reported:
+Manual GTK verification previously reported after PR #27:
 
 1. The workflow grid editor opens with `python3 -m d2wc configure --test-config`.
 2. The row colour styling works.
@@ -131,11 +131,11 @@ d2wc-configurator
 
 16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
 
-## Known-window inventory parser foundation
+## Known-window inventory parser and row source
 
-The first parser slice adds `src/d2wc/event_inventory.py` and `tests/test_event_inventory.py`.
+The first parser slice added `src/d2wc/event_inventory.py` and `tests/test_event_inventory.py`.
 
-Current behavior:
+Current parser behavior:
 
 1. Parse captured Devilspie2 debug/event text into `KnownWindowCandidate` records.
 2. Accept structured keys such as `_QUBES_VMNAME`, `application_name`, `wm_class_instance`, and `window_type`.
@@ -146,17 +146,32 @@ Current behavior:
 7. Derive an application token from the rightmost class-instance segment after `:`.
 8. Preserve the raw class instance value and source block for debugging.
 
+Current row-source behavior:
+
+1. Convert parsed `KnownWindowCandidate` observations into one selectable `KnownWindowTarget` per safe machine/application pair.
+2. Keep repeated observations internal and do not display observation counts.
+3. Skip unsafe whitespace-containing rule tokens until the grammar supports them.
+4. Suppress targets already configured for the selected workflow.
+5. Convert inventory targets into Not configured grid rows for target-based workflows:
+   1. `EXCLUDE`
+   2. `PIN`
+   3. `WORKSPACE_ROUTES`
+   4. `WORKSPACE_PLACEMENT`
+   5. `LEFT_EDGE_CORRECTION`
+6. Do not create `GEOM` rows from inventory targets, because the inventory target only carries machine/application data.
+
+Current refactor state:
+
+1. `src/d2wc/ui/grid_rows.py` contains the pure row models and row builders.
+2. `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly, row controls, Apply/Undo behavior, toasts, and dialogs.
+3. `tests/test_managed_grid_rows.py` now tests the row-builder module directly.
+
 Not included yet:
 
 1. Starting or managing a live `devilspie2 --debug` process.
 2. Capturing a long-running event stream.
-3. Building the cleaned Not configured row source.
-4. Feeding GTK Not configured rows.
-5. Populating Machine/Application dropdowns from captured inventory.
-6. Suppressing candidates already configured for the selected workflow.
-7. Handling quoted or whitespace-containing rule tokens in the grammar.
-
-Repeated observations in `devilspie2 --debug` output are normal. The inventory UI should not report observation counts. It should collapse repeated observations into one selectable rule target where they describe the same machine/application target.
+3. Auto-refreshing GTK from live captured inventory.
+4. Handling quoted or whitespace-containing rule tokens in the grammar.
 
 ## Current safe capability
 
@@ -182,6 +197,7 @@ The current Python core supports:
 18. Test-config-only generic add, modify, and delete backend for all six managed sections.
 19. Workflow-focused GTK grid editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
+21. Known-window row-source helpers for Not configured target workflows.
 
 ## Active next work
 
@@ -189,11 +205,11 @@ Known-window inventory is the active branch work.
 
 Expected next slice:
 
-1. Convert parsed `KnownWindowCandidate` observations into one selectable Not configured target per machine/application rule target.
-2. Keep repeated observations internal and do not display observation counts.
-3. Suppress targets already configured for the selected workflow.
-4. Expose a clean inventory row-source interface for GTK.
-5. Keep live `devilspie2 --debug` capture out of scope until the parser and row-source logic are tested.
+1. Add a bounded read-only `devilspie2 --debug` capture layer.
+2. Use a temporary probe Lua script that prints only the values needed for inventory.
+3. Parse captured output through `parse_known_window_candidates()`.
+4. Convert parsed observations into `KnownWindowTarget` values.
+5. Keep GTK live refresh out of scope until capture is tested independently.
 
 ## Future restore work
 
