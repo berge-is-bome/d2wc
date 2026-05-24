@@ -4,7 +4,7 @@ Devilspie2 Workspace Configurator.
 
 Created by André in collaboration with ChatGPT.
 
-`d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, a GTK test-config editor, and the first known-window inventory parser foundation.
+`d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, known-window inventory parsing, workflow grid row helpers, and a GTK test-config editor.
 
 ## Current status
 
@@ -27,7 +27,11 @@ The Python core supports validation, render preview, safe-save behavior, and gua
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, and derives an application token from the class instance value. This is a parser/model/test slice only. It does not yet start `devilspie2 --debug`, capture live process output, build the Not configured row source, or populate GTK rows.
+The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, derives an application token from the class instance value, collapses repeated observations into one selectable machine/application target, and suppresses targets already configured for the selected workflow.
+
+The pure row-building layer for the GTK grid now lives in `src/d2wc/ui/grid_rows.py`. It converts configured test-config entries, event proposals, and known-window inventory targets into `ManagedGridRow` values. `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly, row controls, Apply/Undo behavior, toasts, and dialogs.
+
+The known-window inventory work still does not start `devilspie2 --debug`, capture live process output, or run a live GTK refresh loop.
 
 The GTK UI currently uses this dedicated test config:
 
@@ -57,6 +61,9 @@ docs/
 src/
   d2wc.lua                      Current devilspie2 Lua rules script.
   d2wc/                         Python configurator core, desktop integration, and GTK UI proof.
+    event_inventory.py          Known-window parser, target grouping, and target suppression.
+    ui/grid_rows.py             Pure grid row models and row builders.
+    ui/managed_actions.py       GTK managed-section editor assembly and row controls.
 tests/                          Python tests for the configurator core and UI helpers.
 ```
 
@@ -135,9 +142,9 @@ Current GTK test-config features:
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
-## Known-window inventory parser
+## Known-window inventory parser and row source
 
-The first known-window inventory slice is intentionally narrow and testable. `parse_known_window_candidates()` accepts captured Devilspie2 debug/event text and returns normalized `KnownWindowCandidate` records.
+The known-window inventory parser is intentionally narrow and testable. `parse_known_window_candidates()` accepts captured Devilspie2 debug/event text and returns normalized `KnownWindowCandidate` records.
 
 The parser currently supports both structured key names and the human-readable labels used by the documented manual probe, including:
 
@@ -150,7 +157,9 @@ The parser currently supports both structured key names and the human-readable l
 7. `Screen Geometry:`
 8. `Window geometry:`
 
-This parser is a foundation for the future Not configured view. It does not yet provide a live process-capture loop, cleaned row source, suppression layer, or GTK row population.
+The inventory row-source layer converts parsed observations into one selectable target per safe machine/application pair, without displaying observation counts. It can then build workflow-specific Not configured rows and suppress targets already configured for the selected workflow.
+
+This is now ready for the next safe slice: bounded live `devilspie2 --debug` capture through a read-only probe. It does not yet provide that live process-capture loop.
 
 ## Development direction
 
@@ -161,7 +170,7 @@ Current UI priorities:
 1. Keep the test-config editor safe and clear.
 2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
 3. Continue refining the workflow-focused grid editor behavior on top of the PR #27 baseline when needed.
-4. Build the known-window inventory from parsed Devilspie2 debug/event output before live process capture is wired deeply into the UI.
+4. Build bounded read-only known-window inventory capture from Devilspie2 debug/event output.
 5. Keep real config writes behind an explicit future design review.
 6. Later, wire Lua event handoff and suppression for already-known windows.
 
