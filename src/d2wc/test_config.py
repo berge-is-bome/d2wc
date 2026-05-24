@@ -18,6 +18,7 @@ from d2wc.event_preview import EventRulePreview, build_event_rule_preview
 
 TEST_CONFIG_RELATIVE_PATH = Path(".config/devilspie2/d2wc-test.lua")
 BUNDLED_CONFIG_PATH = Path(__file__).resolve().parents[1] / "d2wc.lua"
+SUCCESS_ACTION_MESSAGE = "Operation completed successfully."
 
 
 @dataclass(frozen=True)
@@ -284,9 +285,13 @@ def format_action_result(result: TestConfigActionResult | tuple[TestConfigAction
     if result is None:
         return "Action result: none"
     if isinstance(result, tuple):
+        if all(item.ok for item in result):
+            return SUCCESS_ACTION_MESSAGE
         return "\n\n".join(format_action_result(item) for item in result)
+    if result.ok:
+        return SUCCESS_ACTION_MESSAGE
 
-    lines = [f"Action: {result.action}", f"Status: {'ok' if result.ok else 'error'}"]
+    lines = [f"Action: {result.action}", "Status: error"]
     if result.message:
         lines.append(result.message)
     if result.path is not None:
