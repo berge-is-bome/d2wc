@@ -38,7 +38,7 @@ The branch now includes the latest grid editor UI work, the known-window invento
 
 ## Latest confirmed local verification
 
-Latest verification reported on `configurator-known-window-inventory` after adding manual GTK inventory refresh:
+Latest verification reported on `configurator-known-window-inventory` after removing the Not configured mode and using inventory as Add-row dropdown values:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -130,7 +130,7 @@ d2wc-configurator
 ```
 
 16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
-17. Manual `Refresh inventory` button captures current known-window targets and opens the Not configured view.
+17. Manual `Refresh inventory` button captures current known-window targets and adds their machine/application values to the top `Add` row dropdowns.
 
 ## Known-window inventory parser, capture, stream, and row source
 
@@ -165,22 +165,18 @@ Current row-source behavior:
 2. Keep repeated observations internal and do not display observation counts.
 3. Skip unsafe whitespace-containing rule tokens until the grammar supports them.
 4. Suppress targets already configured for the selected workflow.
-5. Convert inventory targets into Not configured grid rows for target-based workflows:
-   1. `EXCLUDE`
-   2. `PIN`
-   3. `WORKSPACE_ROUTES`
-   4. `WORKSPACE_PLACEMENT`
-   5. `LEFT_EDGE_CORRECTION`
-6. Do not create `GEOM` rows from inventory targets, because the inventory target only carries machine/application data.
+5. Use inventory targets to populate Machine/Application dropdown values for target-based workflows.
+6. Do not create `GEOM` suggestions from inventory targets, because the inventory target only carries machine/application data.
 
 Current GTK integration behavior:
 
 1. The managed editor accepts prepared inventory targets.
 2. The manual `Refresh inventory` button runs bounded read-only inventory capture.
 3. Captured targets are merged into editor state without visible duplicate rows.
-4. The UI switches to Not configured mode after refresh.
-5. Current workflow rows are rebuilt through the existing section-aware suppression layer.
-6. Continuous GTK live refresh remains out of scope.
+4. The separate Not configured mode has been removed.
+5. Each workflow uses one top `Add` row and configured rows below it.
+6. Captured inventory values appear in the Machine/Application dropdowns for the top `Add` row.
+7. Continuous GTK live refresh remains out of scope.
 
 Current refactor state:
 
@@ -220,7 +216,7 @@ The current Python core supports:
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 21. Known-window row-source helpers for Not configured target workflows.
 22. Bounded and continuous known-window inventory capture helpers.
-23. Manual GTK inventory refresh into Not configured rows.
+23. Manual GTK inventory refresh into Add-row dropdown values.
 
 ## Active next work
 
@@ -229,8 +225,8 @@ Known-window inventory is the active branch work.
 Expected next slice:
 
 1. Manually smoke-test `Refresh inventory` in the GTK configurator.
-2. Confirm captured domain/class targets appear in Not configured workflows.
-3. Confirm already configured targets are suppressed for the selected workflow.
+2. Confirm captured domain/class targets appear in the Machine/Application dropdowns of the top `Add` row.
+3. Confirm the old Not configured button/view is gone.
 4. Confirm failures from the capture command use a blocking error dialog.
 5. Defer continuous GTK background monitoring until lifecycle and notification behavior are designed.
 

@@ -33,7 +33,7 @@ The capture and stream layer in `src/d2wc/event_inventory_capture.py` uses a tem
 
 The pure row-building layer for the GTK grid now lives in `src/d2wc/ui/grid_rows.py`. It converts configured test-config entries, event proposals, and known-window inventory targets into `ManagedGridRow` values. `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly, row controls, Apply/Undo behavior, toasts, and dialogs.
 
-The GTK editor now includes a manual `Refresh inventory` button. It runs the bounded read-only inventory capture, merges newly captured targets into editor state, switches to the Not configured view, and refreshes the current workflow rows. Continuous GTK live refresh is still future work.
+The GTK editor now includes a manual `Refresh inventory` button. It runs the bounded read-only inventory capture, merges newly captured targets into editor state, and refreshes the current workflow grid. Captured machine/application values are made available in the top `Add` row dropdowns rather than being shown as separate Not configured rows. Continuous GTK live refresh is still future work.
 
 The GTK UI currently uses this dedicated test config:
 
@@ -132,7 +132,7 @@ Command meanings:
 Current GTK test-config features:
 
 1. Workflow selector for all six managed sections.
-2. Configured and not-configured row views.
+2. A single workflow grid with a top `Add` row and configured rows below it.
 3. Row-level `Action` selector for `Add`, `Modify`, and `Delete`.
 4. Split rule fields such as `Machine`, `Application`, `Geometry profile`, `Workspace`, and `Left edge`.
 5. Searchable popup selectors for longer value lists.
@@ -142,7 +142,7 @@ Current GTK test-config features:
 9. Action-based row coloring for add, modify, and delete rows.
 10. Per-workflow help from the `Menu` button or `F1`.
 11. Stable GTK/X11 class for Devilspie2 matching: `d2wc-configurator`.
-12. Manual `Refresh inventory` action for captured known-window targets.
+12. Manual `Refresh inventory` action that adds captured machine/application values to the `Add` row dropdowns.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
@@ -161,11 +161,11 @@ The parser currently supports both structured key names and the human-readable l
 7. `Screen Geometry:`
 8. `Window geometry:`
 
-The inventory row-source layer converts parsed observations into one selectable target per safe machine/application pair, without displaying observation counts. It can then build workflow-specific Not configured rows and suppress targets already configured for the selected workflow.
+The inventory row-source layer converts parsed observations into one selectable target per safe machine/application pair, without displaying observation counts. Captured values are used to populate workflow dropdown choices for the top `Add` row, while configured rows remain separate below it.
 
 The capture layer currently supports both a bounded startup inventory snapshot and a continuous stream parser. Startup output creates the initial known-window inventory. Later debug output can add newly opened domain/class pairs while the monitor is running.
 
-The first GTK integration slice is manual inventory refresh. It feeds captured targets into the existing Not configured row source without enabling real config writes or a long-running unreviewed background UX.
+The first GTK integration slice is manual inventory refresh. It feeds captured machine/application targets into the existing `Add` row dropdown choices without enabling real config writes or a long-running unreviewed background UX.
 
 ## Development direction
 
@@ -176,7 +176,7 @@ Current UI priorities:
 1. Keep the test-config editor safe and clear.
 2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
 3. Continue refining the workflow-focused grid editor behavior on top of the PR #27 baseline when needed.
-4. Manually smoke-test captured known-window inventory in the GTK Not configured row source.
+4. Manually smoke-test captured known-window inventory in the GTK `Add` row dropdowns.
 5. Keep real config writes behind an explicit future design review.
 6. Later, wire Lua event handoff and suppression for already-known windows.
 

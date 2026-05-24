@@ -317,9 +317,9 @@ Current behavior:
 1. Provide a manual `Refresh inventory` button in the managed editor.
 2. Run bounded read-only inventory capture when requested.
 3. Merge captured targets into editor state while preserving first-seen order.
-4. Feed captured targets into the Not configured row source.
-5. Keep target suppression section-aware.
-6. Switch the editor to Not configured mode after refresh.
+4. Remove the separate Not configured mode.
+5. Keep one top `Add` row per workflow, with configured rows below it.
+6. Feed captured machine/application values into the top `Add` row dropdowns.
 7. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
 8. Avoid an unreviewed long-running background UX.
 
@@ -330,7 +330,7 @@ Wire the continuous stream layer into GTK after the manual refresh path is manua
 Required behavior:
 
 1. Define when the monitor starts and stops.
-2. Define how new targets are surfaced without interrupting active edits.
+2. Define how new targets are added to dropdown choices without interrupting active edits.
 3. Define notification behavior for newly seen unconfigured windows.
 4. Keep target suppression section-aware.
 5. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
