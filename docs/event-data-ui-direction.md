@@ -73,6 +73,23 @@ get_window_property( '_QUBES_VMNAME' )
 
 `debug_print` is useful for temporary proofs, because Python can read stdout from `devilspie2 --debug`. In application logic, Lua can call the functions directly and pass the resulting values to the configurator command through the chosen event handoff mechanism.
 
+## Known-window inventory parser foundation
+
+The first known-window inventory implementation slice adds a parser/model/test foundation for captured Devilspie2 debug/event text.
+
+The parser is intentionally narrow:
+
+1. It accepts raw captured debug/event text.
+2. It extracts known-window candidates from block-oriented text.
+3. It keeps only `WINDOW_TYPE_NORMAL` candidates.
+4. It normalizes the Qubes VM/domain value into a `machine` field.
+5. It derives an `application` token from the class instance value.
+6. It stores the original class instance value and raw source block for debugging.
+
+The parser accepts both structured keys, such as `_QUBES_VMNAME`, `application_name`, `wm_class_instance`, and `window_type`, and the human-readable labels used by the manual probe below, such as `Domain:`, `Application name:`, `Window Type:`, and `Class instance name:`.
+
+This foundation does not yet start `devilspie2 --debug`, capture a live event stream, deduplicate a long-running inventory, populate GTK Not configured rows, or suppress already-configured entries. Those remain follow-up work on the known-window inventory branch.
+
 ## Manual reference probe
 
 The broader manual debug probe used during design discussion was:
