@@ -2,6 +2,7 @@ from pathlib import Path
 
 from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRoute
 from d2wc.event_data import get_event_fixture
+from d2wc.event_inventory import KnownWindowTarget
 from d2wc.test_config import TestConfigSnapshot as ConfigSnapshot
 from d2wc.ui.managed_actions import build_configured_grid_rows, build_known_window_grid_rows
 
@@ -54,3 +55,41 @@ def test_build_known_window_grid_rows_creates_event_proposals() -> None:
     assert rows[3].geometry == "x=474 y=359 w=3366 h=1801"
     assert rows[4].target_entry == "d:work c:example g:event_example"
     assert rows[5].target_entry == "d:work c:example le:pos1"
+
+
+def test_build_known_window_grid_rows_creates_inventory_target_rows() -> None:
+    rows = build_known_window_grid_rows(
+        inventory_targets=(
+            KnownWindowTarget(machine="personal", application="navigator"),
+            KnownWindowTarget(machine="work", application="terminal"),
+        )
+    )
+
+    assert [row.section for row in rows] == [
+        "EXCLUDE",
+        "PIN",
+        "WORKSPACE_ROUTES",
+        "WORKSPACE_PLACEMENT",
+        "LEFT_EDGE_CORRECTION",
+        "EXCLUDE",
+        "PIN",
+        "WORKSPACE_ROUTES",
+        "WORKSPACE_PLACEMENT",
+        "LEFT_EDGE_CORRECTION",
+    ]
+    assert all(row.source == "not configured" for row in rows)
+    assert all(row.action == "Add" for row in rows)
+    assert rows[0].target_entry == "d:personal c:navigator"
+    assert rows[3].target_entry == "d:personal c:navigator"
+    assert rows[4].target_entry == "d:personal c:navigator le:pos1"
+    assert rows[5].target_entry == "d:work c:terminal"
+    assert rows[8].target_entry == "d:work c:terminal"
+    assert rows[9].target_entry == "d:work c:terminal le:pos1"
+
+
+def test_build_known_window_grid_rows_inventory_targets_do_not_create_geom_rows() -> None:
+    rows = build_known_window_grid_rows(
+        inventory_targets=(KnownWindowTarget(machine="personal", application="navigator"),)
+    )
+
+    assert "GEOM" not in {row.section for row in rows}
