@@ -75,5 +75,5 @@ def test_capture_known_window_inventory_preserves_timeout_output() -> None:
     assert result.raw_text == (
         "Domain: work\n"
         "Window Type: WINDOW_TYPE_NORMAL\n"
-        "Class instance name: work:Terminal"
+        "Class instance name: work:Terminal\n"
     )
