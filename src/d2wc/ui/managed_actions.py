@@ -41,6 +41,13 @@ eventbox.d2wc-row-delete,
   background-color: #cf2d56;
   border-radius: 8px;
 }
+button.d2wc-row-action-button,
+.d2wc-row-action-button {
+  min-width: 0;
+  min-height: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
 button.d2wc-apply-add,
 .d2wc-apply-add {
   background-image: none;
@@ -564,12 +571,14 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     undo_button.set_hexpand(True)
     undo_button.set_size_request(56, -1)
     undo_button.set_no_show_all(True)
+    undo_button.get_style_context().add_class("d2wc-row-action-button")
     undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
     action_box.pack_start(undo_button, True, True, 0)
 
     apply_button = Gtk.Button(label="Apply")
     apply_button.set_hexpand(True)
     apply_button.set_size_request(56, -1)
+    apply_button.get_style_context().add_class("d2wc-row-action-button")
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     action_box.pack_start(apply_button, True, True, 0)
 
