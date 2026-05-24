@@ -2,6 +2,8 @@
 
 Devilspie2 Workspace Configurator.
 
+Created by André in collaboration with ChatGPT.
+
 `d2wc` combines the active `devilspie2` Lua rules script with a Python configurator core and a GTK configurator proof. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, a GTK test-config editor, and the first known-window inventory parser foundation.
 
 ## Current status
@@ -25,7 +27,7 @@ The Python core supports validation, render preview, safe-save behavior, and gua
 5. `EXCLUDE`
 6. `LEFT_EDGE_CORRECTION`
 
-The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, and derives an application token from the class instance value. This is a parser/model/test slice only. It does not yet start `devilspie2 --debug`, capture live process output, deduplicate a long-running inventory, or populate GTK rows.
+The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, and derives an application token from the class instance value. This is a parser/model/test slice only. It does not yet start `devilspie2 --debug`, capture live process output, build the Not configured row source, or populate GTK rows.
 
 The GTK UI currently uses this dedicated test config:
 
@@ -33,7 +35,7 @@ The GTK UI currently uses this dedicated test config:
 ~/.config/devilspie2/d2wc-test.lua
 ```
 
-The UI can prepare, load, replace, display, and edit that test config. It uses a managed-section editor with `Section`, `Action`, existing-entry, target-entry, profile, workspace, and geometry fields, plus a single `Apply` action. The editor supports add, modify, and delete for all six managed sections.
+The UI can prepare, load, replace, and edit that test config. It uses a workflow-focused managed-section editor with normalized workflow labels, split rule-part fields, searchable selectors for machine/application/profile values, row-level `Apply` actions, action-based row colors, dirty-row `Undo`, compact success toasts, and per-workflow help through the menu or `F1`. The editor supports add, modify, and delete for all six managed sections.
 
 The real user config is not the GTK write target at this stage. The active direction is still to build around event-provided Devilspie2/Lua data. See [`docs/event-data-ui-direction.md`](docs/event-data-ui-direction.md).
 
@@ -44,6 +46,8 @@ Latest confirmed local verification is recorded in [`docs/development-status.md`
 ```text
 docs/
   backup-archives.md            Backup archive behavior for guarded writes.
+  configurator-notification-settings.md
+                                 Future Configure menu notification settings.
   development-status.md         Current PR status, latest local verification, and next work.
   event-data-ui-direction.md    Current GTK UI direction around Devilspie2 event data.
   product-development-brief.md  In-depth product and UI direction.
@@ -117,14 +121,17 @@ Command meanings:
 
 Current GTK test-config features:
 
-1. Managed-section editor at the top of the window.
-2. `Section` selector for all six managed sections.
-3. `Action` selector for `Add`, `Modify`, and `Delete`.
-4. Section/action-aware editable fields.
-5. Single `Apply` button next to `Close`.
-6. Display of the current managed-section contents below the editor.
-7. Automatic reload of displayed test-config sections after each successful edit.
-8. Action result text with success/error details and backup archive path and member name.
+1. Workflow selector for all six managed sections.
+2. Configured and not-configured row views.
+3. Row-level `Action` selector for `Add`, `Modify`, and `Delete`.
+4. Split rule fields such as `Machine`, `Application`, `Geometry profile`, `Workspace`, and `Left edge`.
+5. Searchable popup selectors for longer value lists.
+6. Workspace dropdown populated from the X11 workspace count when available, with a fallback to workspace 1.
+7. Row-level `Apply` buttons with compact success toasts.
+8. Dirty rows split the action area into amber `Undo` and action-coloured `Apply` halves.
+9. Action-based row coloring for add, modify, and delete rows.
+10. Per-workflow help from the `Menu` button or `F1`.
+11. Stable GTK/X11 class for Devilspie2 matching: `d2wc-configurator`.
 
 Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
 
@@ -143,7 +150,7 @@ The parser currently supports both structured key names and the human-readable l
 7. `Screen Geometry:`
 8. `Window geometry:`
 
-This parser is a foundation for the future Not configured view. It does not yet provide a live process-capture loop or GTK row population.
+This parser is a foundation for the future Not configured view. It does not yet provide a live process-capture loop, cleaned row source, suppression layer, or GTK row population.
 
 ## Development direction
 
@@ -153,7 +160,7 @@ Current UI priorities:
 
 1. Keep the test-config editor safe and clear.
 2. Continue using `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target.
-3. Build the next spreadsheet-style editor on a follow-up branch.
+3. Continue refining the workflow-focused grid editor behavior on top of the PR #27 baseline when needed.
 4. Build the known-window inventory from parsed Devilspie2 debug/event output before live process capture is wired deeply into the UI.
 5. Keep real config writes behind an explicit future design review.
 6. Later, wire Lua event handoff and suppression for already-known windows.

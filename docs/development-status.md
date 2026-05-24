@@ -2,36 +2,66 @@
 
 ## Current repository status
 
-Current repository status after PR #23 and during known-window inventory parser work:
+Current active branch:
 
 ```text
-Main: 7f4c0141b9a7a7220109ce43c2d65860a6f946dd
-Latest merged proof: PR #23, managed-section test-config actions
-Current known-window inventory branch: configurator-known-window-inventory
-Current parser PR: PR #26, known-window inventory parser foundation
-Parallel grid editor branch: configurator-grid-editor-ui
-Tracking issue: #17, Build GTK configurator UI around Devilspie2 event data
-Draft research PR: PR #16, Devilspie2 window probe proof
+configurator-known-window-inventory
 ```
 
-The CLI/core edit-proof phase is complete for the six managed Lua sections:
+Current branch scope:
 
-1. `GEOM`
-2. `WORKSPACE_PLACEMENT`
-3. `WORKSPACE_ROUTES`
-4. `PIN`
-5. `EXCLUDE`
-6. `LEFT_EDGE_CORRECTION`
-
-The GTK UI has moved beyond read-only display into a dedicated test-config editor. UI writes are scoped to:
+1. Continue from the PR #27 workflow-focused grid editor baseline.
+2. Keep all writes scoped to the dedicated test config:
 
 ```text
 ~/.config/devilspie2/d2wc-test.lua
 ```
 
-The real user config remains out of scope for automatic GTK writes.
+3. Keep real user config writes out of scope.
+4. Build the known-window inventory in small testable slices before live capture is wired into the UI.
+
+Current merged baseline:
+
+```text
+PR #27: Polish GTK configurator grid editor
+Merge commit: fe36986712e4e985ea3b7e06f925d94ab4f7649c
+```
+
+Known-window parser foundation already merged into this branch:
+
+```text
+PR #26: Add initial known-window inventory parser for Devilspie2 event/debug text
+Merge commit: bcb152c81f85e79c0927991fd81351f0e3f71321
+```
+
+The branch now includes both the latest grid editor UI work and the known-window inventory parser foundation.
 
 ## Latest confirmed local verification
+
+Verification reported after merging PR #27 into `main` and then into `configurator-known-window-inventory`:
+
+```bash
+python3 -m pytest
+python3 -m d2wc configure --test-config
+```
+
+Latest confirmed pytest result:
+
+```text
+266 passed
+```
+
+Manual GTK verification reported:
+
+1. The workflow grid editor opens with `python3 -m d2wc configure --test-config`.
+2. The row colour styling works.
+3. Wrapped rows have aligned columns through GTK size groups.
+4. The configurator publishes the stable window class `d2wc-configurator`.
+5. The workspace selector reflects the current X11 workspace count when available, with a fallback to workspace 1.
+6. Dirty rows split the action area into amber `Undo` and action-coloured `Apply` halves.
+7. `Undo` restores unsaved row edits.
+8. `Apply` remains available for dirty rows.
+9. Successful apply actions show a compact translucent toast instead of a blocking dialog.
 
 Verification reported on PR #26:
 
@@ -47,15 +77,7 @@ The PR branch validation passed.
 The full pytest suite passed locally with the known-window inventory parser tests included.
 ```
 
-Verification reported on PR #23:
-
-```bash
-python3 -m d2wc validate --config src/d2wc.lua
-python3 -m pytest
-python3 -m d2wc configure --test-config
-```
-
-Result:
+Earlier verification for PR #23:
 
 ```text
 257 pytest tests passed.
@@ -63,51 +85,51 @@ The dom0 installed-wheel test was clear.
 The managed editor add, modify, delete, Apply, and field-clearing behavior were confirmed.
 ```
 
-Earlier verification after PR #22 reported:
+## Current GTK UI behavior
+
+The GTK test-config editor currently supports:
+
+1. Workflow selector for all six managed sections:
+   1. `Exclude`
+   2. `Pin`
+   3. `Workspace routes`
+   4. `Window geometry`
+   5. `Workspace placement`
+   6. `Left edge correction`
+2. Configured and not-configured row modes.
+3. Row-level `Action` selector for `Add`, `Modify`, and `Delete`.
+4. Split rule fields instead of raw combined prefixed strings:
+   1. `Machine`
+   2. `Application`
+   3. `Workspace`
+   4. `Geometry profile`
+   5. `Left edge`
+   6. `Profile name`
+   7. `X`, `Y`, `W`, and `H`
+5. Searchable popup selectors for longer value lists.
+6. Workspace dropdown populated from the current X11 workspace count when available, with a fallback to workspace 1.
+7. Row-level `Apply` actions.
+8. Row-level unsaved-edit detection.
+9. Dirty-row split action area:
+   1. left half: amber `Undo`
+   2. right half: action-coloured `Apply`
+10. Action-based row colours:
+   1. `Add` = green
+   2. `Modify` = purple
+   3. `Delete` = red
+11. Compact translucent success toast:
+   1. text: `Operation completed successfully.`
+   2. detailed write target and backup output is no longer shown on success.
+12. Errors and validation failures still use blocking dialogs.
+13. Per-workflow help from `Menu -> Help`.
+14. `F1` shortcut for the current workflow help.
+15. Stable GTK/X11 class for Devilspie2 matching:
 
 ```text
-251 pytest tests passed.
-Add GEOM button added event_example to d2wc-test.lua.
-Add placement button added d:work c:example g:event_example to d2wc-test.lua.
-The GTK action result panel and managed-section display refreshed after writes.
+d2wc-configurator
 ```
 
-Earlier verification after PR #21 reported:
-
-```text
-247 pytest tests passed.
-d2wc-test.lua was created and read successfully.
---init-test-config, --test-config, and --replace-test-config worked as expected.
-```
-
-Earlier verification after PR #20 reported:
-
-```text
-238 pytest tests passed.
-The GTK event proposal preview and vertical resize behavior worked as expected.
-```
-
-## Current UI direction
-
-The active implementation direction is split across separate branches:
-
-1. `configurator-grid-editor-ui` for the workflow-focused grid editor polish.
-2. `configurator-known-window-inventory` for known-window inventory parsing, cleanup, and later UI row-source integration.
-
-The first known-window inventory slice adds a parser/model/test foundation only. It does not yet wire live `devilspie2 --debug` capture or GTK Not configured population.
-
-The GTK test-config workflow currently supports:
-
-1. `--init-test-config`
-2. `--test-config`
-3. `--replace-test-config`
-4. `--test-config-path`
-5. Managed-section add, modify, and delete for all six sections.
-6. Section/action-aware fields.
-7. Visible action result text with backup archive path and member names.
-8. Automatic reload of displayed test-config sections after writes.
-
-See [Event-Data GTK UI Direction](event-data-ui-direction.md) for the full direction and Devilspie2 function references.
+16. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
 
 ## Known-window inventory parser foundation
 
@@ -128,38 +150,13 @@ Not included yet:
 
 1. Starting or managing a live `devilspie2 --debug` process.
 2. Capturing a long-running event stream.
-3. Deduplicating repeated candidates.
+3. Building the cleaned Not configured row source.
 4. Feeding GTK Not configured rows.
-5. Populating Machine/Application dropdowns.
+5. Populating Machine/Application dropdowns from captured inventory.
 6. Suppressing candidates already configured for the selected workflow.
 7. Handling quoted or whitespace-containing rule tokens in the grammar.
 
-## Useful Devilspie2 event data
-
-Start with these event-provided functions:
-
-```lua
-get_class_instance_name()
-get_window_property( '_QUBES_VMNAME' )
-get_screen_geometry()
-get_window_geometry()
-```
-
-Keep the exact known-working Qubes property call form:
-
-```lua
-get_window_property( '_QUBES_VMNAME' )
-```
-
-Known behavior:
-
-1. `devilspie2 --debug` prints an initial startup dump for all currently known or processed windows.
-2. After startup, `devilspie2 --debug` behaves like an append-only event stream.
-3. Capturing the first debug output is not target selection.
-4. Capturing the next event after startup is unreliable because menus and launchers can generate intermediary events.
-5. The current `d2wc.lua` already filters non-normal windows with `WINDOW_TYPE_NORMAL`.
-6. The remaining practical issue is which normal event to act on.
-7. For now, accept duplicate configurator openings and rely on later suppression for windows that already have a profile or handling rule.
+Repeated observations in `devilspie2 --debug` output are normal. The inventory UI should not report observation counts. It should collapse repeated observations into one selectable rule target where they describe the same machine/application target.
 
 ## Current safe capability
 
@@ -183,8 +180,33 @@ The current Python core supports:
 16. GTK event-data fixture and command-argument plumbing.
 17. Dedicated test-config preparation and loading.
 18. Test-config-only generic add, modify, and delete backend for all six managed sections.
-19. GTK managed-section editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
+19. Workflow-focused GTK grid editor scoped to `~/.config/devilspie2/d2wc-test.lua`.
 20. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
+
+## Active next work
+
+Known-window inventory is the active branch work.
+
+Expected next slice:
+
+1. Convert parsed `KnownWindowCandidate` observations into one selectable Not configured target per machine/application rule target.
+2. Keep repeated observations internal and do not display observation counts.
+3. Suppress targets already configured for the selected workflow.
+4. Expose a clean inventory row-source interface for GTK.
+5. Keep live `devilspie2 --debug` capture out of scope until the parser and row-source logic are tested.
+
+## Future restore work
+
+Applied-write restore is documented as future work and should remain separate from unsaved row-level undo.
+
+Expected restore direction:
+
+1. Restore from the existing safe-save backup archive path.
+2. Show backup members newest first.
+3. Allow preview or inspection before restore.
+4. Validate the restore candidate before replacing the active file.
+5. Reuse staged write, sync, and backup safety rules.
+6. Keep restore scoped to `~/.config/devilspie2/d2wc-test.lua` until real-config writes are explicitly reviewed.
 
 ## Test command guidance
 
@@ -222,6 +244,32 @@ For a clean GTK test-config baseline:
 python3 -m d2wc configure --replace-test-config
 ```
 
+## Useful Devilspie2 event data
+
+Start with these event-provided functions:
+
+```lua
+get_class_instance_name()
+get_window_property( '_QUBES_VMNAME' )
+get_screen_geometry()
+get_window_geometry()
+```
+
+Keep the exact known-working Qubes property call form:
+
+```lua
+get_window_property( '_QUBES_VMNAME' )
+```
+
+Known behavior:
+
+1. `devilspie2 --debug` prints an initial startup dump for all currently known or processed windows.
+2. After startup, `devilspie2 --debug` behaves like an append-only event stream.
+3. Capturing the first debug output is not target selection.
+4. Capturing the next event after startup is unreliable because menus and launchers can generate intermediary events.
+5. The current `d2wc.lua` already filters non-normal windows with `WINDOW_TYPE_NORMAL`.
+6. The known-window inventory branch should treat this as list building, not single target selection.
+
 ## Historical Lua script preservation
 
 The pre-repository `d2wc.lua` history has been preserved in Git and connected to `main`.
@@ -240,44 +288,6 @@ git log --oneline --reverse archive/d2wc-lua-pre-repo-history -- src/d2wc.lua
 
 Design context recovered from that history is recorded in [Lua Design History Notes](lua-design-history.md).
 
-## Completed managed-section edit proofs
-
-All six managed Lua sections now have the same core editing proof pattern:
-
-1. Add one managed entry or rule.
-2. Modify one managed entry or rule.
-3. Delete one managed entry or rule.
-4. Preview by default.
-5. Write only when `--write` is supplied.
-6. Route writes through the safe-save helper.
-7. Create timestamped backup members stored in .bak.tgz archives on successful writes.
-8. Re-validate rendered output after edits.
-9. Leave the original config unchanged after failed edits.
-10. Preserve comments and blank lines where practical.
-11. Preserve `-- add more here` marker-tail behavior in edited rule-list sections.
-12. Match modify and delete requests by parsed meaning rather than token order where applicable.
-13. Reject exact duplicate targets where duplicates would make behavior ambiguous.
-
-## Draft PR #16 research outcome
-
-PR #16 explored using Devilspie2 as a direct event-data source.
-
-Current status:
-
-```text
-PR #16 is open as a draft.
-Do not merge it as-is.
-```
-
-Useful research outcomes:
-
-1. Devilspie2 is event-driven.
-2. `devilspie2 --debug` emits a startup dump before later event output.
-3. Lua can call the needed functions directly.
-4. `debug_print` is useful only as a proof mechanism to get values back to Python through stdout.
-5. Perfect target selection should not block UI work.
-6. The UI should be built around event-provided data and later suppression logic.
-
 ## Completed proof summary
 
 1. PR #3: safe-save proof.
@@ -291,7 +301,8 @@ Useful research outcomes:
 9. PR #15: selected-window geometry diagnostic proof.
 10. PR #19: event-data GTK UI proof.
 11. PR #20: read-only event proposal preview.
-12. PR #21: test-config GTK UI proof.
+12. PR #21: test-config configurator UI proof.
 13. PR #22: test-config proposal action buttons.
 14. PR #23: managed-section test-config actions.
 15. PR #26: known-window inventory parser foundation.
+16. PR #27: workflow-focused grid editor polish.

@@ -37,7 +37,7 @@ The repository currently contains:
 17. Read-only Qubes/dom0 selected-window geometry proof.
 18. Event-data UI direction notes in [Event-Data GTK UI Direction](event-data-ui-direction.md).
 19. Dedicated GTK test-config workflow using `~/.config/devilspie2/d2wc-test.lua`.
-20. GTK managed-section editor for all six managed sections, scoped to the test config.
+20. Workflow-focused GTK grid editor for all six managed sections, scoped to the test config.
 21. Known-window inventory parser foundation in `src/d2wc/event_inventory.py`.
 22. Development status notes in [Development Status](development-status.md).
 
@@ -67,7 +67,8 @@ The implementation should follow these decisions:
 18. Build the GTK UI around representative Devilspie2/Lua event data, not around live target-selection experiments.
 19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
 20. Use `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target until the real-config write workflow has its own explicit review.
-21. Build the known-window inventory in small testable slices: parser first, then deduplication and UI row source, then live capture.
+21. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
+22. Build the known-window inventory in small testable slices: parser first, row source and suppression second, live capture last.
 
 ## Completed stages
 
@@ -229,31 +230,37 @@ Complete and merged through PR #23.
 
 Confirmed behavior:
 
-1. All writes remain scoped to `~/.config/devilspie2/d2wc-test.lua`.
-2. The GTK managed-section editor can add, modify, and delete entries in all six sections.
-3. `Section` and `Action` selectors control the active fields.
-4. A single `Apply` action performs the selected operation.
-5. Tested core edit operations and safe-save behavior are reused.
-6. Displayed sections refresh after each write.
-7. Action fields clear after successful Apply.
+1. All writes are scoped to `~/.config/devilspie2/d2wc-test.lua`.
+2. GTK can add, modify, and delete entries for all six managed sections.
+3. The editor reuses tested core edit operations and safe-save behavior.
+4. The editor uses section/action-aware fields.
 
 ### Stage 20: grid-style GTK editor
 
-In progress on the separate `configurator-grid-editor-ui` branch.
+Complete and merged through PR #27.
 
-Required behavior:
+Confirmed behavior:
 
-1. Show configured entries and not-configured candidate rows in one workflow-focused editor.
-2. Use row-level Apply behavior instead of a global Apply action.
-3. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
-4. Keep real config writes out of scope.
-5. Keep the not-configured view backed by fixture/event data until the known-window inventory source is wired in.
+1. The workflow-focused grid editor is the active UI.
+2. Rows are wrapped and aligned with GTK size groups.
+3. Action row colours are:
+   1. `Add` = green
+   2. `Modify` = purple
+   3. `Delete` = red
+4. Dirty rows split the action area:
+   1. left half: amber `Undo`
+   2. right half: action-coloured `Apply`
+5. Successful apply actions show a compact translucent toast.
+6. Errors and validation failures still use blocking dialogs.
+7. Workspace selector reads the X11 workspace count when available.
+8. Workspace fallback is workspace 1 only.
+9. Configurator publishes stable GTK/X11 class `d2wc-configurator`.
+10. Menu currently has `Help`. Future `Configure` menu behavior is documented for notification settings.
+11. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua`.
 
 ### Stage 21: known-window inventory parser foundation
 
-In progress on the `configurator-known-window-inventory` branch.
-
-The first slice adds `src/d2wc/event_inventory.py` and parser tests.
+Complete through PR #26 and active as the foundation for the current branch.
 
 Current parser foundation behavior:
 
@@ -270,9 +277,9 @@ Intentionally not included yet:
 
 1. Starting or managing a live `devilspie2 --debug` process.
 2. Capturing a long-running event stream.
-3. Deduplicating candidates across multiple captured blocks.
+3. Building the cleaned Not configured row source.
 4. Feeding the GTK Not configured row builder.
-5. Populating Machine/Application dropdowns.
+5. Populating Machine/Application dropdowns from captured inventory.
 6. Suppressing candidates already configured for the selected workflow.
 7. Handling quoted or whitespace-containing rule tokens in the grammar.
 
@@ -284,24 +291,14 @@ Turn parsed candidates into the row source needed by the GTK Not configured view
 
 Required behavior:
 
-1. Deduplicate repeated candidates by normalized machine and application identity.
-2. Keep only candidates useful for the selected workflow.
-3. Suppress candidates already configured for the selected workflow where practical.
-4. Expose a clean inventory interface for GTK without coupling GTK to raw debug text parsing.
-5. Keep live process capture out of scope until this row source is tested.
+1. Convert repeated candidate observations into one selectable rule target where they describe the same machine/application target.
+2. Do not display observation counts, because repeated entries in `devilspie2 --debug` output are normal.
+3. Keep only targets useful for the selected workflow.
+4. Suppress targets already configured for the selected workflow where practical.
+5. Expose a clean inventory interface for GTK without coupling GTK to raw debug text parsing.
+6. Keep live process capture out of scope until this row source is tested.
 
-### Stage 23: event-data handoff proof from Lua to Python
-
-After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
-
-Required behavior:
-
-1. Lua captures event data directly from Devilspie2 functions.
-2. Lua passes the event data to the configurator command through a safe handoff mechanism.
-3. GTK displays exactly the event data it received.
-4. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config write workflow is reviewed.
-
-### Stage 24: live `devilspie2 --debug` inventory capture
+### Stage 23: live `devilspie2 --debug` inventory capture
 
 Add the live process-capture layer after the parser and row-source logic are tested.
 
@@ -312,6 +309,17 @@ Required behavior:
 3. Continue parsing later event output into candidates.
 4. Avoid blocking GTK responsiveness.
 5. Avoid persistent changes to the user's real Devilspie2 config.
+
+### Stage 24: event-data handoff proof from Lua to Python
+
+After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
+
+Required behavior:
+
+1. Lua captures event data directly from Devilspie2 functions.
+2. Lua passes the event data to the configurator command through a safe handoff mechanism.
+3. GTK displays exactly the event data it received.
+4. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config write workflow is reviewed.
 
 ### Stage 25: suppression for already-known windows
 
@@ -332,27 +340,31 @@ Purpose:
 3. Suppress repeated prompts for already-known windows later.
 4. Make the real application-window configurator flow less noisy over time.
 
-### Stage 26: backup retention or archive review
+### Stage 26: applied-write restore and backup recovery
 
-Review the current backup-archive strategy before real-config writes are enabled.
+Add a user-facing restore workflow for changes that have already been applied to the test config or, later, the real config.
 
-Options to evaluate:
+Required behavior:
 
-1. Keep full timestamped `.bak` files.
-2. Store backups in a single compressed archive.
-3. Store append-only diffs in a single archive file.
-4. Add a retention policy for old backups.
+1. Treat this as separate from row-level unsaved-edit undo.
+2. Restore from the existing safe-save backup archive path rather than from transient UI state.
+3. Show available backup members in a clear order, newest first.
+4. Allow previewing or inspecting the selected restore target before writing.
+5. Validate the restored candidate before replacing the active file.
+6. Reuse the same staged write, sync, and backup safety rules as normal guarded writes.
+7. Keep the restore workflow scoped to `~/.config/devilspie2/d2wc-test.lua` until real-config writes are explicitly reviewed.
+8. Document how restore interacts with backup retention before enabling it for real config writes.
 
 ### Stage 27: real-config write review
 
-Before enabling real user config writes in GTK, review:
+Do not enable real user config writes until this review is complete.
 
-1. Which config path is considered the active real user config.
-2. How the UI shows the target path.
-3. Whether real writes require a separate explicit mode.
-4. Whether real writes should require a final confirmation dialog.
-5. How backups are surfaced to the user.
-6. Whether the UI should provide a restore-from-backup workflow.
+Required behavior:
+
+1. Define explicit user confirmation behavior.
+2. Define backup retention behavior.
+3. Define recovery behavior.
+4. Confirm whether writes go directly to the active script or through a staged promotion flow.
 
 ### Stage 28: generated split profiles
 
