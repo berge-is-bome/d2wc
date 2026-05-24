@@ -4,7 +4,7 @@ set -euo pipefail
 BASE_DIR="$HOME/Qubes"
 ARCHIVE="$BASE_DIR/d2wc.tgz"
 WORKDIR="$BASE_DIR/d2wc"
-VM="work"
+VM="disp1234"
 
 LOCAL_BIN="$HOME/.local/bin"
 D2WC_BIN="$LOCAL_BIN/d2wc"
