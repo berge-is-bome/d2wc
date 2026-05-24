@@ -1,4 +1,11 @@
-from d2wc.event_inventory import KnownWindowCandidate, parse_known_window_candidates
+from d2wc.core.managed_config import ManagedConfig, WorkspaceRoute
+from d2wc.event_inventory import (
+    KnownWindowCandidate,
+    KnownWindowTarget,
+    build_available_known_window_targets,
+    build_known_window_targets,
+    parse_known_window_candidates,
+)
 
 
 def test_parse_known_window_candidates_keeps_only_normal_windows() -> None:
@@ -89,3 +96,102 @@ window_type: WINDOW_TYPE_NORMAL
 """
 
     assert parse_known_window_candidates(raw) == ()
+
+
+def test_build_known_window_targets_collapses_repeated_observations() -> None:
+    candidates = (
+        _candidate("personal", "navigator"),
+        _candidate("personal", "navigator"),
+        _candidate("work", "navigator"),
+    )
+
+    assert build_known_window_targets(candidates) == (
+        KnownWindowTarget(machine="personal", application="navigator"),
+        KnownWindowTarget(machine="work", application="navigator"),
+    )
+
+
+def test_build_known_window_targets_skips_whitespace_tokens() -> None:
+    candidates = (
+        _candidate("personal", "example app"),
+        _candidate("work vm", "navigator"),
+        _candidate("work", "navigator"),
+    )
+
+    assert build_known_window_targets(candidates) == (
+        KnownWindowTarget(machine="work", application="navigator"),
+    )
+
+
+def test_build_available_known_window_targets_suppresses_section_matches() -> None:
+    candidates = (
+        _candidate("personal", "navigator"),
+        _candidate("work", "navigator"),
+        _candidate("work", "terminal"),
+    )
+    config = _config(
+        workspace_routes=(WorkspaceRoute(2, ("d:work c:navigator",)),),
+    )
+
+    assert build_available_known_window_targets(candidates, config, "WORKSPACE_ROUTES") == (
+        KnownWindowTarget(machine="personal", application="navigator"),
+        KnownWindowTarget(machine="work", application="terminal"),
+    )
+
+
+def test_build_available_known_window_targets_honors_broad_domain_and_class_rules() -> None:
+    candidates = (
+        _candidate("personal", "navigator"),
+        _candidate("personal", "terminal"),
+        _candidate("work", "navigator"),
+        _candidate("work", "terminal"),
+    )
+    config = _config(
+        exclude=("d:personal",),
+        pin=("c:terminal",),
+    )
+
+    assert build_available_known_window_targets(candidates, config, "EXCLUDE") == (
+        KnownWindowTarget(machine="work", application="navigator"),
+        KnownWindowTarget(machine="work", application="terminal"),
+    )
+    assert build_available_known_window_targets(candidates, config, "PIN") == (
+        KnownWindowTarget(machine="personal", application="navigator"),
+        KnownWindowTarget(machine="work", application="navigator"),
+    )
+
+
+def test_build_available_known_window_targets_returns_empty_for_non_target_sections() -> None:
+    assert build_available_known_window_targets(
+        (_candidate("work", "navigator"),),
+        _config(),
+        "GEOM",
+    ) == ()
+
+
+def _candidate(machine: str, application: str) -> KnownWindowCandidate:
+    return KnownWindowCandidate(
+        machine=machine,
+        application=application,
+        raw_class_instance_name=f"{machine}:{application}",
+        window_type="WINDOW_TYPE_NORMAL",
+        raw_source="source",
+    )
+
+
+def _config(
+    *,
+    exclude: tuple[str, ...] = (),
+    pin: tuple[str, ...] = (),
+    workspace_routes: tuple[WorkspaceRoute, ...] = (),
+    workspace_placement: tuple[str, ...] = (),
+    left_edge_correction: tuple[str, ...] = (),
+) -> ManagedConfig:
+    return ManagedConfig(
+        exclude=exclude,
+        pin=pin,
+        workspace_routes=workspace_routes,
+        geom=(),
+        workspace_placement=workspace_placement,
+        left_edge_correction=left_edge_correction,
+    )
