@@ -55,7 +55,11 @@ def run_configurator(
     window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
     window.set_default_size(1280, 720)
     window.set_border_width(18)
-    window.connect("destroy", Gtk.main_quit)
+    def handle_destroy(_window) -> None:
+        editor.stop()
+        Gtk.main_quit()
+
+    window.connect("destroy", handle_destroy)
 
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
@@ -65,7 +69,7 @@ def run_configurator(
     content.set_vexpand(True)
     outer.pack_start(content, True, True, 0)
 
-    editor = build_managed_section_editor(Gtk, test_config_snapshot, _event)
+    editor = build_managed_section_editor(Gtk, test_config_snapshot, _event, GLib=GLib)
     content.pack_start(editor.widget, True, True, 0)
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)

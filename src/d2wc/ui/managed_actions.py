@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import subprocess
+import threading
 from dataclasses import dataclass
 from typing import Callable
 
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES
 from d2wc.event_data import WindowEventData
 from d2wc.event_inventory import KnownWindowTarget, merge_known_window_targets
-from d2wc.event_inventory_capture import capture_known_window_inventory
+from d2wc.event_inventory_capture import stream_known_window_inventory
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 from d2wc.ui.grid_rows import (
@@ -23,7 +24,6 @@ from d2wc.ui.grid_rows import (
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
 SUCCESS_TOAST_MESSAGE = "Operation completed successfully."
-INVENTORY_REFRESH_SUCCESS_MESSAGE = "Inventory refreshed."
 FALLBACK_WORKSPACES = ("1",)
 ROW_CSS = """
 eventbox.d2wc-row-add,
@@ -136,6 +136,7 @@ class ManagedSectionEditor:
     widget: object
     apply: Callable[[], None]
     show_help: Callable[[], None]
+    stop: Callable[[], None]
 
 
 
@@ -145,7 +146,9 @@ def build_managed_section_editor(
     snapshot: TestConfigSnapshot | None,
     event_data: WindowEventData | None = None,
     inventory_targets: tuple[KnownWindowTarget, ...] = (),
-    inventory_capture=capture_known_window_inventory,
+    *,
+    GLib=None,
+    inventory_stream=stream_known_window_inventory,
 ) -> ManagedSectionEditor:
     """Build the section-focused managed editor for the dedicated test config."""
 
@@ -167,9 +170,6 @@ def build_managed_section_editor(
 
     section_combo = _section_combo(Gtk)
     top_bar.pack_start(section_combo, False, False, 0)
-
-    refresh_inventory_button = Gtk.Button(label="Refresh inventory")
-    top_bar.pack_start(refresh_inventory_button, False, False, 0)
 
     rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     main_box.pack_start(rows_box, True, True, 0)
@@ -243,28 +243,68 @@ def build_managed_section_editor(
         if isinstance(row_controls, list) and row_controls:
             apply_row_action(row_controls[0])
 
-    def refresh_inventory() -> None:
-        try:
-            result = inventory_capture()
-        except Exception as exc:  # pragma: no cover - exercised manually with real Devilspie2
-            _show_message(Gtk, main_box, f"Inventory refresh failed:\n{exc}")
-            return
-
-        current_inventory_targets = state["inventory_targets"]
-        if not isinstance(current_inventory_targets, tuple):
-            current_inventory_targets = ()
-        state["inventory_targets"] = merge_known_window_targets(current_inventory_targets, result.targets)
-        refresh_editor_rows()
-        _show_toast(Gtk, main_box, INVENTORY_REFRESH_SUCCESS_MESSAGE)
-
     def show_help() -> None:
         _show_message(Gtk, main_box, WORKFLOW_HELP[current_section()])
 
+    inventory_stop_event = threading.Event()
+
+    def merge_inventory_targets(targets: tuple[KnownWindowTarget, ...]) -> bool:
+        if inventory_stop_event.is_set():
+            return False
+        current_inventory_targets = state["inventory_targets"]
+        if not isinstance(current_inventory_targets, tuple):
+            current_inventory_targets = ()
+        merged_targets = merge_known_window_targets(current_inventory_targets, targets)
+        if merged_targets == current_inventory_targets:
+            return False
+        state["inventory_targets"] = merged_targets
+
+        row_controls = state["row_controls"]
+        if isinstance(row_controls, list) and any(
+            isinstance(control, _EditorControls) and control.is_dirty for control in row_controls
+        ):
+            return False
+
+        refresh_editor_rows()
+        return False
+
+    def show_inventory_error(message: str) -> bool:
+        if not inventory_stop_event.is_set():
+            _show_message(Gtk, main_box, f"Inventory monitor failed:\n{message}")
+        return False
+
+    def monitor_inventory() -> None:
+        try:
+            for event in inventory_stream():
+                if inventory_stop_event.is_set():
+                    break
+                if event.targets and GLib is not None:
+                    GLib.idle_add(merge_inventory_targets, event.targets)
+        except Exception as exc:  # pragma: no cover - exercised manually with real Devilspie2
+            if GLib is not None:
+                GLib.idle_add(show_inventory_error, str(exc))
+
+    monitor_thread: threading.Thread | None = None
+    if GLib is not None and inventory_stream is not None:
+        monitor_thread = threading.Thread(
+            target=monitor_inventory,
+            name="d2wc-known-window-inventory",
+            daemon=True,
+        )
+        monitor_thread.start()
+
+    def stop_inventory_monitor() -> None:
+        inventory_stop_event.set()
+
     section_combo.connect("changed", lambda _combo: refresh_editor_rows())
-    refresh_inventory_button.connect("clicked", lambda _button: refresh_inventory())
     refresh_editor_rows()
 
-    return ManagedSectionEditor(widget=main_box, apply=apply_first_row, show_help=show_help)
+    return ManagedSectionEditor(
+        widget=main_box,
+        apply=apply_first_row,
+        show_help=show_help,
+        stop=stop_inventory_monitor,
+    )
 
 
 class _EditorControls:
