@@ -398,7 +398,11 @@ def build_managed_section_editor(
             return
 
         result = apply_managed_section_action(snapshot_value.path, request)
-        _show_message(Gtk, main_box, format_action_result(result))
+        result_text = format_action_result(result)
+        if result.ok:
+            _show_toast(Gtk, main_box, result_text)
+        else:
+            _show_message(Gtk, main_box, result_text)
         refreshed_snapshot = load_test_config_snapshot(snapshot_value.path)
         state["snapshot"] = refreshed_snapshot
         if result.ok:
@@ -1121,6 +1125,33 @@ def _class_from_event(event: WindowEventData | None) -> str:
     if not class_token or any(char.isspace() for char in class_token):
         return ""
     return class_token
+
+
+def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int = 5) -> None:
+    try:
+        from gi.repository import GLib
+    except (ImportError, ValueError):  # pragma: no cover
+        _show_message(Gtk, parent, text)
+        return
+
+    toast = Gtk.InfoBar()
+    toast.set_message_type(Gtk.MessageType.INFO)
+    toast.set_show_close_button(True)
+
+    content = toast.get_content_area()
+    label = _text_label(Gtk, text)
+    label.set_selectable(False)
+    content.add(label)
+
+    def dismiss() -> bool:
+        if toast.get_parent() is not None:
+            parent.remove(toast)
+        return False
+
+    toast.connect("response", lambda _toast, _response: dismiss())
+    parent.pack_end(toast, False, False, 0)
+    toast.show_all()
+    GLib.timeout_add_seconds(timeout_seconds, dismiss)
 
 
 def _show_message(Gtk, parent, text: str) -> None:
