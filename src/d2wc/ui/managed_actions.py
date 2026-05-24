@@ -593,6 +593,7 @@ def _build_section_rows_panel(
     scroller.add(panel)
 
     columns = SECTION_COLUMNS[section]
+    column_size_groups = _column_size_groups(Gtk, len(columns) + 1)
     header = Gtk.Grid()
     header.set_hexpand(True)
     header.set_column_homogeneous(False)
@@ -604,18 +605,24 @@ def _build_section_rows_panel(
         label.set_hexpand(_column_expands(column_name))
         if not _column_expands(column_name):
             label.set_width_chars(_column_width_chars(column_name))
+        column_size_groups[column_index].add_widget(label)
         header.attach(label, column_index, 0, 1, 1)
     panel.pack_start(header, False, True, 0)
 
     for row in rows:
         controls = _build_row_controls(Gtk, snapshot, section, row, event_data, workspace_values)
         row_controls.append(controls)
-        panel.pack_start(_build_action_row(Gtk, columns, controls, apply_row_action), False, True, 0)
+        panel.pack_start(
+            _build_action_row(Gtk, columns, controls, apply_row_action, column_size_groups),
+            False,
+            True,
+            0,
+        )
 
     return scroller
 
 
-def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, apply_row_action):
+def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, apply_row_action, column_size_groups):
     row_box = Gtk.EventBox()
     row_box.set_visible_window(True)
     row_box.set_above_child(False)
@@ -635,10 +642,14 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     for column_index, column_name in enumerate(columns):
         widget = _widget_for_column(Gtk, controls, column_name)
         widget.set_hexpand(_column_expands(column_name))
+        if not _column_expands(column_name) and hasattr(widget, "set_width_chars"):
+            widget.set_width_chars(_column_width_chars(column_name))
+        column_size_groups[column_index].add_widget(widget)
         grid.attach(widget, column_index, 0, 1, 1)
 
     apply_button = Gtk.Button(label="Apply")
     apply_button.set_hexpand(False)
+    column_size_groups[len(columns)].add_widget(apply_button)
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     grid.attach(apply_button, len(columns), 0, 1, 1)
 
@@ -883,6 +894,10 @@ def _set_action_row_style(row_box, action: str) -> None:
     for css_class in ("d2wc-row-add", "d2wc-row-modify", "d2wc-row-delete"):
         style.remove_class(css_class)
     style.add_class(f"d2wc-row-{action.lower()}")
+
+
+def _column_size_groups(Gtk, count: int):
+    return [Gtk.SizeGroup.new(Gtk.SizeGroupMode.HORIZONTAL) for _index in range(count)]
 
 
 def _column_expands(column_name: str) -> bool:
