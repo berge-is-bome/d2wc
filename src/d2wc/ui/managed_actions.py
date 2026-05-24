@@ -24,12 +24,12 @@ SECTION_LABELS = {
 }
 SECTION_BY_LABEL = {label: section for section, label in SECTION_LABELS.items()}
 SECTION_COLUMNS = {
-    "EXCLUDE": ("Action", "Domain", "Application name"),
-    "PIN": ("Action", "Domain", "Application name"),
-    "WORKSPACE_ROUTES": ("Action", "Domain", "Application name", "Workspace"),
+    "EXCLUDE": ("Action", "Machine", "Application"),
+    "PIN": ("Action", "Machine", "Application"),
+    "WORKSPACE_ROUTES": ("Action", "Machine", "Application", "Workspace"),
     "GEOM": ("Action", "Profile name", "Coordinates"),
-    "WORKSPACE_PLACEMENT": ("Action", "Domain", "Application name", "Geometry profile"),
-    "LEFT_EDGE_CORRECTION": ("Action", "Domain", "Application name", "Left edge"),
+    "WORKSPACE_PLACEMENT": ("Action", "Machine", "Application", "Geometry profile"),
+    "LEFT_EDGE_CORRECTION": ("Action", "Machine", "Application", "Left edge"),
 }
 
 
@@ -429,6 +429,10 @@ class _SearchableCombo:
     def get_active_text(self) -> str:
         return self.active_text
 
+    def set_placeholder(self, placeholder: str) -> None:
+        self.placeholder = placeholder
+        self._update_button_label()
+
     def set_sensitive(self, sensitive: bool) -> None:
         self.widget.set_sensitive(sensitive)
 
@@ -528,7 +532,7 @@ def _build_section_rows_grid(
     scroller.add(grid)
 
     columns = SECTION_COLUMNS[section]
-    for column_index, column_name in enumerate((*columns, "Apply")):
+    for column_index, column_name in enumerate(columns):
         label = Gtk.Label(label=column_name)
         label.set_xalign(0)
         grid.attach(label, column_index, 0, 1, 1)
@@ -555,8 +559,8 @@ def _build_row_controls(
     workspace_values: tuple[str, ...],
 ) -> _EditorControls:
     action_combo = _combo_box(Gtk, EDITOR_ACTIONS)
-    domain_combo = _searchable_combo(Gtk, "Domain", width=18)
-    class_combo = _searchable_combo(Gtk, "Application name", width=22)
+    domain_combo = _searchable_combo(Gtk, "Machine", width=18)
+    class_combo = _searchable_combo(Gtk, "Application", width=22)
     geometry_combo = _searchable_combo(Gtk, "Geometry profile", width=18)
     left_edge_combo = _combo_box(Gtk, tuple(sorted(LEFT_EDGE_MODES)))
     new_profile_entry = _entry(Gtk, "Profile name", width=18)
@@ -596,9 +600,9 @@ def _build_row_controls(
 def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
     if column_name == "Action":
         return controls.action_combo
-    if column_name == "Domain":
+    if column_name == "Machine":
         return controls.domain_combo.widget
-    if column_name == "Application name":
+    if column_name == "Application":
         return controls.class_combo.widget
     if column_name == "Geometry profile":
         return controls.geometry_combo.widget
@@ -696,6 +700,8 @@ def _populate_controls_from_grid_row(controls: _EditorControls, row: ManagedGrid
     parts = _rule_parts(row.target_entry or row.existing_entry)
     if parts.domain:
         _set_combo_active_text(controls.domain_combo, parts.domain)
+    elif controls.section == "WORKSPACE_PLACEMENT" and parts.class_name:
+        controls.domain_combo.set_placeholder("All")
     if parts.class_name:
         _set_combo_active_text(controls.class_combo, parts.class_name)
     if parts.geometry_profile:
