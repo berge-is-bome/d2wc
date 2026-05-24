@@ -8,7 +8,8 @@ from typing import Callable
 
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES
 from d2wc.event_data import WindowEventData
-from d2wc.event_inventory import KnownWindowTarget
+from d2wc.event_inventory import KnownWindowTarget, merge_known_window_targets
+from d2wc.event_inventory_capture import capture_known_window_inventory
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 from d2wc.ui.grid_rows import (
@@ -24,6 +25,7 @@ from d2wc.ui.grid_rows import (
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
 SUCCESS_TOAST_MESSAGE = "Operation completed successfully."
+INVENTORY_REFRESH_SUCCESS_MESSAGE = "Inventory refreshed."
 FALLBACK_WORKSPACES = ("1",)
 ROW_CSS = """
 eventbox.d2wc-row-add,
@@ -145,6 +147,7 @@ def build_managed_section_editor(
     snapshot: TestConfigSnapshot | None,
     event_data: WindowEventData | None = None,
     inventory_targets: tuple[KnownWindowTarget, ...] = (),
+    inventory_capture=capture_known_window_inventory,
 ) -> ManagedSectionEditor:
     """Build the section-focused managed editor for the dedicated test config."""
 
@@ -159,6 +162,7 @@ def build_managed_section_editor(
         "snapshot": snapshot,
         "show_not_configured": False,
         "row_controls": [],
+        "inventory_targets": inventory_targets,
     }
 
     top_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
@@ -169,6 +173,9 @@ def build_managed_section_editor(
 
     mode_button = Gtk.Button(label="Not configured")
     top_bar.pack_start(mode_button, False, False, 0)
+
+    refresh_inventory_button = Gtk.Button(label="Refresh inventory")
+    top_bar.pack_start(refresh_inventory_button, False, False, 0)
 
     rows_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
     main_box.pack_start(rows_box, True, True, 0)
@@ -189,7 +196,10 @@ def build_managed_section_editor(
 
         section = current_section()
         show_not_configured = bool(state["show_not_configured"])
-        rows = _rows_for_section(current_snapshot(), event_data, inventory_targets, section, show_not_configured)
+        current_inventory_targets = state["inventory_targets"]
+        if not isinstance(current_inventory_targets, tuple):
+            current_inventory_targets = ()
+        rows = _rows_for_section(current_snapshot(), event_data, current_inventory_targets, section, show_not_configured)
         if rows:
             rows_box.pack_start(
                 _build_section_rows_panel(
@@ -200,7 +210,7 @@ def build_managed_section_editor(
                     row_controls,
                     apply_row_action,
                     event_data,
-                    inventory_targets,
+                    current_inventory_targets,
                     workspace_values,
                 ),
                 True,
@@ -250,11 +260,28 @@ def build_managed_section_editor(
         mode_button.set_label("Configured" if state["show_not_configured"] else "Not configured")
         refresh_editor_rows()
 
+    def refresh_inventory() -> None:
+        try:
+            result = inventory_capture()
+        except Exception as exc:  # pragma: no cover - exercised manually with real Devilspie2
+            _show_message(Gtk, main_box, f"Inventory refresh failed:\n{exc}")
+            return
+
+        current_inventory_targets = state["inventory_targets"]
+        if not isinstance(current_inventory_targets, tuple):
+            current_inventory_targets = ()
+        state["inventory_targets"] = merge_known_window_targets(current_inventory_targets, result.targets)
+        state["show_not_configured"] = True
+        mode_button.set_label("Configured")
+        refresh_editor_rows()
+        _show_toast(Gtk, main_box, INVENTORY_REFRESH_SUCCESS_MESSAGE)
+
     def show_help() -> None:
         _show_message(Gtk, main_box, WORKFLOW_HELP[current_section()])
 
     section_combo.connect("changed", lambda _combo: refresh_editor_rows())
     mode_button.connect("clicked", lambda _button: toggle_mode())
+    refresh_inventory_button.connect("clicked", lambda _button: refresh_inventory())
     refresh_editor_rows()
 
     return ManagedSectionEditor(widget=main_box, apply=apply_first_row, show_help=show_help)
