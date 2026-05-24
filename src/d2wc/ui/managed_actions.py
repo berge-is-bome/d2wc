@@ -15,20 +15,20 @@ from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActi
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
 FALLBACK_WORKSPACES = ("1", "2", "3", "4")
 ROW_CSS = """
+eventbox.d2wc-row-add,
 .d2wc-row-add {
-  background-color: #5b2bd6;
+  background-color: #6a35e8;
   border-radius: 8px;
-  padding: 6px;
 }
+eventbox.d2wc-row-modify,
 .d2wc-row-modify {
-  background-color: #16865a;
+  background-color: #159b63;
   border-radius: 8px;
-  padding: 6px;
 }
+eventbox.d2wc-row-delete,
 .d2wc-row-delete {
-  background-color: #b3264a;
+  background-color: #cf2d56;
   border-radius: 8px;
-  padding: 6px;
 }
 """
 SECTION_LABELS = {
@@ -579,12 +579,13 @@ def _build_section_rows_panel(
     workspace_values: tuple[str, ...],
 ):
     scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
     scroller.set_hexpand(True)
     scroller.set_vexpand(True)
     scroller.set_size_request(-1, 260)
 
     panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    panel.set_hexpand(True)
     panel.set_margin_top(8)
     panel.set_margin_bottom(8)
     panel.set_margin_start(8)
@@ -593,19 +594,21 @@ def _build_section_rows_panel(
 
     columns = SECTION_COLUMNS[section]
     header = Gtk.Grid()
+    header.set_hexpand(True)
     header.set_column_homogeneous(True)
     header.set_column_spacing(8)
     for column_index, column_name in enumerate((*columns, "")):
         label = Gtk.Label(label=column_name)
+        label.set_hexpand(True)
         label.set_xalign(0.5)
         label.set_justify(Gtk.Justification.CENTER)
         header.attach(label, column_index, 0, 1, 1)
-    panel.pack_start(header, False, False, 0)
+    panel.pack_start(header, False, True, 0)
 
     for row in rows:
         controls = _build_row_controls(Gtk, snapshot, section, row, event_data, workspace_values)
         row_controls.append(controls)
-        panel.pack_start(_build_action_row(Gtk, columns, controls, apply_row_action), False, False, 0)
+        panel.pack_start(_build_action_row(Gtk, columns, controls, apply_row_action), False, True, 0)
 
     return scroller
 
@@ -614,9 +617,11 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     row_box = Gtk.EventBox()
     row_box.set_visible_window(True)
     row_box.set_above_child(False)
+    row_box.set_hexpand(True)
     _set_action_row_style(row_box, _active_action(controls))
 
     grid = Gtk.Grid()
+    grid.set_hexpand(True)
     grid.set_column_homogeneous(True)
     grid.set_column_spacing(8)
     grid.set_margin_top(6)
@@ -626,9 +631,12 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     row_box.add(grid)
 
     for column_index, column_name in enumerate(columns):
-        grid.attach(_widget_for_column(Gtk, controls, column_name), column_index, 0, 1, 1)
+        widget = _widget_for_column(Gtk, controls, column_name)
+        widget.set_hexpand(True)
+        grid.attach(widget, column_index, 0, 1, 1)
 
     apply_button = Gtk.Button(label="Apply")
+    apply_button.set_hexpand(True)
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     grid.attach(apply_button, len(columns), 0, 1, 1)
 
@@ -651,10 +659,10 @@ def _build_row_controls(
     left_edge_combo = _combo_box(Gtk, tuple(sorted(LEFT_EDGE_MODES)))
     new_profile_entry = _entry(Gtk, "Profile name", width=18)
     workspace_combo = _combo_box(Gtk, workspace_values)
-    x_entry = _entry(Gtk, "x", width=6)
-    y_entry = _entry(Gtk, "y", width=6)
-    w_entry = _entry(Gtk, "w", width=6)
-    h_entry = _entry(Gtk, "h", width=6)
+    x_entry = _entry(Gtk, "x", width=5)
+    y_entry = _entry(Gtk, "y", width=5)
+    w_entry = _entry(Gtk, "w", width=5)
+    h_entry = _entry(Gtk, "h", width=5)
 
     controls = _EditorControls(
         section=section,
@@ -855,7 +863,11 @@ def _workspace_values() -> tuple[str, ...]:
 def _install_row_css(Gtk, widget) -> None:
     provider = Gtk.CssProvider()
     provider.load_from_data(ROW_CSS.encode("utf-8"))
-    widget.get_style_context().add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+    Gtk.StyleContext.add_provider_for_screen(
+        widget.get_screen(),
+        provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
 
 
 def _set_action_row_style(row_box, action: str) -> None:
