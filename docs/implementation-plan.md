@@ -39,7 +39,8 @@ The repository currently contains:
 19. Dedicated GTK test-config workflow using `~/.config/devilspie2/d2wc-test.lua`.
 20. Workflow-focused GTK grid editor for all six managed sections, scoped to the test config.
 21. Known-window inventory parser foundation in `src/d2wc/event_inventory.py`.
-22. Development status notes in [Development Status](development-status.md).
+22. Known-window row-source helpers in `src/d2wc/ui/grid_rows.py`.
+23. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer while the configurator UI is developed.
 
@@ -68,7 +69,7 @@ The implementation should follow these decisions:
 19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
 20. Use `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target until the real-config write workflow has its own explicit review.
 21. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
-22. Build the known-window inventory in small testable slices: parser first, row source and suppression second, live capture last.
+22. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded live capture third, GTK live refresh last.
 
 ## Completed stages
 
@@ -260,7 +261,7 @@ Confirmed behavior:
 
 ### Stage 21: known-window inventory parser foundation
 
-Complete through PR #26 and active as the foundation for the current branch.
+Complete through PR #26.
 
 Current parser foundation behavior:
 
@@ -273,44 +274,53 @@ Current parser foundation behavior:
 7. Derive an application token from the rightmost class-instance segment after `:`.
 8. Preserve the raw class instance value and source block for debugging.
 
-Intentionally not included yet:
-
-1. Starting or managing a live `devilspie2 --debug` process.
-2. Capturing a long-running event stream.
-3. Building the cleaned Not configured row source.
-4. Feeding the GTK Not configured row builder.
-5. Populating Machine/Application dropdowns from captured inventory.
-6. Suppressing candidates already configured for the selected workflow.
-7. Handling quoted or whitespace-containing rule tokens in the grammar.
-
-## Future implementation stages
-
 ### Stage 22: known-window inventory row source
 
-Turn parsed candidates into the row source needed by the GTK Not configured view.
+Complete on the `configurator-known-window-inventory` branch.
 
-Required behavior:
+Current row-source behavior:
 
 1. Convert repeated candidate observations into one selectable rule target where they describe the same machine/application target.
 2. Do not display observation counts, because repeated entries in `devilspie2 --debug` output are normal.
-3. Keep only targets useful for the selected workflow.
+3. Skip unsafe whitespace-containing rule tokens until the grammar supports them.
 4. Suppress targets already configured for the selected workflow where practical.
-5. Expose a clean inventory interface for GTK without coupling GTK to raw debug text parsing.
-6. Keep live process capture out of scope until this row source is tested.
+5. Convert inventory targets into Not configured grid rows for target-based workflows.
+6. Do not create `GEOM` rows from inventory targets, because this inventory slice only carries machine/application data.
+7. Expose a clean row-builder interface for GTK without coupling GTK to raw debug text parsing.
 
-### Stage 23: live `devilspie2 --debug` inventory capture
+The row-source logic now lives in `src/d2wc/ui/grid_rows.py`, while `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly and row control behavior.
+
+## Future implementation stages
+
+### Stage 23: bounded live `devilspie2 --debug` inventory capture
 
 Add the live process-capture layer after the parser and row-source logic are tested.
 
 Required behavior:
 
-1. Start or attach to the chosen debug/event source safely.
-2. Treat startup output as inventory input, not as target selection.
-3. Continue parsing later event output into candidates.
-4. Avoid blocking GTK responsiveness.
-5. Avoid persistent changes to the user's real Devilspie2 config.
+1. Use a temporary read-only probe Lua script rather than the active `d2wc.lua` rules script.
+2. Print only the values needed for inventory, currently domain/machine, class instance, and window type.
+3. Run `devilspie2 --debug` for a bounded capture period.
+4. Treat startup output as inventory input, not as target selection.
+5. Continue parsing later event output into candidates where practical.
+6. Terminate the process cleanly.
+7. Return raw text or parsed `KnownWindowTarget` values through a core API.
+8. Avoid blocking GTK responsiveness.
+9. Avoid persistent changes to the user's real Devilspie2 config.
 
-### Stage 24: event-data handoff proof from Lua to Python
+### Stage 24: GTK inventory refresh integration
+
+Wire the tested bounded capture layer into GTK after capture itself is stable.
+
+Required behavior:
+
+1. Keep initial integration manually triggered or otherwise bounded.
+2. Feed captured targets into the Not configured row source.
+3. Keep target suppression section-aware.
+4. Avoid long-running background behavior until the UX is explicitly reviewed.
+5. Keep writes scoped to `~/.config/devilspie2/d2wc-test.lua`.
+
+### Stage 25: event-data handoff proof from Lua to Python
 
 After the UI layout and test-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
 
@@ -321,7 +331,7 @@ Required behavior:
 3. GTK displays exactly the event data it received.
 4. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config write workflow is reviewed.
 
-### Stage 25: suppression for already-known windows
+### Stage 26: suppression for already-known windows
 
 Add logic to avoid automatically opening the configurator for windows that already have a profile or handling rule.
 
@@ -340,7 +350,7 @@ Purpose:
 3. Suppress repeated prompts for already-known windows later.
 4. Make the real application-window configurator flow less noisy over time.
 
-### Stage 26: applied-write restore and backup recovery
+### Stage 27: applied-write restore and backup recovery
 
 Add a user-facing restore workflow for changes that have already been applied to the test config or, later, the real config.
 
@@ -355,7 +365,7 @@ Required behavior:
 7. Keep the restore workflow scoped to `~/.config/devilspie2/d2wc-test.lua` until real-config writes are explicitly reviewed.
 8. Document how restore interacts with backup retention before enabling it for real config writes.
 
-### Stage 27: real-config write review
+### Stage 28: real-config write review
 
 Do not enable real user config writes until this review is complete.
 
@@ -366,6 +376,6 @@ Required behavior:
 3. Define recovery behavior.
 4. Confirm whether writes go directly to the active script or through a staged promotion flow.
 
-### Stage 28: generated split profiles
+### Stage 29: generated split profiles
 
 Implement generated split-profile support.
