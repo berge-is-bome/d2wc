@@ -70,6 +70,17 @@ src/
 tests/                          Python tests for the configurator core and UI helpers.
 ```
 
+## Qubes dom0 installation
+
+The current user-facing target is Qubes dom0. The repo includes two helper scripts for the source-tarball workflow:
+
+1. `d2wc-prepare-archive.sh` runs in a networked DisposableVM and prepares `/tmp/d2wc.tgz`.
+2. `d2wc-installation.sh` runs in dom0 and installs or updates `d2wc`.
+
+Use [`docs/qubes-dom0-installation.md`](docs/qubes-dom0-installation.md) for the full Qubes install/update flow.
+
+Current caveat: the installer already creates `~/.config/devilspie2/d2wc.lua` and launches `d2wc configure`, but the next code slice still needs to make plain `d2wc configure` load that real managed config by default.
+
 ## Local development
 
 Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
