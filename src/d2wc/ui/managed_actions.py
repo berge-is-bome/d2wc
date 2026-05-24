@@ -456,6 +456,7 @@ class _EditorControls:
         self.w_entry = w_entry
         self.h_entry = h_entry
         self.apply_button = None
+        self.undo_button = None
         self.initial_values: tuple[str, ...] = ()
         self.is_restoring = False
         self.is_dirty = False
@@ -674,14 +675,28 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
         column_size_groups[column_index].add_widget(widget)
         grid.attach(widget, column_index, 0, 1, 1)
 
+    action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
+    action_box.set_hexpand(False)
+    action_box.set_size_request(112, -1)
+    column_size_groups[len(columns)].add_widget(action_box)
+
+    undo_button = Gtk.Button(label="Undo")
+    undo_button.set_hexpand(True)
+    undo_button.set_size_request(56, -1)
+    undo_button.set_no_show_all(True)
+    undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
+    action_box.pack_start(undo_button, True, True, 0)
+
     apply_button = Gtk.Button(label="Apply")
-    apply_button.set_hexpand(False)
-    column_size_groups[len(columns)].add_widget(apply_button)
-    apply_button.connect("clicked", lambda _button: _handle_stateful_apply_button(controls, apply_row_action))
-    grid.attach(apply_button, len(columns), 0, 1, 1)
+    apply_button.set_hexpand(True)
+    apply_button.set_size_request(56, -1)
+    apply_button.connect("clicked", lambda _button: apply_row_action(controls))
+    action_box.pack_start(apply_button, True, True, 0)
+
+    grid.attach(action_box, len(columns), 0, 1, 1)
 
     controls.action_combo.connect("changed", lambda _combo: _set_action_row_style(row_box, _active_action(controls)))
-    _initialize_row_state(controls, apply_button)
+    _initialize_row_state(controls, apply_button, undo_button)
     return row_box
 
 
@@ -821,11 +836,13 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
         entry.set_sensitive(edits_geom_values)
 
 
-def _initialize_row_state(controls: _EditorControls, apply_button) -> None:
+def _initialize_row_state(controls: _EditorControls, apply_button, undo_button) -> None:
     controls.apply_button = apply_button
+    controls.undo_button = undo_button
     controls.initial_values = _control_values(controls)
     controls.is_dirty = False
-    _set_apply_button_state(apply_button, _active_action(controls), dirty=False)
+    _set_apply_button_state(apply_button, _active_action(controls))
+    _set_undo_button_state(undo_button, dirty=False)
     _connect_dirty_tracking(controls)
 
 
@@ -844,19 +861,14 @@ def _connect_dirty_tracking(controls: _EditorControls) -> None:
         entry.connect("changed", callback)
 
 
-def _handle_stateful_apply_button(controls: _EditorControls, apply_row_action) -> None:
-    if controls.is_dirty:
-        _restore_initial_values(controls)
-        return
-    apply_row_action(controls)
-
-
 def _refresh_row_dirty_state(controls: _EditorControls) -> None:
     if controls.is_restoring:
         return
     controls.is_dirty = _control_values(controls) != controls.initial_values
     if controls.apply_button is not None:
-        _set_apply_button_state(controls.apply_button, _active_action(controls), dirty=controls.is_dirty)
+        _set_apply_button_state(controls.apply_button, _active_action(controls))
+    if controls.undo_button is not None:
+        _set_undo_button_state(controls.undo_button, dirty=controls.is_dirty)
 
 
 def _restore_initial_values(controls: _EditorControls) -> None:
@@ -1022,7 +1034,7 @@ def _set_action_row_style(row_box, action: str) -> None:
     style.add_class(f"d2wc-row-{action.lower()}")
 
 
-def _set_apply_button_state(apply_button, action: str, *, dirty: bool) -> None:
+def _set_apply_button_state(apply_button, action: str) -> None:
     style = apply_button.get_style_context()
     for css_class in (
         "d2wc-apply-add",
@@ -1031,12 +1043,24 @@ def _set_apply_button_state(apply_button, action: str, *, dirty: bool) -> None:
         "d2wc-apply-dirty",
     ):
         style.remove_class(css_class)
+    apply_button.set_label("Apply")
+    style.add_class(f"d2wc-apply-{action.lower()}")
+
+
+def _set_undo_button_state(undo_button, *, dirty: bool) -> None:
+    style = undo_button.get_style_context()
+    for css_class in (
+        "d2wc-apply-add",
+        "d2wc-apply-modify",
+        "d2wc-apply-delete",
+        "d2wc-apply-dirty",
+    ):
+        style.remove_class(css_class)
+    style.add_class("d2wc-apply-dirty")
     if dirty:
-        apply_button.set_label("Undo")
-        style.add_class("d2wc-apply-dirty")
+        undo_button.show()
     else:
-        apply_button.set_label("Apply")
-        style.add_class(f"d2wc-apply-{action.lower()}")
+        undo_button.hide()
 
 
 def _column_size_groups(Gtk, count: int):
