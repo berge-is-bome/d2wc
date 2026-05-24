@@ -5,8 +5,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
+from d2wc.core.managed_config import ManagedConfig
+from d2wc.core.rule_grammar import PrefixedRule, RuleParseError, parse_prefixed_rule
+
 _NORMAL_WINDOW_TYPE = "WINDOW_TYPE_NORMAL"
 _KEY_VALUE_PATTERN = re.compile(r"^\s*([^:=]+?)\s*[:=]\s*(.*?)\s*$")
+KNOWN_WINDOW_TARGET_SECTIONS = (
+    "EXCLUDE",
+    "PIN",
+    "WORKSPACE_ROUTES",
+    "WORKSPACE_PLACEMENT",
+    "LEFT_EDGE_CORRECTION",
+)
 
 
 @dataclass(frozen=True)
@@ -18,6 +28,20 @@ class KnownWindowCandidate:
     raw_class_instance_name: str
     window_type: str
     raw_source: str
+
+
+@dataclass(frozen=True)
+class KnownWindowTarget:
+    """Selectable rule target derived from one or more window observations."""
+
+    machine: str
+    application: str
+
+    @property
+    def rule(self) -> str:
+        """Return the prefixed target rule for this known-window target."""
+
+        return f"d:{self.machine} c:{self.application}"
 
 
 def parse_known_window_candidates(raw_text: str) -> tuple[KnownWindowCandidate, ...]:
@@ -47,6 +71,69 @@ def parse_known_window_candidates(raw_text: str) -> tuple[KnownWindowCandidate, 
         )
 
     return tuple(candidates)
+
+
+def build_known_window_targets(
+    candidates: tuple[KnownWindowCandidate, ...],
+) -> tuple[KnownWindowTarget, ...]:
+    """Build unique selectable rule targets from parsed window observations.
+
+    Repeated observations in `devilspie2 --debug` output are normal. They are
+    collapsed into one selectable machine/application target without exposing an
+    observation count to the UI.
+    """
+
+    targets: list[KnownWindowTarget] = []
+    seen: set[KnownWindowTarget] = set()
+    for candidate in candidates:
+        machine = candidate.machine.strip().lower()
+        application = candidate.application.strip().lower()
+        if not _is_safe_rule_token(machine) or not _is_safe_rule_token(application):
+            continue
+        target = KnownWindowTarget(machine=machine, application=application)
+        if target in seen:
+            continue
+        seen.add(target)
+        targets.append(target)
+    return tuple(targets)
+
+
+def build_available_known_window_targets(
+    candidates: tuple[KnownWindowCandidate, ...],
+    config: ManagedConfig | None,
+    section: str,
+) -> tuple[KnownWindowTarget, ...]:
+    """Build known-window targets not already configured for one section."""
+
+    return filter_known_window_targets_for_section(
+        build_known_window_targets(candidates),
+        config,
+        section,
+    )
+
+
+def filter_known_window_targets_for_section(
+    targets: tuple[KnownWindowTarget, ...],
+    config: ManagedConfig | None,
+    section: str,
+) -> tuple[KnownWindowTarget, ...]:
+    """Suppress targets already covered by the selected managed section."""
+
+    if section not in KNOWN_WINDOW_TARGET_SECTIONS:
+        return ()
+    if config is None:
+        return targets
+
+    configured_rules = _configured_rules_for_section(config, section)
+    parsed_rules = tuple(_parse_rule_or_none(rule) for rule in configured_rules)
+    return tuple(
+        target
+        for target in targets
+        if not any(
+            parsed_rule is not None and _rule_matches_known_window_target(parsed_rule, target)
+            for parsed_rule in parsed_rules
+        )
+    )
 
 
 def _event_blocks(raw_text: str) -> tuple[str, ...]:
@@ -138,3 +225,38 @@ def _normalize_application(fields: dict[str, str]) -> str | None:
 
     token = chosen.rsplit(":", 1)[-1].strip().lower()
     return token or None
+
+
+def _configured_rules_for_section(config: ManagedConfig, section: str) -> tuple[str, ...]:
+    if section == "EXCLUDE":
+        return config.exclude
+    if section == "PIN":
+        return config.pin
+    if section == "WORKSPACE_ROUTES":
+        return tuple(rule for route in config.workspace_routes for rule in route.rules)
+    if section == "WORKSPACE_PLACEMENT":
+        return config.workspace_placement
+    if section == "LEFT_EDGE_CORRECTION":
+        return config.left_edge_correction
+    return ()
+
+
+def _parse_rule_or_none(rule: str) -> PrefixedRule | None:
+    try:
+        return parse_prefixed_rule(rule)
+    except RuleParseError:
+        return None
+
+
+def _rule_matches_known_window_target(rule: PrefixedRule, target: KnownWindowTarget) -> bool:
+    if not rule.has_target:
+        return False
+    if rule.domain is not None and rule.domain != target.machine:
+        return False
+    if rule.class_name is not None and rule.class_name != target.application:
+        return False
+    return True
+
+
+def _is_safe_rule_token(value: str) -> bool:
+    return bool(value) and not any(char.isspace() for char in value)
