@@ -98,6 +98,22 @@ def build_known_window_targets(
     return tuple(targets)
 
 
+def merge_known_window_targets(
+    existing: tuple[KnownWindowTarget, ...],
+    incoming: tuple[KnownWindowTarget, ...],
+) -> tuple[KnownWindowTarget, ...]:
+    """Merge known-window targets while preserving first-seen order."""
+
+    merged: list[KnownWindowTarget] = []
+    seen: set[KnownWindowTarget] = set()
+    for target in (*existing, *incoming):
+        if target in seen:
+            continue
+        seen.add(target)
+        merged.append(target)
+    return tuple(merged)
+
+
 def build_available_known_window_targets(
     candidates: tuple[KnownWindowCandidate, ...],
     config: ManagedConfig | None,
