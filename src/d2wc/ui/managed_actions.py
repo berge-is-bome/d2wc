@@ -456,9 +456,9 @@ class _EditorControls:
         self.w_entry = w_entry
         self.h_entry = h_entry
         self.apply_button = None
-        self.undo_button = None
         self.initial_values: tuple[str, ...] = ()
         self.is_restoring = False
+        self.is_dirty = False
 
 
 class _SearchableCombo:
@@ -620,12 +620,12 @@ def _build_section_rows_panel(
     scroller.add(panel)
 
     columns = SECTION_COLUMNS[section]
-    column_size_groups = _column_size_groups(Gtk, len(columns) + 2)
+    column_size_groups = _column_size_groups(Gtk, len(columns) + 1)
     header = Gtk.Grid()
     header.set_hexpand(True)
     header.set_column_homogeneous(False)
     header.set_column_spacing(8)
-    for column_index, column_name in enumerate((*columns, "", "")):
+    for column_index, column_name in enumerate((*columns, "")):
         label = Gtk.Label(label=column_name)
         label.set_xalign(0.5)
         label.set_justify(Gtk.Justification.CENTER)
@@ -677,17 +677,11 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
     apply_button = Gtk.Button(label="Apply")
     apply_button.set_hexpand(False)
     column_size_groups[len(columns)].add_widget(apply_button)
-    apply_button.connect("clicked", lambda _button: apply_row_action(controls))
+    apply_button.connect("clicked", lambda _button: _handle_stateful_apply_button(controls, apply_row_action))
     grid.attach(apply_button, len(columns), 0, 1, 1)
 
-    undo_button = Gtk.Button(label="Undo")
-    undo_button.set_hexpand(False)
-    column_size_groups[len(columns) + 1].add_widget(undo_button)
-    undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
-    grid.attach(undo_button, len(columns) + 1, 0, 1, 1)
-
     controls.action_combo.connect("changed", lambda _combo: _set_action_row_style(row_box, _active_action(controls)))
-    _initialize_row_state(controls, apply_button, undo_button)
+    _initialize_row_state(controls, apply_button)
     return row_box
 
 
@@ -827,12 +821,11 @@ def _set_field_sensitivity(section: str, action: str, controls: _EditorControls)
         entry.set_sensitive(edits_geom_values)
 
 
-def _initialize_row_state(controls: _EditorControls, apply_button, undo_button) -> None:
+def _initialize_row_state(controls: _EditorControls, apply_button) -> None:
     controls.apply_button = apply_button
-    controls.undo_button = undo_button
     controls.initial_values = _control_values(controls)
-    undo_button.set_sensitive(False)
-    _set_apply_button_style(apply_button, _active_action(controls), dirty=False)
+    controls.is_dirty = False
+    _set_apply_button_state(apply_button, _active_action(controls), dirty=False)
     _connect_dirty_tracking(controls)
 
 
@@ -851,14 +844,19 @@ def _connect_dirty_tracking(controls: _EditorControls) -> None:
         entry.connect("changed", callback)
 
 
+def _handle_stateful_apply_button(controls: _EditorControls, apply_row_action) -> None:
+    if controls.is_dirty:
+        _restore_initial_values(controls)
+        return
+    apply_row_action(controls)
+
+
 def _refresh_row_dirty_state(controls: _EditorControls) -> None:
     if controls.is_restoring:
         return
-    dirty = _control_values(controls) != controls.initial_values
-    if controls.undo_button is not None:
-        controls.undo_button.set_sensitive(dirty)
+    controls.is_dirty = _control_values(controls) != controls.initial_values
     if controls.apply_button is not None:
-        _set_apply_button_style(controls.apply_button, _active_action(controls), dirty=dirty)
+        _set_apply_button_state(controls.apply_button, _active_action(controls), dirty=controls.is_dirty)
 
 
 def _restore_initial_values(controls: _EditorControls) -> None:
@@ -1024,7 +1022,7 @@ def _set_action_row_style(row_box, action: str) -> None:
     style.add_class(f"d2wc-row-{action.lower()}")
 
 
-def _set_apply_button_style(apply_button, action: str, *, dirty: bool) -> None:
+def _set_apply_button_state(apply_button, action: str, *, dirty: bool) -> None:
     style = apply_button.get_style_context()
     for css_class in (
         "d2wc-apply-add",
@@ -1033,7 +1031,12 @@ def _set_apply_button_style(apply_button, action: str, *, dirty: bool) -> None:
         "d2wc-apply-dirty",
     ):
         style.remove_class(css_class)
-    style.add_class("d2wc-apply-dirty" if dirty else f"d2wc-apply-{action.lower()}")
+    if dirty:
+        apply_button.set_label("Undo")
+        style.add_class("d2wc-apply-dirty")
+    else:
+        apply_button.set_label("Apply")
+        style.add_class(f"d2wc-apply-{action.lower()}")
 
 
 def _column_size_groups(Gtk, count: int):
