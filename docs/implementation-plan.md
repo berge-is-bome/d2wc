@@ -66,7 +66,7 @@ The implementation should follow these decisions:
 18. Build the GTK UI around representative Devilspie2/Lua event data, not around live target-selection experiments.
 19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
 20. Use `~/.config/devilspie2/d2wc-test.lua` as the GTK UI write target until the real-config write workflow has its own explicit review.
-21. Query the current X11 workspace count for the GTK workspace selector when possible, falling back to workspaces `1` through `4` only when the desktop does not report a count.
+21. Query the current X11 workspace count for the GTK workspace selector.
 
 ## Completed stages
 
@@ -244,11 +244,14 @@ Required behavior:
 1. Use one section-focused editor area instead of separate configured, known-window, and selected-row panels.
 2. Show normalized workflow labels such as `Window geometry` instead of raw all-caps section names.
 3. Use searchable popup selectors for rule parts where the list can grow.
-4. Split prefixed rules into separate editable fields, for example `Domain`, `Class`, `Window geometry`, and `Left edge`, instead of exposing `d:`, `c:`, `g:`, and `le:` as one combined string.
+4. Split prefixed rules into separate editable fields, for example `Machine`, `Application`, `Geometry profile`, and `Left edge`, instead of exposing `d:`, `c:`, `g:`, and `le:` as one combined string.
 5. Keep the full original rule hidden for modify and delete matching.
 6. Use separate editable rule-part fields for both new rows and existing configured rows.
-7. Query the current X11 workspace count for the workspace selector when possible, falling back to workspaces `1` through `4` only if the desktop count is unavailable.
+7. Query the current X11 workspace count for the workspace selector.
 8. Writes remain scoped to `~/.config/devilspie2/d2wc-test.lua` until the real-config workflow is reviewed.
+9. Publish a stable GTK/X11 window class for the configurator window so it can be targeted by Devilspie2 as `d2wc-configurator` instead of a Python fallback such as `__main__.py`.
+10. Support a row-level unsaved-edit state so changing an editable field can make the row `Apply` button visually distinct.
+11. Support row-level undo for unsaved UI edits so the row can be restored to its last loaded values before applying.
 
 ### Stage 21: known-window inventory from Devilspie2 event data
 
@@ -262,7 +265,22 @@ Required behavior:
 4. Suppress entries already known to the selected workflow.
 5. Populate not-configured UI rows from the cleaned inventory.
 
-### Stage 22: real-config write review
+### Stage 22: applied-write restore and backup recovery
+
+Add a user-facing restore workflow for changes that have already been applied to the test config or, later, the real config.
+
+Required behavior:
+
+1. Treat this as separate from row-level unsaved-edit undo.
+2. Restore from the existing safe-save backup archive path rather than from transient UI state.
+3. Show available backup members in a clear order, newest first.
+4. Allow previewing or inspecting the selected restore target before writing.
+5. Validate the restored candidate before replacing the active file.
+6. Reuse the same staged write, sync, and backup safety rules as normal guarded writes.
+7. Keep the restore workflow scoped to `~/.config/devilspie2/d2wc-test.lua` until real-config writes are explicitly reviewed.
+8. Document how restore interacts with backup retention before enabling it for real config writes.
+
+### Stage 23: real-config write review
 
 Do not enable real user config writes until this review is complete.
 
