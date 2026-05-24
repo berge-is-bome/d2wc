@@ -17,12 +17,12 @@ FALLBACK_WORKSPACES = ("1", "2", "3", "4")
 ROW_CSS = """
 eventbox.d2wc-row-add,
 .d2wc-row-add {
-  background-color: #6a35e8;
+  background-color: #159b63;
   border-radius: 8px;
 }
 eventbox.d2wc-row-modify,
 .d2wc-row-modify {
-  background-color: #159b63;
+  background-color: #6a35e8;
   border-radius: 8px;
 }
 eventbox.d2wc-row-delete,
@@ -44,7 +44,7 @@ SECTION_COLUMNS = {
     "EXCLUDE": ("Action", "Machine", "Application"),
     "PIN": ("Action", "Machine", "Application"),
     "WORKSPACE_ROUTES": ("Action", "Machine", "Application", "Workspace"),
-    "GEOM": ("Action", "Profile name", "Coordinates"),
+    "GEOM": ("Action", "Profile name", "X", "Y", "W", "H"),
     "WORKSPACE_PLACEMENT": ("Action", "Machine", "Application", "Geometry profile"),
     "LEFT_EDGE_CORRECTION": ("Action", "Machine", "Application", "Left edge"),
 }
@@ -595,13 +595,15 @@ def _build_section_rows_panel(
     columns = SECTION_COLUMNS[section]
     header = Gtk.Grid()
     header.set_hexpand(True)
-    header.set_column_homogeneous(True)
+    header.set_column_homogeneous(False)
     header.set_column_spacing(8)
     for column_index, column_name in enumerate((*columns, "")):
         label = Gtk.Label(label=column_name)
-        label.set_hexpand(True)
         label.set_xalign(0.5)
         label.set_justify(Gtk.Justification.CENTER)
+        label.set_hexpand(_column_expands(column_name))
+        if not _column_expands(column_name):
+            label.set_width_chars(_column_width_chars(column_name))
         header.attach(label, column_index, 0, 1, 1)
     panel.pack_start(header, False, True, 0)
 
@@ -622,7 +624,7 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
     grid = Gtk.Grid()
     grid.set_hexpand(True)
-    grid.set_column_homogeneous(True)
+    grid.set_column_homogeneous(False)
     grid.set_column_spacing(8)
     grid.set_margin_top(6)
     grid.set_margin_bottom(6)
@@ -632,11 +634,11 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
     for column_index, column_name in enumerate(columns):
         widget = _widget_for_column(Gtk, controls, column_name)
-        widget.set_hexpand(True)
+        widget.set_hexpand(_column_expands(column_name))
         grid.attach(widget, column_index, 0, 1, 1)
 
     apply_button = Gtk.Button(label="Apply")
-    apply_button.set_hexpand(True)
+    apply_button.set_hexpand(False)
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     grid.attach(apply_button, len(columns), 0, 1, 1)
 
@@ -706,8 +708,14 @@ def _widget_for_column(Gtk, controls: _EditorControls, column_name: str):
         return controls.workspace_combo
     if column_name == "Left edge":
         return controls.left_edge_combo
-    if column_name == "Coordinates":
-        return _geometry_box(Gtk, controls.x_entry, controls.y_entry, controls.w_entry, controls.h_entry)
+    if column_name == "X":
+        return controls.x_entry
+    if column_name == "Y":
+        return controls.y_entry
+    if column_name == "W":
+        return controls.w_entry
+    if column_name == "H":
+        return controls.h_entry
     return _text_label(Gtk, "")
 
 
@@ -875,6 +883,22 @@ def _set_action_row_style(row_box, action: str) -> None:
     for css_class in ("d2wc-row-add", "d2wc-row-modify", "d2wc-row-delete"):
         style.remove_class(css_class)
     style.add_class(f"d2wc-row-{action.lower()}")
+
+
+def _column_expands(column_name: str) -> bool:
+    return column_name in {"Machine", "Application", "Geometry profile", "Profile name"}
+
+
+def _column_width_chars(column_name: str) -> int:
+    return {
+        "Action": 8,
+        "Workspace": 8,
+        "Left edge": 8,
+        "X": 5,
+        "Y": 5,
+        "W": 5,
+        "H": 5,
+    }.get(column_name, 8)
 
 
 def _rule_parts(rule: str) -> _RuleParts:
