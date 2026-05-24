@@ -67,10 +67,26 @@ def run_configurator(
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
+    menu_button = Gtk.MenuButton(label="Menu")
+    menu = Gtk.Menu()
+    help_item = Gtk.MenuItem(label="Help")
+    help_item.connect("activate", lambda _item: editor.show_help())
+    menu.append(help_item)
+    menu.show_all()
+    menu_button.set_popup(menu)
+    button_box.pack_start(menu_button, False, False, 0)
+
     close_button = Gtk.Button(label="Close")
     close_button.connect("clicked", lambda _button: window.destroy())
     button_box.pack_end(close_button, False, False, 0)
 
+    def handle_key_press(_window, event) -> bool:
+        if event.keyval == Gdk.KEY_F1:
+            editor.show_help()
+            return True
+        return False
+
+    window.connect("key-press-event", handle_key_press)
     window.show_all()
     Gtk.main()
     return 0
