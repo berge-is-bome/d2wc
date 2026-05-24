@@ -14,9 +14,7 @@ from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 from d2wc.ui.grid_rows import (
     ManagedGridRow,
-    build_available_known_window_grid_rows,
     build_configured_grid_rows,
-    build_known_window_grid_rows,
     class_values,
     domain_values,
     profile_names,
@@ -160,7 +158,6 @@ def build_managed_section_editor(
 
     state: dict[str, object] = {
         "snapshot": snapshot,
-        "show_not_configured": False,
         "row_controls": [],
         "inventory_targets": inventory_targets,
     }
@@ -170,9 +167,6 @@ def build_managed_section_editor(
 
     section_combo = _section_combo(Gtk)
     top_bar.pack_start(section_combo, False, False, 0)
-
-    mode_button = Gtk.Button(label="Not configured")
-    top_bar.pack_start(mode_button, False, False, 0)
 
     refresh_inventory_button = Gtk.Button(label="Refresh inventory")
     top_bar.pack_start(refresh_inventory_button, False, False, 0)
@@ -195,11 +189,10 @@ def build_managed_section_editor(
         state["row_controls"] = row_controls
 
         section = current_section()
-        show_not_configured = bool(state["show_not_configured"])
         current_inventory_targets = state["inventory_targets"]
         if not isinstance(current_inventory_targets, tuple):
             current_inventory_targets = ()
-        rows = _rows_for_section(current_snapshot(), event_data, current_inventory_targets, section, show_not_configured)
+        rows = _rows_for_section(current_snapshot(), current_inventory_targets, section)
         if rows:
             rows_box.pack_start(
                 _build_section_rows_panel(
@@ -218,12 +211,7 @@ def build_managed_section_editor(
                 0,
             )
         else:
-            empty_text = (
-                "No not-configured windows are available for this section yet."
-                if show_not_configured
-                else "No configured entries are available for this section."
-            )
-            rows_box.pack_start(_text_label(Gtk, empty_text), False, False, 0)
+            rows_box.pack_start(_text_label(Gtk, "No entries are available for this section."), False, False, 0)
 
         rows_box.show_all()
 
@@ -255,11 +243,6 @@ def build_managed_section_editor(
         if isinstance(row_controls, list) and row_controls:
             apply_row_action(row_controls[0])
 
-    def toggle_mode() -> None:
-        state["show_not_configured"] = not bool(state["show_not_configured"])
-        mode_button.set_label("Configured" if state["show_not_configured"] else "Not configured")
-        refresh_editor_rows()
-
     def refresh_inventory() -> None:
         try:
             result = inventory_capture()
@@ -271,8 +254,6 @@ def build_managed_section_editor(
         if not isinstance(current_inventory_targets, tuple):
             current_inventory_targets = ()
         state["inventory_targets"] = merge_known_window_targets(current_inventory_targets, result.targets)
-        state["show_not_configured"] = True
-        mode_button.set_label("Configured")
         refresh_editor_rows()
         _show_toast(Gtk, main_box, INVENTORY_REFRESH_SUCCESS_MESSAGE)
 
@@ -280,7 +261,6 @@ def build_managed_section_editor(
         _show_message(Gtk, main_box, WORKFLOW_HELP[current_section()])
 
     section_combo.connect("changed", lambda _combo: refresh_editor_rows())
-    mode_button.connect("clicked", lambda _button: toggle_mode())
     refresh_inventory_button.connect("clicked", lambda _button: refresh_inventory())
     refresh_editor_rows()
 
@@ -442,16 +422,9 @@ class _SearchableCombo:
 
 def _rows_for_section(
     snapshot: TestConfigSnapshot | None,
-    event_data: WindowEventData | None,
     inventory_targets: tuple[KnownWindowTarget, ...],
     section: str,
-    show_not_configured: bool,
 ) -> tuple[ManagedGridRow, ...]:
-    if show_not_configured and inventory_targets:
-        return build_available_known_window_grid_rows(snapshot, section, inventory_targets)
-    if show_not_configured:
-        return tuple(row for row in build_known_window_grid_rows(event_data) if row.section == section)
-
     configured_rows = tuple(row for row in build_configured_grid_rows(snapshot) if row.section == section)
     if snapshot is None or snapshot.config is None:
         return configured_rows
