@@ -4,7 +4,7 @@ from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRo
 from d2wc.event_data import get_event_fixture
 from d2wc.event_inventory import KnownWindowTarget
 from d2wc.test_config import TestConfigSnapshot as ConfigSnapshot
-from d2wc.ui.managed_actions import (
+from d2wc.ui.grid_rows import (
     build_available_known_window_grid_rows,
     build_configured_grid_rows,
     build_known_window_grid_rows,

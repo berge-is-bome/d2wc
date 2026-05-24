@@ -6,12 +6,21 @@ import subprocess
 from dataclasses import dataclass
 from typing import Callable
 
-from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
+from d2wc.core.rule_grammar import LEFT_EDGE_MODES
 from d2wc.event_data import WindowEventData
-from d2wc.event_inventory import KnownWindowTarget, filter_known_window_targets_for_section
-from d2wc.event_preview import build_event_rule_preview
+from d2wc.event_inventory import KnownWindowTarget
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
+from d2wc.ui.grid_rows import (
+    ManagedGridRow,
+    build_available_known_window_grid_rows,
+    build_configured_grid_rows,
+    build_known_window_grid_rows,
+    class_values,
+    domain_values,
+    profile_names,
+    rule_parts,
+)
 
 EDITOR_ACTIONS = ("Add", "Modify", "Delete")
 SUCCESS_TOAST_MESSAGE = "Operation completed successfully."
@@ -129,251 +138,6 @@ class ManagedSectionEditor:
     show_help: Callable[[], None]
 
 
-@dataclass(frozen=True)
-class ManagedGridRow:
-    """One editor row for configured entries or known-window proposals."""
-
-    source: str
-    section: str
-    action: str
-    existing_entry: str = ""
-    target_entry: str = ""
-    profile_filter: str = ""
-    existing_profile: str = ""
-    new_profile: str = ""
-    workspace: str = ""
-    geometry: str = ""
-
-    def as_values(self) -> tuple[str, ...]:
-        """Return values in a stable order for tests and future list models."""
-
-        return (
-            self.source,
-            self.section,
-            self.action,
-            self.existing_entry,
-            self.target_entry,
-            self.profile_filter,
-            self.existing_profile,
-            self.new_profile,
-            self.workspace,
-            self.geometry,
-        )
-
-    @classmethod
-    def from_values(cls, values: tuple[str, ...]) -> ManagedGridRow:
-        """Build a row from stable-order values."""
-
-        return cls(*values)
-
-
-@dataclass(frozen=True)
-class _RuleParts:
-    domain: str = ""
-    class_name: str = ""
-    geometry_profile: str = ""
-    left_edge_mode: str = ""
-
-
-def build_configured_grid_rows(snapshot: TestConfigSnapshot | None) -> tuple[ManagedGridRow, ...]:
-    """Flatten current test-config entries into configured editor rows."""
-
-    if snapshot is None or snapshot.config is None:
-        return ()
-
-    rows: list[ManagedGridRow] = []
-    config = snapshot.config
-
-    rows.extend(
-        ManagedGridRow(
-            source="configured",
-            section="EXCLUDE",
-            action="Modify",
-            existing_entry=rule,
-            target_entry=rule,
-        )
-        for rule in config.exclude
-    )
-    rows.extend(
-        ManagedGridRow(
-            source="configured",
-            section="PIN",
-            action="Modify",
-            existing_entry=rule,
-            target_entry=rule,
-        )
-        for rule in config.pin
-    )
-    for route in config.workspace_routes:
-        rows.extend(
-            ManagedGridRow(
-                source="configured",
-                section="WORKSPACE_ROUTES",
-                action="Modify",
-                existing_entry=rule,
-                target_entry=rule,
-                workspace=str(route.workspace),
-            )
-            for rule in route.rules
-        )
-    rows.extend(
-        ManagedGridRow(
-            source="configured",
-            section="GEOM",
-            action="Modify",
-            existing_entry=profile.name,
-            existing_profile=profile.name,
-            new_profile=profile.name,
-            geometry=_geometry_text(profile.x, profile.y, profile.w, profile.h),
-        )
-        for profile in config.geom
-    )
-    rows.extend(
-        ManagedGridRow(
-            source="configured",
-            section="WORKSPACE_PLACEMENT",
-            action="Modify",
-            existing_entry=rule,
-            target_entry=rule,
-            existing_profile=_rule_parts(rule).geometry_profile,
-        )
-        for rule in config.workspace_placement
-    )
-    rows.extend(
-        ManagedGridRow(
-            source="configured",
-            section="LEFT_EDGE_CORRECTION",
-            action="Modify",
-            existing_entry=rule,
-            target_entry=rule,
-        )
-        for rule in config.left_edge_correction
-    )
-    return tuple(rows)
-
-
-def build_known_window_grid_rows(
-    event_data: WindowEventData | None = None,
-    inventory_targets: tuple[KnownWindowTarget, ...] = (),
-) -> tuple[ManagedGridRow, ...]:
-    """Build not-configured rows from inventory targets or available event data."""
-
-    if inventory_targets:
-        return _known_window_target_grid_rows(inventory_targets)
-    if event_data is None:
-        return ()
-
-    target_rule = _target_rule_from_event(event_data)
-    preview = build_event_rule_preview(event_data)
-    geometry = event_data.window_geometry
-    geometry_text = _geometry_text(
-        _event_number_to_text(geometry.x),
-        _event_number_to_text(geometry.y),
-        _event_number_to_text(geometry.w),
-        _event_number_to_text(geometry.h),
-    )
-    profile_name = preview.geometry_profile_name or ""
-    placement_rule = preview.placement_rule or (f"{target_rule} g:{profile_name}" if target_rule and profile_name else "")
-
-    rows = [
-        ManagedGridRow(
-            source="not configured",
-            section="EXCLUDE",
-            action="Add",
-            target_entry=target_rule,
-        ),
-        ManagedGridRow(
-            source="not configured",
-            section="PIN",
-            action="Add",
-            target_entry=target_rule,
-        ),
-        ManagedGridRow(
-            source="not configured",
-            section="WORKSPACE_ROUTES",
-            action="Add",
-            target_entry=target_rule,
-        ),
-        ManagedGridRow(
-            source="not configured",
-            section="GEOM",
-            action="Add",
-            new_profile=profile_name,
-            geometry=geometry_text,
-        ),
-        ManagedGridRow(
-            source="not configured",
-            section="WORKSPACE_PLACEMENT",
-            action="Add",
-            target_entry=placement_rule,
-            existing_profile=profile_name,
-        ),
-        ManagedGridRow(
-            source="not configured",
-            section="LEFT_EDGE_CORRECTION",
-            action="Add",
-            target_entry=f"{target_rule} le:pos1" if target_rule else "",
-        ),
-    ]
-    return tuple(row for row in rows if _row_has_candidate_value(row))
-
-
-
-def build_available_known_window_grid_rows(
-    snapshot: TestConfigSnapshot | None,
-    section: str,
-    inventory_targets: tuple[KnownWindowTarget, ...],
-) -> tuple[ManagedGridRow, ...]:
-    """Build section-specific Not configured rows after config suppression."""
-
-    config = snapshot.config if snapshot is not None else None
-    available_targets = filter_known_window_targets_for_section(
-        inventory_targets,
-        config,
-        section,
-    )
-    return tuple(row for row in _known_window_target_grid_rows(available_targets) if row.section == section)
-
-
-def _known_window_target_grid_rows(targets: tuple[KnownWindowTarget, ...]) -> tuple[ManagedGridRow, ...]:
-    rows: list[ManagedGridRow] = []
-    for target in targets:
-        target_rule = target.rule
-        rows.extend(
-            (
-                ManagedGridRow(
-                    source="not configured",
-                    section="EXCLUDE",
-                    action="Add",
-                    target_entry=target_rule,
-                ),
-                ManagedGridRow(
-                    source="not configured",
-                    section="PIN",
-                    action="Add",
-                    target_entry=target_rule,
-                ),
-                ManagedGridRow(
-                    source="not configured",
-                    section="WORKSPACE_ROUTES",
-                    action="Add",
-                    target_entry=target_rule,
-                ),
-                ManagedGridRow(
-                    source="not configured",
-                    section="WORKSPACE_PLACEMENT",
-                    action="Add",
-                    target_entry=target_rule,
-                ),
-                ManagedGridRow(
-                    source="not configured",
-                    section="LEFT_EDGE_CORRECTION",
-                    action="Add",
-                    target_entry=f"{target_rule} le:pos1",
-                ),
-            )
-        )
-    return tuple(rows)
 
 
 def build_managed_section_editor(
@@ -813,9 +577,9 @@ def _build_row_controls(
         h_entry=h_entry,
     )
 
-    _reset_combo(domain_combo, _domain_values(snapshot, event_data, inventory_targets), include_blank=True)
-    _reset_combo(class_combo, _class_values(snapshot, event_data, inventory_targets), include_blank=True)
-    _reset_combo(geometry_combo, _profile_names(snapshot), include_blank=True)
+    _reset_combo(domain_combo, domain_values(snapshot, event_data, inventory_targets), include_blank=True)
+    _reset_combo(class_combo, class_values(snapshot, event_data, inventory_targets), include_blank=True)
+    _reset_combo(geometry_combo, profile_names(snapshot), include_blank=True)
     _populate_controls_from_grid_row(controls, row)
 
     action_combo.connect("changed", lambda _combo: _set_field_sensitivity(section, _active_action(controls), controls))
@@ -1025,7 +789,7 @@ def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, cont
 def _populate_controls_from_grid_row(controls: _EditorControls, row: ManagedGridRow) -> None:
     _set_combo_active_text(controls.action_combo, row.action)
 
-    parts = _rule_parts(row.target_entry or row.existing_entry)
+    parts = rule_parts(row.target_entry or row.existing_entry)
     if parts.domain:
         _set_combo_active_text(controls.domain_combo, parts.domain)
     elif controls.section == "WORKSPACE_PLACEMENT" and parts.class_name:
@@ -1045,38 +809,6 @@ def _populate_controls_from_grid_row(controls: _EditorControls, row: ManagedGrid
     _set_geometry_fields_from_text(controls, row.geometry)
 
 
-def _domain_values(
-    snapshot: TestConfigSnapshot | None,
-    event_data: WindowEventData | None,
-    inventory_targets: tuple[KnownWindowTarget, ...] = (),
-) -> tuple[str, ...]:
-    values = {_rule_parts(row.target_entry or row.existing_entry).domain for row in build_configured_grid_rows(snapshot)}
-    values.update(target.machine for target in inventory_targets)
-    event_domain = event_data.display_domain.lower() if event_data and event_data.display_domain else ""
-    if event_domain:
-        values.add(event_domain)
-    values.discard("")
-    return tuple(sorted(values))
-
-
-def _class_values(
-    snapshot: TestConfigSnapshot | None,
-    event_data: WindowEventData | None,
-    inventory_targets: tuple[KnownWindowTarget, ...] = (),
-) -> tuple[str, ...]:
-    values = {_rule_parts(row.target_entry or row.existing_entry).class_name for row in build_configured_grid_rows(snapshot)}
-    values.update(target.application for target in inventory_targets)
-    event_class = _class_from_event(event_data)
-    if event_class:
-        values.add(event_class)
-    values.discard("")
-    return tuple(sorted(values))
-
-
-def _profile_names(snapshot: TestConfigSnapshot | None) -> tuple[str, ...]:
-    if snapshot is None or snapshot.config is None:
-        return ()
-    return tuple(profile.name for profile in snapshot.config.geom)
 
 
 def _workspace_values() -> tuple[str, ...]:
@@ -1170,44 +902,6 @@ def _column_width_chars(column_name: str) -> int:
     }.get(column_name, 8)
 
 
-def _rule_parts(rule: str) -> _RuleParts:
-    if not rule.strip():
-        return _RuleParts()
-    try:
-        parsed = parse_prefixed_rule(rule)
-    except RuleParseError:
-        return _RuleParts()
-    return _RuleParts(
-        domain=parsed.domain or "",
-        class_name=parsed.class_name or "",
-        geometry_profile=parsed.geometry_profile or "",
-        left_edge_mode=parsed.left_edge_mode or "",
-    )
-
-
-def _row_has_candidate_value(row: ManagedGridRow) -> bool:
-    return bool(row.target_entry or row.new_profile or row.geometry)
-
-
-def _target_rule_from_event(event: WindowEventData) -> str:
-    class_token = _class_from_event(event)
-    if not class_token:
-        return ""
-
-    domain = event.display_domain
-    if domain and not any(char.isspace() for char in domain):
-        return f"d:{domain.lower()} c:{class_token}"
-    return f"c:{class_token}"
-
-
-def _class_from_event(event: WindowEventData | None) -> str:
-    if event is None:
-        return ""
-    raw_class = event.class_instance_name or event.window_class or ""
-    class_token = raw_class.rsplit(":", 1)[-1].lower()
-    if not class_token or any(char.isspace() for char in class_token):
-        return ""
-    return class_token
 
 
 def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int = 5) -> None:
@@ -1320,8 +1014,6 @@ def _text_label(Gtk, text: str):
     return label
 
 
-def _geometry_text(x: object, y: object, w: object, h: object) -> str:
-    return f"x={x} y={y} w={w} h={h}"
 
 
 def _set_geometry_fields_from_text(controls: _EditorControls, geometry: str) -> None:
