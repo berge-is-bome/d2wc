@@ -8,7 +8,7 @@ from typing import Callable
 
 from d2wc.core.rule_grammar import LEFT_EDGE_MODES, RuleParseError, parse_prefixed_rule
 from d2wc.event_data import WindowEventData
-from d2wc.event_inventory import KnownWindowTarget
+from d2wc.event_inventory import KnownWindowTarget, filter_known_window_targets_for_section
 from d2wc.event_preview import build_event_rule_preview
 from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
@@ -316,6 +316,23 @@ def build_known_window_grid_rows(
         ),
     ]
     return tuple(row for row in rows if _row_has_candidate_value(row))
+
+
+
+def build_available_known_window_grid_rows(
+    snapshot: TestConfigSnapshot | None,
+    section: str,
+    inventory_targets: tuple[KnownWindowTarget, ...],
+) -> tuple[ManagedGridRow, ...]:
+    """Build section-specific Not configured rows after config suppression."""
+
+    config = snapshot.config if snapshot is not None else None
+    available_targets = filter_known_window_targets_for_section(
+        inventory_targets,
+        config,
+        section,
+    )
+    return tuple(row for row in _known_window_target_grid_rows(available_targets) if row.section == section)
 
 
 def _known_window_target_grid_rows(targets: tuple[KnownWindowTarget, ...]) -> tuple[ManagedGridRow, ...]:

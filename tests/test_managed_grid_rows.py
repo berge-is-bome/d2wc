@@ -4,7 +4,11 @@ from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRo
 from d2wc.event_data import get_event_fixture
 from d2wc.event_inventory import KnownWindowTarget
 from d2wc.test_config import TestConfigSnapshot as ConfigSnapshot
-from d2wc.ui.managed_actions import build_configured_grid_rows, build_known_window_grid_rows
+from d2wc.ui.managed_actions import (
+    build_available_known_window_grid_rows,
+    build_configured_grid_rows,
+    build_known_window_grid_rows,
+)
 
 
 def test_build_configured_grid_rows_flattens_all_sections() -> None:
@@ -93,3 +97,56 @@ def test_build_known_window_grid_rows_inventory_targets_do_not_create_geom_rows(
     )
 
     assert "GEOM" not in {row.section for row in rows}
+
+
+def test_build_available_known_window_grid_rows_suppresses_current_section_matches() -> None:
+    snapshot = ConfigSnapshot(
+        path=Path("d2wc-test.lua"),
+        exists=True,
+        config=ManagedConfig(
+            exclude=(),
+            pin=(),
+            workspace_routes=(WorkspaceRoute(2, ("d:work c:navigator",)),),
+            geom=(),
+            workspace_placement=(),
+            left_edge_correction=(),
+        ),
+    )
+
+    rows = build_available_known_window_grid_rows(
+        snapshot,
+        "WORKSPACE_ROUTES",
+        (
+            KnownWindowTarget(machine="personal", application="navigator"),
+            KnownWindowTarget(machine="work", application="navigator"),
+            KnownWindowTarget(machine="work", application="terminal"),
+        ),
+    )
+
+    assert [row.section for row in rows] == ["WORKSPACE_ROUTES", "WORKSPACE_ROUTES"]
+    assert [row.target_entry for row in rows] == [
+        "d:personal c:navigator",
+        "d:work c:terminal",
+    ]
+
+
+def test_build_available_known_window_grid_rows_returns_empty_for_geom() -> None:
+    snapshot = ConfigSnapshot(
+        path=Path("d2wc-test.lua"),
+        exists=True,
+        config=ManagedConfig(
+            exclude=(),
+            pin=(),
+            workspace_routes=(),
+            geom=(),
+            workspace_placement=(),
+            left_edge_correction=(),
+        ),
+    )
+
+    assert build_available_known_window_grid_rows(
+        snapshot,
+        "GEOM",
+        (KnownWindowTarget(machine="personal", application="navigator"),),
+    ) == ()
+
