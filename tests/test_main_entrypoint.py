@@ -17,6 +17,30 @@ local LEFT_EDGE_CORRECTION = {
 '''
 
 
+def test_main_without_args_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
+    calls = []
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
+
+    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+
+    def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
+        calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
+        return 0
+
+    monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
+
+    exit_code = __main__.main([])
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert config_awareness.status == "ok"
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == config_path
+    assert prepare_result is None
+
+
 def test_main_configure_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
     calls = []
     config_path = tmp_path / "d2wc.lua"
