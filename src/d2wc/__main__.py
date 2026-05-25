@@ -19,6 +19,8 @@ from d2wc.test_config import (
 )
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
 
+DEFAULT_MANAGED_CONFIG_RELATIVE_PATH = Path(".config/devilspie2/d2wc.lua")
+
 
 @dataclass(frozen=True)
 class ConfigureInput:
@@ -43,8 +45,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 def _run_configure(argv: Sequence[str]) -> int:
     try:
-        if not argv:
-            return run_configurator()
         configure_input = _parse_configure_args(argv)
         return run_configurator(
             configure_input.event_data,
@@ -60,7 +60,7 @@ def _run_configure(argv: Sequence[str]) -> int:
 def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     parser = argparse.ArgumentParser(
         prog="d2wc configure",
-        description="Open the GTK event-data and test-config UI proof.",
+        description="Open the GTK d2wc managed-config editor.",
     )
     parser.add_argument(
         "--event-fixture",
@@ -134,6 +134,8 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     test_config_snapshot = None
     if args.test_config or args.init_test_config or args.replace_test_config:
         test_config_snapshot = load_test_config_snapshot(args.test_config_path)
+    elif args.config is None:
+        test_config_snapshot = load_test_config_snapshot(default_managed_config_path())
 
     config_awareness = None
     if args.config is not None:
@@ -147,6 +149,12 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         test_config_snapshot=test_config_snapshot,
         prepare_result=prepare_result,
     )
+
+
+def default_managed_config_path() -> Path:
+    """Return the user-local d2wc-managed Devilspie2 Lua config path."""
+
+    return Path.home() / DEFAULT_MANAGED_CONFIG_RELATIVE_PATH
 
 
 def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> EventConfigAwareness:
