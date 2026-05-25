@@ -1,11 +1,31 @@
 from d2wc import __main__
 
 
-def test_main_configure_runs_gtk_launcher(monkeypatch) -> None:
-    calls = []
+MANAGED_CONFIG_SOURCE = '''
+local EXCLUDE = {
+}
+local PIN = {
+}
+local WORKSPACE_ROUTES = {
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+'''
 
-    def fake_run_configurator() -> int:
-        calls.append("run")
+
+def test_main_configure_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
+    calls = []
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
+
+    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+
+    def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
+        calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
         return 0
 
     monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
@@ -13,11 +33,21 @@ def test_main_configure_runs_gtk_launcher(monkeypatch) -> None:
     exit_code = __main__.main(["configure"])
 
     assert exit_code == 0
-    assert calls == ["run"]
+    assert len(calls) == 1
+    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert config_awareness.status == "ok"
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == config_path
+    assert prepare_result is None
 
 
-def test_main_configure_reports_missing_gtk(monkeypatch, capsys) -> None:
-    def fake_run_configurator() -> int:
+def test_main_configure_reports_missing_gtk(monkeypatch, tmp_path, capsys) -> None:
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
+
+    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+
+    def fake_run_configurator(_event_data, _config_awareness, _test_config_snapshot, _prepare_result) -> int:
         raise __main__.GtkConfiguratorImportError("GTK is missing")
 
     monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
@@ -33,23 +63,7 @@ def test_main_configure_reports_missing_gtk(monkeypatch, capsys) -> None:
 def test_main_configure_passes_event_data_and_config_awareness(monkeypatch, tmp_path) -> None:
     calls = []
     config_path = tmp_path / "d2wc.lua"
-    config_path.write_text(
-        '''
-local EXCLUDE = {
-}
-local PIN = {
-}
-local WORKSPACE_ROUTES = {
-}
-local GEOM = {
-}
-local WORKSPACE_PLACEMENT = {
-}
-local LEFT_EDGE_CORRECTION = {
-}
-''',
-        encoding="utf-8",
-    )
+    config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
 
     def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
         calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
@@ -91,23 +105,7 @@ local LEFT_EDGE_CORRECTION = {
 def test_main_configure_loads_test_config(monkeypatch, tmp_path) -> None:
     calls = []
     test_config_path = tmp_path / "d2wc-test.lua"
-    test_config_path.write_text(
-        '''
-local EXCLUDE = {
-}
-local PIN = {
-}
-local WORKSPACE_ROUTES = {
-}
-local GEOM = {
-}
-local WORKSPACE_PLACEMENT = {
-}
-local LEFT_EDGE_CORRECTION = {
-}
-''',
-        encoding="utf-8",
-    )
+    test_config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
 
     def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
         calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
