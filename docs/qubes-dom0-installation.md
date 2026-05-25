@@ -36,10 +36,16 @@ Run the dom0 installer:
 ./d2wc-installation.sh
 ```
 
-After installation, a new terminal should be able to find the installed command:
+After installation, a new terminal should be able to find and launch the installed command:
 
 ```bash
 command -v d2wc
+d2wc
+```
+
+The explicit configurator subcommand remains available:
+
+```bash
 d2wc configure
 ```
 
@@ -94,7 +100,7 @@ The dom0 installer performs the dom0 side of the install/update workflow:
 8. Launches the installed command with the explicit path:
 
 ```bash
-$HOME/.local/bin/d2wc configure
+$HOME/.local/bin/d2wc
 ```
 
 ### 5. Existing Devilspie2 scripts are not overwritten
@@ -131,6 +137,14 @@ Expected output:
 /home/user/.local/bin/d2wc
 ```
 
-## Current implementation note
+Launch the configurator with:
 
-The installer is intentionally ahead of the final real-config plumbing. The next code change must make plain `d2wc configure` load `~/.config/devilspie2/d2wc.lua` as the managed config by default.
+```bash
+d2wc
+```
+
+For scripts or explicit usage, this is also supported:
+
+```bash
+d2wc configure
+```
