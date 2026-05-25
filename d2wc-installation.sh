@@ -101,7 +101,7 @@ ensure_local_bin_path_for_user_shell() {
     *)
       echo "WARNING: shell '$user_shell' is not handled automatically." >&2
       echo "WARNING: add $HOME/.local/bin to PATH manually, or launch d2wc by full path:" >&2
-      echo "WARNING: $D2WC_BIN configure" >&2
+      echo "WARNING: $D2WC_BIN" >&2
       ;;
   esac
 }
@@ -161,4 +161,4 @@ cd "$BASE_DIR"
 
 python3 -c 'import d2wc; print("Using d2wc from:", d2wc.__file__)'
 
-"$D2WC_BIN" configure
+"$D2WC_BIN"
