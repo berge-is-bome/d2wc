@@ -37,6 +37,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     args = list(sys.argv[1:] if argv is None else argv)
 
+    if not args:
+        return _run_configure(())
+
     if args[:1] == ["configure"]:
         return _run_configure(args[1:])
 
