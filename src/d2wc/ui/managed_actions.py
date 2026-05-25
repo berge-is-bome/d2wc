@@ -380,7 +380,7 @@ class _SearchableCombo:
 
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scroller.set_size_request(280, 180)
+        scroller.set_size_request(280, 320)
         box.pack_start(scroller, True, True, 0)
 
         self.list_box = Gtk.ListBox()
