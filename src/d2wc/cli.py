@@ -67,7 +67,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     configure = subcommands.add_parser(
         "configure",
-        help="Open the configurator UI. Placeholder until the GTK proof stage.",
+        help="Open the configurator UI.",
     )
     configure.set_defaults(func=_cmd_configure)
 
@@ -232,8 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _cmd_configure(_args: argparse.Namespace) -> int:
-    print("d2wc configurator UI is not implemented yet.")
-    print("Next step: build parser/validator core before GTK UI work.")
+    print("Use 'd2wc' or 'd2wc configure' to open the configurator UI.")
     return 0
 
 

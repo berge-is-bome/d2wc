@@ -41,6 +41,13 @@ eventbox.d2wc-row-delete,
   background-color: #cf2d56;
   border-radius: 8px;
 }
+button.d2wc-row-action-button,
+.d2wc-row-action-button {
+  min-width: 0;
+  min-height: 0;
+  padding-left: 4px;
+  padding-right: 4px;
+}
 button.d2wc-apply-add,
 .d2wc-apply-add {
   background-image: none;
@@ -373,7 +380,7 @@ class _SearchableCombo:
 
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        scroller.set_size_request(280, 180)
+        scroller.set_size_request(280, 320)
         box.pack_start(scroller, True, True, 0)
 
         self.list_box = Gtk.ListBox()
@@ -486,26 +493,21 @@ def _build_section_rows_panel(
     inventory_targets: tuple[KnownWindowTarget, ...],
     workspace_values: tuple[str, ...],
 ):
-    scroller = Gtk.ScrolledWindow()
-    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-    scroller.set_hexpand(True)
-    scroller.set_vexpand(True)
-    scroller.set_size_request(-1, 260)
-
-    panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-    panel.set_hexpand(True)
-    panel.set_margin_top(8)
-    panel.set_margin_bottom(8)
-    panel.set_margin_start(8)
-    panel.set_margin_end(8)
-    scroller.add(panel)
+    outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+    outer.set_hexpand(True)
+    outer.set_vexpand(True)
 
     columns = SECTION_COLUMNS[section]
     column_size_groups = _column_size_groups(Gtk, len(columns) + 1)
+
     header = Gtk.Grid()
     header.set_hexpand(True)
     header.set_column_homogeneous(False)
     header.set_column_spacing(8)
+    header.set_margin_top(8)
+    header.set_margin_bottom(0)
+    header.set_margin_start(8)
+    header.set_margin_end(8)
     for column_index, column_name in enumerate((*columns, "")):
         label = Gtk.Label(label=column_name)
         label.set_xalign(0.5)
@@ -515,7 +517,22 @@ def _build_section_rows_panel(
             label.set_width_chars(_column_width_chars(column_name))
         column_size_groups[column_index].add_widget(label)
         header.attach(label, column_index, 0, 1, 1)
-    panel.pack_start(header, False, True, 0)
+    outer.pack_start(header, False, True, 0)
+
+    scroller = Gtk.ScrolledWindow()
+    scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+    scroller.set_hexpand(True)
+    scroller.set_vexpand(True)
+    scroller.set_size_request(-1, 260)
+    outer.pack_start(scroller, True, True, 0)
+
+    panel = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+    panel.set_hexpand(True)
+    panel.set_margin_top(4)
+    panel.set_margin_bottom(8)
+    panel.set_margin_start(8)
+    panel.set_margin_end(8)
+    scroller.add(panel)
 
     for row in rows:
         controls = _build_row_controls(Gtk, snapshot, section, row, event_data, inventory_targets, workspace_values)
@@ -527,7 +544,7 @@ def _build_section_rows_panel(
             0,
         )
 
-    return scroller
+    return outer
 
 
 def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, apply_row_action, column_size_groups):
@@ -557,19 +574,21 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
     action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=0)
     action_box.set_hexpand(False)
-    action_box.set_size_request(112, -1)
+    action_box.set_size_request(224, -1)
     column_size_groups[len(columns)].add_widget(action_box)
 
     undo_button = Gtk.Button(label="Undo")
     undo_button.set_hexpand(True)
-    undo_button.set_size_request(56, -1)
+    undo_button.set_size_request(112, -1)
     undo_button.set_no_show_all(True)
+    undo_button.get_style_context().add_class("d2wc-row-action-button")
     undo_button.connect("clicked", lambda _button: _restore_initial_values(controls))
     action_box.pack_start(undo_button, True, True, 0)
 
     apply_button = Gtk.Button(label="Apply")
     apply_button.set_hexpand(True)
-    apply_button.set_size_request(56, -1)
+    apply_button.set_size_request(112, -1)
+    apply_button.get_style_context().add_class("d2wc-row-action-button")
     apply_button.connect("clicked", lambda _button: apply_row_action(controls))
     action_box.pack_start(apply_button, True, True, 0)
 
