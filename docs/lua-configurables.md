@@ -58,9 +58,9 @@ Do not assume that the same dotted/wildcard matching applies to every managed se
 
 ## `EXCLUDE`
 
-`EXCLUDE` tells `d2wc` to ignore matching windows.
+`EXCLUDE` tells `d2wc` to ignore matching domains/windows.
 
-The configurator should use this for windows that should not be moved, resized, pinned, routed, or corrected. Examples include app menus, splash windows, panels, transient helpers, or applications that behave badly when managed.
+The configurator should use this for windows that should not be moved, resized, pinned, routed, or corrected.
 
 User-facing actions:
 
