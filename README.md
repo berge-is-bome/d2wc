@@ -4,91 +4,78 @@ Devilspie2 Workspace Configurator.
 
 Created by André, with code developed in collaboration with ChatGPT and Codex.
 
-`d2wc` combines a `devilspie2` Lua rules script with a Python configurator core and GTK configurator. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, known-window inventory parsing and stream capture, workflow grid row helpers, and the GTK managed-config editor.
+`d2wc` is a desktop workspace and window placement configurator for Linux systems that use Devilspie2.
 
-## Current status
+It helps keep application windows predictable: on the right workspace, at the right size and position, pinned where useful, or ignored when a window should not be managed.
 
-The repository starts from the current `d2wc` Lua script version `0.1.12.3`.
+The first public target is Qubes OS with XFCE. Broader X11/Linux use is part of the project direction, but should be treated as experimental until it has been tested on those desktops.
 
-The active Lua script supports:
+## What d2wc helps you do
 
-1. Excluding domains, classes, or domain/class combinations from automation.
-2. Pinning selected windows so they appear on all workspaces.
-3. Routing windows to workspaces by domain, class, or domain/class match.
-4. Applying named geometry profiles to matching windows.
-5. Applying optional left-edge correction for windows that do not land exactly at `x = 0` when `set_window_geometry()` is used.
+### Route windows to workspaces
 
-The Python core supports validation, render preview, safe-save behavior, and guarded add, modify, and delete commands for all managed Lua sections:
+Send matching windows to the workspace where they belong.
 
-1. `GEOM`
-2. `WORKSPACE_PLACEMENT`
-3. `WORKSPACE_ROUTES`
-4. `PIN`
-5. `EXCLUDE`
-6. `LEFT_EDGE_CORRECTION`
+A route can be broad, such as every window from a Qubes domain, or narrow, such as one application from one domain.
 
-The known-window inventory work has an initial parser in `src/d2wc/event_inventory.py`. It parses raw Devilspie2 debug/event text into normalized `KnownWindowCandidate` records, keeps only `WINDOW_TYPE_NORMAL` windows, normalizes the Qubes machine/domain value, derives an application token from the class instance value, collapses repeated observations into one selectable machine/application target, and suppresses targets already configured for the selected workflow.
+### Place windows with saved geometry profiles
 
-The capture and stream layer in `src/d2wc/event_inventory_capture.py` uses a temporary read-only Devilspie2 probe script instead of the active `d2wc.lua` rules script. The bounded snapshot path captures startup inventory output. The continuous stream parser then supports the long-running design where newly opened domain/class pairs become known while `d2wc` is running.
+Save reusable window size and position profiles, then apply those profiles to matching windows.
 
-The pure row-building layer for the GTK grid now lives in `src/d2wc/ui/grid_rows.py`. It converts configured entries, event proposals, and known-window inventory targets into `ManagedGridRow` values. `src/d2wc/ui/managed_actions.py` remains focused on GTK widget assembly, row controls, Apply/Undo behavior, toasts, and dialogs.
+This is useful for layouts such as a file manager on the left, a browser on the right, a document viewer on a second workspace, or any other repeated desktop arrangement.
 
-The installed GTK configurator uses this d2wc-managed Devilspie2 Lua file by default:
+### Pin selected windows
+
+Keep selected windows visible on all workspaces.
+
+This is useful for small monitors, utility windows, notes, panels, or other windows that should stay available while moving between workspaces.
+
+### Exclude windows from automation
+
+Tell `d2wc` to leave selected windows alone.
+
+This is useful for menus, splash windows, helper dialogs, panels, launchers, or applications that should not be moved, resized, routed, pinned, or corrected.
+
+### Correct left-edge placement problems
+
+Some desktop environments or window-manager combinations may not place a window exactly on the left edge when asked to do so.
+
+`d2wc` includes a left-edge correction workflow for those cases.
+
+## The configurator
+
+`d2wc` includes a GTK configurator for managing the supported rule types.
+
+The configurator provides these workflows:
+
+1. Exclude
+2. Pin
+3. Workspace routes
+4. Window geometry
+5. Workspace placement
+6. Left edge correction
+
+Each workflow uses a focused grid with one top row for adding a new rule and configured rows below it for existing rules. Rows can be added, modified, deleted, applied, or undone before applying.
+
+The configurator also offers per-workflow help from the `Menu` button or by pressing `F1`.
+
+## Known window suggestions
+
+The configurator can populate Machine and Application choices from windows that are already known while `d2wc` is open.
+
+This makes new rules easier to create because common values can be selected from dropdowns instead of typed from memory.
+
+## Installed user config
+
+The installed configurator uses this managed Devilspie2 file by default:
 
 ```text
 ~/.config/devilspie2/d2wc.lua
 ```
 
-The installer creates that file from the bundled `src/d2wc.lua` only when it is missing. Existing Devilspie2 Lua scripts in `~/.config/devilspie2/` are not touched. Devilspie2 can load multiple Lua scripts from the same directory, so `d2wc.lua` can coexist with other user scripts.
+Existing Devilspie2 scripts in the same directory are not replaced by the installer.
 
-The GTK editor starts the known-window inventory monitor automatically. Startup debug output populates the top `Add` row Machine/Application dropdowns, and later debug-output events add newly seen domain/class values while the configurator remains open. Captured machine/application values are made available in dropdowns rather than being shown as separate Not configured rows.
-
-Launch the installed configurator with:
-
-```bash
-d2wc
-```
-
-The explicit subcommand also remains available:
-
-```bash
-d2wc configure
-```
-
-Latest confirmed local verification is recorded in [`docs/development-status.md`](docs/development-status.md).
-
-## Repository layout
-
-```text
-docs/
-  backup-archives.md            Backup archive behavior for guarded writes.
-  configurator-notification-settings.md
-                                 Future Configure menu notification settings.
-  development-status.md         Current PR status, latest local verification, and next work.
-  event-data-ui-direction.md    Current GTK UI direction around Devilspie2 event data.
-  product-development-brief.md  In-depth product and UI direction.
-  qubes-dom0-installation.md    Qubes dom0 source-tarball install/update flow.
-  lua-configurables.md          User-facing explanation of the Lua configuration sections.
-  lua-design-history.md         Design context recovered from archived pre-repository Lua history.
-  repository-layout.md          Repository structure and development conventions.
-src/
-  d2wc.lua                      Current devilspie2 Lua rules script.
-  d2wc/                         Python configurator core, desktop integration, and GTK UI.
-    event_inventory.py          Known-window parser, target grouping, and target suppression.
-    event_inventory_capture.py  Bounded and continuous Devilspie2 debug inventory capture.
-    ui/grid_rows.py             Pure grid row models and row builders.
-    ui/managed_actions.py       GTK managed-section editor assembly and row controls.
-tests/                          Python tests for the configurator core and UI helpers.
-```
-
-## Qubes dom0 installation
-
-The current user-facing target is Qubes dom0. The repo includes two helper scripts for the source-tarball workflow:
-
-1. `d2wc-prepare-archive.sh` runs in a networked DisposableVM and prepares `/tmp/d2wc.tgz`.
-2. `d2wc-installation.sh` runs in dom0 and installs or updates `d2wc`.
-
-Use [`docs/qubes-dom0-installation.md`](docs/qubes-dom0-installation.md) for the full Qubes install/update flow.
+## Launching d2wc
 
 After installation, launch the configurator with:
 
@@ -96,124 +83,39 @@ After installation, launch the configurator with:
 d2wc
 ```
 
-## Local development
-
-Install `python3-pip` with your package manager, then install the project in editable mode from the repository root:
+The explicit configurator command is also available:
 
 ```bash
-python3 -m pip install -e .
+d2wc configure
 ```
 
-Re-run the editable install command after switching to a branch that changes `[project.scripts]`; otherwise the generated `d2wc` console wrapper may still point at the previously installed entry point.
+## Qubes dom0 installation
 
-For normal source-checkout testing after editable install:
+For Qubes users, the repository includes a source-archive installation flow for dom0.
 
-```bash
-python3 -m d2wc --help
-python3 -m d2wc validate --config src/d2wc.lua
-python3 -m d2wc render --config src/d2wc.lua --stdout
-python3 -m pytest
-```
-
-When renderer behavior changes, use the stronger renderer verification path:
-
-```bash
-python3 -m d2wc validate --config src/d2wc.lua
-python3 -m d2wc render --config src/d2wc.lua --stdout > /tmp/d2wc-rendered.lua
-python3 -m d2wc validate --config /tmp/d2wc-rendered.lua
-python3 -m pytest
-```
-
-The `validate` command is read-only. It parses and validates the managed Lua sections but does not modify any file.
-
-The `render` command is read-only in ordinary preview use. Guarded edit commands preview by default and apply changes only when `--write` is supplied.
-
-Before a guarded write replaces a Lua config, `d2wc` stores the previous config snapshot as a timestamped member inside a per-config `.bak.tgz` archive. See [`docs/backup-archives.md`](docs/backup-archives.md).
-
-## GTK configurator workflow
-
-Launch the GTK configurator after installing the current checkout:
-
-```bash
-python3 -m d2wc
-```
-
-For UI development, use the dedicated test config commands:
-
-```bash
-python3 -m d2wc configure --init-test-config
-python3 -m d2wc configure --test-config
-python3 -m d2wc configure --replace-test-config
-```
-
-Command meanings:
-
-1. `--init-test-config` creates `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua` if it is missing, then loads it.
-2. `--test-config` loads the existing `~/.config/devilspie2/d2wc-test.lua` without replacing it.
-3. `--replace-test-config` replaces `~/.config/devilspie2/d2wc-test.lua` from bundled `src/d2wc.lua`, then loads it.
-4. `--test-config-path <path>` overrides the test config path for disposable automated tests and isolated manual experiments.
-
-The development test-config path is:
+Use the installation guide here:
 
 ```text
-~/.config/devilspie2/d2wc-test.lua
+docs/qubes-dom0-installation.md
 ```
 
-Current GTK features:
+## Documentation
 
-1. Workflow selector for all six managed sections.
-2. A single workflow grid with a top `Add` row and configured rows below it.
-3. Row-level `Action` selector for `Add`, `Modify`, and `Delete`.
-4. Split rule fields such as `Machine`, `Application`, `Geometry profile`, `Workspace`, and `Left edge`.
-5. Searchable popup selectors for longer value lists.
-6. Workspace dropdown populated from the X11 workspace count when available, with a fallback to workspace 1.
-7. Row-level `Apply` buttons with compact success toasts.
-8. Dirty rows split the action area into amber `Undo` and action-coloured `Apply` halves.
-9. Action-based row coloring for add, modify, and delete rows.
-10. Per-workflow help from the `Menu` button or `F1`.
-11. Stable GTK/X11 class for Devilspie2 matching: `d2wc-configurator`.
-12. Automatic known-window inventory monitor that adds captured machine/application values to the `Add` row dropdowns.
+Useful project documents:
 
-Comments and blank separator lines inside the managed Lua sections are treated as user-managed content. The renderer should preserve them where practical, especially in rule-list sections where comments explain why a rule exists.
+1. `docs/qubes-dom0-installation.md` for the Qubes dom0 install and update flow.
+2. `docs/lua-configurables.md` for the supported rule types and user-editable sections.
+3. `docs/backup-archives.md` for backup behavior during guarded writes.
+4. `docs/product-development-brief.md` for the product direction and intended user outcomes.
+5. `docs/development-status.md` for current development status and verification notes.
+6. `docs/repository-layout.md` for the repository structure and documentation index.
 
-## Known-window inventory parser, stream, and row source
+## Project status
 
-The known-window inventory parser is intentionally narrow and testable. `parse_known_window_candidates()` accepts captured Devilspie2 debug/event text and returns normalized `KnownWindowCandidate` records.
+`d2wc` is preparing for its first public release.
 
-The parser currently supports both structured key names and the human-readable labels used by the documented manual probe, including:
+The current release focus is Qubes OS with XFCE, a GTK configurator, guarded writes to the managed config, and clear installation documentation.
 
-1. `Domain:`
-2. `Application name:`
-3. `Window name:`
-4. `Window Type:`
-5. `Class instance name:`
-6. `Window class:`
-7. `Screen Geometry:`
-8. `Window geometry:`
+## License
 
-The inventory row-source layer converts parsed observations into one selectable target per safe machine/application pair, without displaying observation counts. Captured values are used to populate workflow dropdown choices for the top `Add` row, while configured rows remain separate below it.
-
-The capture layer currently supports both a bounded startup inventory snapshot and a continuous stream parser. Startup output creates the initial known-window inventory. Later debug output can add newly opened domain/class pairs while the monitor is running.
-
-The GTK integration feeds captured machine/application targets into the existing `Add` row dropdown choices automatically while the configurator is open.
-
-## Development direction
-
-The CLI/core editing proof phase is complete for the managed Lua sections. The GTK development phase is focused on the managed-config editor that exercises the same tested core edit operations safely.
-
-Current UI priorities:
-
-1. Keep the managed-config editor safe and clear.
-2. Continue refining the workflow-focused grid editor behavior on top of the PR #27 baseline when needed.
-3. Continue refining automatic known-window inventory behavior in the GTK `Add` row dropdowns.
-4. Continue polishing the Qubes/dom0 source-tarball install flow for public release.
-5. Later, wire Lua event handoff and suppression for already-known windows.
-
-Important direction notes:
-
-1. Devilspie2/Lua remains the event source.
-2. If the user chooses the configurator from a window event, GTK should open with the data captured from that Lua event.
-3. Duplicate configurator launches for intermediary events are acceptable for now.
-4. Later suppression logic should avoid automatically opening the configurator for windows that already have a profile or handling rule.
-
-The ordered future roadmap is maintained in [`docs/implementation-plan.md`](docs/implementation-plan.md).
+See `LICENSE`.
