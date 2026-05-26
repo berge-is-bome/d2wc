@@ -2,53 +2,96 @@
 
 ## Purpose
 
-This document describes the packaging direction for `d2wc`.
+This document describes the packaging and installation direction for `d2wc`.
 
-The first priority is to package `d2wc` cleanly for the environments where it is most likely to be used first:
+The first priority is to support the environments where `d2wc` is most likely to be used first:
 
-1. Qubes OS app qubes and dom0-related workflows where appropriate.
-2. Fedora-family systems.
+1. Qubes OS dom0 source-archive installation.
+2. Qubes OS app qubes and Fedora-family systems.
 3. Debian-family systems later.
 4. Other Linux distributions after the architecture is stable.
 
-The packaging plan should remain conservative until the first implementation stack is proven.
+The packaging plan should remain conservative until the first public release path is proven.
 
 ## Current project state
 
 The repository currently contains:
 
 1. The active `devilspie2` Lua rules script.
-2. Development documentation.
-3. No installable configurator application yet.
+2. A Python package with the `d2wc` command entry point.
+3. Parser, validator, renderer, safe-save, backup, and guarded edit logic for the managed Lua sections.
+4. A GTK configurator for the managed config.
+5. Known-window inventory parsing, capture, stream, and GTK dropdown integration.
+6. Qubes/dom0 source-archive install and update helper scripts.
+7. Development and user-facing documentation.
 
-Packaging should therefore happen in phases.
+The current public-release installation path is the Qubes/dom0 source-archive workflow documented in [Qubes dom0 Installation](qubes-dom0-installation.md).
+
+Distribution packages are still future work.
+
+## Current Qubes/dom0 source-archive installation model
+
+The current source-archive workflow uses two scripts:
+
+1. `d2wc-prepare-archive.sh`
+   1. Runs in a networked DisposableVM.
+   2. Clones or updates the repository checkout.
+   3. Creates `/tmp/d2wc.tgz` from the current Git checkout.
+   4. Copies `d2wc-installation.sh` to `/tmp/d2wc-installation.sh`.
+2. `d2wc-installation.sh`
+   1. Runs in dom0.
+   2. Copies `/tmp/d2wc.tgz` from the configured DisposableVM.
+   3. Extracts the archive to `~/Qubes/d2wc`.
+   4. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
+   5. Removes a previous user-site `d2wc` installation when present.
+   6. Installs the package into the dom0 user Python site without network access.
+   7. Configures `$HOME/.local/bin` for Bash or Fish using a managed shell-config block.
+   8. Launches `d2wc` on first install.
+   9. On later updates, reports that the configurator can be launched manually.
+
+The current managed config path is:
+
+```text
+~/.config/devilspie2/d2wc.lua
+```
+
+Existing Devilspie2 scripts in `~/.config/devilspie2/` are not replaced by the installer.
 
 ## Packaging phases
 
 ### Phase 0: source checkout
 
-Phase 0 is the current state.
+Complete.
 
-A user or developer clones the repository and manually copies or runs the Lua script.
-
-This is acceptable only while the project is still being designed.
+A user or developer can clone the repository and run the Lua script or Python package from source.
 
 ### Phase 1: developer install
 
-Phase 1 should support a developer install for the configurator prototype.
+Complete for the current development workflow.
 
-Expected behavior:
+Supported behavior:
 
-1. Install Python package dependencies.
-2. Run the configurator from the repository checkout.
-3. Use a test copy of the Lua file.
-4. Avoid modifying the user's real desktop configuration unless explicitly requested.
+1. Install the Python package in editable mode from the repository root.
+2. Run the CLI and GTK configurator from the repository checkout.
+3. Use the dedicated test-config workflow for isolated UI testing.
+4. Avoid modifying unrelated user configuration.
 
-This phase is for development and testing, not end users.
+### Phase 2: Qubes/dom0 source-archive install
 
-### Phase 2: local package
+Complete for the current public-release target.
 
-Phase 2 should produce a local package that can be installed on a test system.
+Supported behavior:
+
+1. Prepare a source archive in a networked DisposableVM.
+2. Copy and run the installer in dom0.
+3. Install or update the user-site Python package without dom0 network access.
+4. Preserve an existing `~/.config/devilspie2/d2wc.lua`.
+5. Keep other Devilspie2 scripts untouched.
+6. Launch the installed `d2wc` command.
+
+### Phase 3: local package
+
+Future work.
 
 For Fedora-family systems, this likely means an RPM.
 
@@ -64,9 +107,9 @@ The package should install:
 6. Documentation.
 7. Optional helper service files, if needed later.
 
-### Phase 3: distribution-quality package
+### Phase 4: distribution-quality package
 
-Phase 3 should refine the package for wider use.
+Future work.
 
 This includes:
 
@@ -79,9 +122,9 @@ This includes:
 7. Reproducible source archive.
 8. Clear uninstall behavior.
 
-## First target packaging format
+## First distribution package target
 
-The first package target should be Fedora RPM.
+The first distribution package target should be Fedora RPM.
 
 Reasons:
 
@@ -91,29 +134,25 @@ Reasons:
 
 Debian packaging should follow after the basic app layout is stable.
 
-## Expected installed commands
+## Current installed command
 
-The command names are not final, but packaging should eventually provide clear commands.
+The current Python package provides this console entry point:
 
-Possible commands:
+```bash
+d2wc
+```
 
-1. `d2wc`
-2. `d2wc-configure`
-3. `d2wc-run`
-4. `d2wc-test-left-edge`
+The current behavior is:
 
-Recommended direction:
+1. `d2wc` opens the GTK configurator.
+2. `d2wc configure` also opens the GTK configurator.
+3. Other CLI subcommands remain available behind the same `d2wc` command.
 
-1. `d2wc configure` opens the configurator.
-2. `d2wc run` starts or verifies the managed `devilspie2` runtime.
-3. `d2wc reload` reloads or restarts the managed runtime.
-4. `d2wc test-left-edge` runs a left-edge correction test harness when implemented.
-
-A single `d2wc` command with subcommands is cleaner than many unrelated command names.
+The single `d2wc` command remains the preferred direction.
 
 ## Desktop integration
 
-The package may install a desktop launcher for the configurator.
+The package may later install a desktop launcher for the configurator.
 
 A desktop file can allow:
 
@@ -129,11 +168,19 @@ Optional tray behavior should not be required for packaging.
 
 The package should avoid interfering with unrelated `devilspie2` configurations.
 
-The long-term model is that `d2wc` owns the `devilspie2` instance that runs the managed `d2wc` Lua script.
+The current Qubes/dom0 installer creates or preserves only:
 
-Packaging should therefore avoid installing files in a way that silently takes over a user's existing `devilspie2` setup.
+```text
+~/.config/devilspie2/d2wc.lua
+```
 
-Preferred behavior:
+It does not remove, replace, or rewrite other Lua scripts in `~/.config/devilspie2/`.
+
+The longer-term model is that `d2wc` should own the Devilspie2 instance that runs the managed `d2wc` Lua script.
+
+Packaging should therefore avoid installing files in a way that silently takes over a user's existing Devilspie2 setup.
+
+Preferred packaged behavior:
 
 1. Install a default script/template.
 2. Let the user initialize a managed config.
@@ -142,7 +189,7 @@ Preferred behavior:
 
 ## File layout direction
 
-Exact paths should be finalized later, but the project should aim for standard Linux layout.
+Exact distribution package paths should be finalized later, but the project should aim for standard Linux layout.
 
 Possible installed layout:
 
@@ -153,7 +200,7 @@ Possible installed layout:
 /usr/share/doc/d2wc/
 ```
 
-Possible user config layout:
+Possible user config layout for distribution packages:
 
 ```text
 ~/.config/d2wc/d2wc.lua
@@ -162,7 +209,13 @@ Possible user config layout:
 ~/.local/state/d2wc/logs/
 ```
 
-The user's managed Lua file should live in user config, not be edited directly under `/usr/share`.
+The current Qubes/dom0 source-archive flow deliberately uses:
+
+```text
+~/.config/devilspie2/d2wc.lua
+```
+
+That path keeps the public-release Qubes workflow simple and compatible with Devilspie2's normal user script directory.
 
 ## Lua script installation model
 
@@ -170,7 +223,7 @@ The packaged Lua script should be treated as a template.
 
 First-run behavior should likely be:
 
-1. Check for `~/.config/d2wc/d2wc.lua`.
+1. Check for the user-managed `d2wc.lua` file.
 2. If missing, copy the packaged template there.
 3. Use the user copy as the managed active script.
 4. Leave the packaged template unchanged.
@@ -194,15 +247,16 @@ This is a reason to keep the managed block format deterministic.
 
 ## Python packaging direction
 
-The first implementation is expected to use Python.
+The first implementation uses Python.
 
 The project should keep core logic separate from UI code:
 
 1. Parser/writer/validator core.
 2. Window identity helper code.
-3. GTK UI front end.
-4. Future Qt UI front end.
-5. CLI entry point.
+3. Known-window inventory helpers.
+4. GTK UI front end.
+5. Future Qt UI front end.
+6. CLI entry point.
 
 This allows the package to expose both GUI and command-line behavior without duplicating logic.
 
@@ -213,9 +267,9 @@ Dependencies should remain modest.
 Expected early dependencies:
 
 1. Python 3.
-2. PyGObject/GTK for the first UI proof.
+2. PyGObject/GTK for the first UI.
 3. `devilspie2`.
-4. X11 helper tools or libraries as needed for active-window capture.
+4. X11 helper tools or libraries as needed for active-window capture or workspace inspection.
 
 Optional or later dependencies:
 
@@ -238,125 +292,3 @@ The Fedora RPM should eventually define:
 6. Runtime dependencies.
 7. Installed files.
 8. Desktop file validation.
-9. Basic smoke tests.
-
-Possible package name:
-
-```text
-d2wc
-```
-
-The RPM should not assume it can configure Qubes dom0 automatically. Qubes-specific behavior may require careful documentation and possibly separate packaging decisions.
-
-## Debian packaging direction
-
-Debian packaging should follow after Fedora packaging is stable.
-
-The Debian package should use the same source layout and command names where possible.
-
-The project should avoid Fedora-only assumptions in the application code.
-
-## Qubes considerations
-
-Qubes needs special care.
-
-Qubes dom0 is normally offline and has no ordinary network access. That affects how `d2wc` should be distributed, tested, and installed for Qubes users.
-
-Likely Qubes installation routes:
-
-1. Clone the repository in a networked qube.
-2. Move the cloned repository into dom0 using Qubes built-in copy mechanisms.
-3. Run `d2wc` from the copied source tree or perform a local developer install.
-4. Alternatively, download or build an RPM in a networked environment.
-5. Move the RPM into dom0 using Qubes built-in copy mechanisms.
-6. Install the RPM locally in dom0.
-
-This means the project should support both:
-
-1. Running from a source checkout.
-2. Installing from a local RPM file without requiring network access at install time.
-
-The documentation should never assume that dom0 can run `git clone`, install dependencies from the network, or fetch package repositories directly.
-
-Questions to answer later:
-
-1. Where should `d2wc` run for Qubes workflows?
-2. Which parts belong in dom0, if any?
-3. Which parts can run in an app qube?
-4. How should the managed Lua script be installed or copied?
-5. What Qubes-specific dependencies are needed?
-6. How should documentation warn users before modifying dom0 behavior?
-7. How should offline dependency handling be documented for dom0?
-8. Should Qubes users be offered a source-checkout workflow before RPM packaging is ready?
-
-The first implementation can target the user's known Qubes/XFCE workflow, but packaging should not blindly assume all Qubes users want the same install path.
-
-## Development install
-
-For early development, the repository should eventually support a simple developer workflow such as:
-
-```bash
-python -m d2wc configure
-```
-
-or:
-
-```bash
-./dev/run-configurator
-```
-
-The exact command depends on the final source layout.
-
-The developer workflow should use test files by default to avoid damaging the user's active Lua configuration.
-
-For Qubes/dom0 testing, the source-checkout workflow should remain important even after RPM packaging exists. It gives users a way to inspect the source in a networked qube, copy it into dom0, and run or test it without relying on dom0 network access.
-
-## Testing package behavior
-
-Packaging tests should check:
-
-1. The command exists after install.
-2. The configurator can open.
-3. The managed Lua template is installed.
-4. First-run config initialization creates a user copy.
-5. Backup directory can be created.
-6. The package can be removed cleanly.
-7. User config is not deleted on normal uninstall unless explicitly purged.
-8. Local RPM install works without network access once dependencies are present.
-
-## Uninstall behavior
-
-Uninstall should remove packaged files but preserve user configuration by default.
-
-User data should remain under:
-
-```text
-~/.config/d2wc/
-~/.local/state/d2wc/
-```
-
-A separate purge instruction can explain how to remove user configuration manually.
-
-## Versioning
-
-The project should use clear semantic-ish versioning once packaging begins.
-
-The current Lua script version is `0.1.12.3`, but the repository package version may need a separate project version once the configurator exists.
-
-Possible approach:
-
-1. Keep Lua script version comments for now.
-2. Introduce project package version when the Python application starts.
-3. Document when script version and package version diverge.
-
-## Open questions
-
-1. Should the active user Lua file be copied from a package template or generated from structured config?
-2. Should the package include a systemd user service later?
-3. Should `d2wc run` manage the `devilspie2` process directly?
-4. How should Qubes-specific installation differ from ordinary Linux installation?
-5. Should GTK and future Qt front ends be separate packages or optional extras?
-6. What is the cleanest Fedora RPM dependency set for PyGObject and GTK?
-7. What is the cleanest Debian dependency set?
-8. How should Qubes/dom0 offline install instructions be structured?
-9. Which source-checkout workflow should be supported before RPM packaging is ready?
