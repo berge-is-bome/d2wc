@@ -12,22 +12,15 @@ cp install.sh /tmp
 
 In dom0:
 
-4. Create `~/d2wc`.
-5. Copy `install.sh` from the disposable.
-6. Edit VM name to match your's.
-8. Make the script executable.
-9. Run the script.
-10. Shutdown disposable.
+4. Copy `install.sh` from the disposable.
+5. Edit VM name to match your's.
+6. Make the script executable.
+7. Run the script.
+8. Shutdown disposable.
 
 ```bash
-cd $HOME
-mkdir -p d2wc
 qvm-run --pass-io disp1234 'cat /tmp/install.sh' > ~/tmp/install.sh
 nvim /tmp/install.sh
 sudo chmod +x
 ./install.sh
 ```
-
-Explain that the installer creates `~/.config/devilspie2/d2wc.lua` only if it does not already exist.
-
-Explain that the installer configures `$HOME/.local/bin` for Bash or Fish so the installed `d2wc` command is available later.
