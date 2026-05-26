@@ -31,10 +31,16 @@ git archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
 4. Copy `d2wc-installation.sh` to `/tmp` in the same DisposableVM.
 5. In dom0, create `~/Qubes` if it does not already exist.
 6. Copy `/tmp/d2wc-installation.sh` from the DisposableVM into dom0.
-7. Edit the `VM="disp1234"` line in the dom0 script so it matches the actual DisposableVM name.
-8. Make the dom0 script executable.
-9. Run the dom0 script.
-10. Explain that the installer creates `~/.config/devilspie2/d2wc.lua` only if it does not already exist.
-11. Explain that the installer configures `$HOME/.local/bin` for Bash or Fish so the installed `d2wc` command is available later.
+
+```bash
+```bash
+qvm-run --pass-io disp1234 'cat /tmp/d2wc-installation.sh' > ~/Qubes/d2wc-installation.sh
+```
+
+8. Edit the `VM="disp1234"` line in the dom0 script so it matches the actual DisposableVM name.
+9. Make the dom0 script executable.
+10. Run the dom0 script.
+11. Explain that the installer creates `~/.config/devilspie2/d2wc.lua` only if it does not already exist.
+12. Explain that the installer configures `$HOME/.local/bin` for Bash or Fish so the installed `d2wc` command is available later.
 
 Keep the document concise, practical, and Qubes-specific.
