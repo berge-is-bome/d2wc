@@ -13,14 +13,14 @@ The plan should remain practical and test-driven. Each stage should produce some
 The repository currently contains:
 
 1. `src/d2wc.lua`, the current `devilspie2` Lua rules script.
-2. Product and UI flow documentation.
-3. Runtime architecture documentation.
-4. Technology evaluation documentation.
-5. Event monitoring documentation.
-6. Left-edge correction testing documentation.
-7. Packaging documentation.
-8. Lua configurables documentation.
-9. Lua design history notes recovered from archived pre-repository script versions.
+2. [Product Development Brief](product-development-brief.md) and [UI Flow](ui-flow.md) documentation.
+3. [Runtime Architecture](runtime-architecture.md) documentation.
+4. [Technology Evaluation](technology-evaluation.md) documentation.
+5. [Event Monitoring](event-monitoring.md) documentation.
+6. [Left-Edge Correction Testing](left-edge-correction-testing.md) documentation.
+7. [Packaging](packaging.md) documentation.
+8. [Lua Configurables](lua-configurables.md) documentation.
+9. [Lua Design History Notes](lua-design-history.md) recovered from archived pre-repository script versions.
 10. Python package skeleton for the configurator core.
 11. Parser, validator, renderer, settings, split-profile, backup archive path and member name, duplicate-validation, and shadow-validation tests.
 12. Core safe-save helper and temporary-directory tests.
