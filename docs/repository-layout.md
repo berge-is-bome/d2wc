@@ -31,6 +31,7 @@ docs/
   technology-evaluation.md
   testing.md
   ui-flow.md
+  user-installation-documentation-notes.md
 src/
   d2wc.lua
   d2wc/
@@ -80,13 +81,14 @@ tests/
 9. [Lua Design History Notes](lua-design-history.md) records design context recovered from the archived pre-repository Lua script history.
 10. [MVP Scope](mvp-scope.md) separates the safe manual configurator from post-resize automation.
 11. [Packaging](packaging.md) describes Fedora-first RPM direction, later Debian packaging, Qubes/dom0 offline installation routes, and current source-archive installation behavior.
-12. [Product Development Brief](product-development-brief.md) describes the product direction and user outcomes.
+12. [Product Development Brief](product-development-brief.md) describes the product direction and intended user outcomes.
 13. [Qubes dom0 Installation](qubes-dom0-installation.md) describes the current Qubes dom0 source-archive install/update flow.
 14. [Repository Layout](repository-layout.md) describes this repository structure.
 15. [Runtime Architecture](runtime-architecture.md) describes the Lua script, configurator, helper process direction, runtime settings, save model, and reload model.
 16. [Technology Evaluation](technology-evaluation.md) explains the Python, GTK-first, Qt-roadmap direction.
 17. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
 18. [UI Flow](ui-flow.md) describes the configurator screens, entry points, generated split profiles, and user-facing workflows.
+19. [User Installation Documentation Notes](user-installation-documentation-notes.md) records the intended shape of future user-facing manual installation documentation.
 
 ## Directory purposes
 
@@ -140,6 +142,12 @@ Use short topic branches for repo changes. Examples:
 Public-facing documents, especially the README, should explain what `d2wc` is and what the user can do with it.
 
 Technical details should live in focused documents under `docs/`.
+
+Use inline Markdown links for documentation references:
+
+```text
+[Document Title](document-name.md)
+```
 
 When a behavior is confirmed, write it as current behavior.
 
