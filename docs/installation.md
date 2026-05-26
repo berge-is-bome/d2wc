@@ -1,4 +1,4 @@
-In the disposable:
+In a disposable:
 
 1. Clone repository.
 2. Create archive.
