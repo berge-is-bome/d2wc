@@ -137,11 +137,7 @@ The Qubes source-tarball workflow has two helper scripts:
    9. Launches the installed configurator on first install.
    10. On later updates, reports that `d2wc` can be launched manually.
 
-The user-facing install guide is:
-
-```text
-docs/qubes-dom0-installation.md
-```
+Use [Qubes dom0 Installation](qubes-dom0-installation.md) for the full user-facing install guide.
 
 The normal installed launch command is:
 
