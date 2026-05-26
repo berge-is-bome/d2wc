@@ -5,23 +5,24 @@
 Current active branch:
 
 ```text
-configurator-action-button-size
+documentation-update-public-release
 ```
 
 Current branch scope:
 
-1. Polish the GTK managed-config editor action-button sizing and small usability details.
-2. Add the Qubes/dom0 source-tarball install and update workflow.
-3. Make the installed `d2wc` command open the configurator directly.
-4. Load the d2wc-managed real config by default:
-
-```text
-~/.config/devilspie2/d2wc.lua
-```
-
-5. Keep existing user Devilspie2 scripts untouched. `d2wc` owns only `d2wc.lua`.
+1. Rewrite the README as a public-facing description of what `d2wc` is.
+2. Remove technical implementation sections from the README.
+3. Keep displaced technical and development information in `docs/`.
+4. Refresh stale documentation before the first public release.
 
 Current merged baseline:
+
+```text
+PR #29: Match action button width to dirty split state
+Merge commit: d466f8d59f53abf0e390a3e1f68a31ed74f7414d
+```
+
+Recent merged baseline before PR #29:
 
 ```text
 PR #28: Add known-window inventory integration
@@ -37,7 +38,7 @@ Merge commit: fe36986712e4e985ea3b7e06f925d94ab4f7649c
 
 ## Latest confirmed verification
 
-Verification reported before PR #28 was merged:
+Final verification before PR #29 was merged:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -47,10 +48,8 @@ python3 -m pytest
 Result:
 
 ```text
-281 passed
+282 passed
 ```
-
-Manual GTK smoke testing after PR #28 confirmed that automatic known-window inventory values populate the Machine/Application dropdowns.
 
 Manual verification reported during PR #29:
 
@@ -59,8 +58,9 @@ Manual verification reported during PR #29:
 3. The Qubes/dom0 source-tarball install flow works.
 4. The dom0 installer preserves an existing `~/.config/devilspie2/d2wc.lua`.
 5. The installed dom0 command opens the configurator from the real managed config after local config validation issues were corrected.
+6. Normal `Apply` buttons match the width of the dirty `Undo` / `Apply` split state.
 
-Before merging PR #29, run the normal local verification path:
+Before merging the public-release documentation branch, run the normal local verification path:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -96,7 +96,7 @@ The GTK managed-config editor currently supports:
 10. Dirty-row split action area:
     1. left half: amber `Undo`
     2. right half: action-coloured `Apply`
-11. Normal single-button `Apply` action area sized to match the dirty `Undo`/`Apply` split width.
+11. Normal single-button `Apply` action area sized to match the dirty `Undo` / `Apply` split width.
 12. Action-based row colours:
     1. `Add` = green
     2. `Modify` = purple
@@ -118,7 +118,7 @@ d2wc-configurator
 
 ## Qubes/dom0 install behavior
 
-The Qubes source-tarball workflow now has two helper scripts:
+The Qubes source-tarball workflow has two helper scripts:
 
 1. `d2wc-prepare-archive.sh`
    1. Runs in a networked DisposableVM.
@@ -131,9 +131,11 @@ The Qubes source-tarball workflow now has two helper scripts:
    3. Pulls `/tmp/d2wc.tgz` from that VM.
    4. Extracts to `~/Qubes/d2wc`.
    5. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
-   6. Reinstalls the Python package into the dom0 user site.
-   7. Configures `$HOME/.local/bin` for Bash or Fish with a managed shell-config block.
-   8. Launches the installed configurator using `$HOME/.local/bin/d2wc`.
+   6. Removes a previous user-site `d2wc` installation when present.
+   7. Installs the new package into the dom0 user Python site without network access.
+   8. Configures `$HOME/.local/bin` for Bash or Fish with a managed shell-config block.
+   9. Launches the installed configurator on first install.
+   10. On later updates, reports that `d2wc` can be launched manually.
 
 The user-facing install guide is:
 
@@ -227,7 +229,9 @@ The current Python core supports:
 
 ## Active next work
 
-After PR #29, the next planned development slice is Lua event handoff.
+The current active work is the public-release documentation pass.
+
+After this pass, the next planned development slice remains Lua event handoff.
 
 Lua event handoff means:
 
@@ -333,34 +337,5 @@ The pre-repository `d2wc.lua` history has been preserved in Git and connected to
 A tag points to the archived history:
 
 ```text
-archive/d2wc-lua-pre-repo-history
+pre-repo-lua-history
 ```
-
-Inspect the preserved Lua evolution with:
-
-```bash
-git log --oneline --reverse archive/d2wc-lua-pre-repo-history -- src/d2wc.lua
-```
-
-Design context recovered from that history is recorded in [Lua Design History Notes](lua-design-history.md).
-
-## Completed proof summary
-
-1. PR #3: safe-save proof.
-2. PR #4: `GEOM` edit proof.
-3. PR #5: `WORKSPACE_PLACEMENT` edit proof.
-4. PR #7, PR #8, PR #9: `WORKSPACE_ROUTES` edit proof and comment preservation fixes.
-5. PR #11: `PIN` and `EXCLUDE` edit proof.
-6. PR #12: `LEFT_EDGE_CORRECTION` edit proof.
-7. PR #13: documentation refresh after managed-section edit proofs.
-8. PR #14: first GTK launch proof.
-9. PR #15: selected-window geometry diagnostic proof.
-10. PR #19: event-data GTK UI proof.
-11. PR #20: read-only event proposal preview.
-12. PR #21: test-config configurator UI proof.
-13. PR #22: test-config proposal action buttons.
-14. PR #23: managed-section test-config actions.
-15. PR #26: known-window inventory parser foundation.
-16. PR #27: workflow-focused grid editor polish.
-17. PR #28: known-window inventory integration.
-18. PR #29: Qubes install flow, real managed config launch path, and GTK polish.
