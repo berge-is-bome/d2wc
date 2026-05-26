@@ -28,13 +28,11 @@ This is useful for layouts such as a file manager on the left, a browser on the 
 
 Keep selected windows visible on all workspaces.
 
-This is useful for small monitors, utility windows, notes, panels, or other windows that should stay available while moving between workspaces.
+This is useful to keep utility windows, notes, or other windows that should stay available while moving between workspaces.
 
 ### Exclude windows from automation
 
-Tell `d2wc` to leave selected windows alone.
-
-This is useful for menus, splash windows, helper dialogs, panels, launchers, or applications that should not be moved, resized, routed, pinned, or corrected.
+Tell `d2wc` to leave selected windows, or all windows from a specific domain (VM/Machine) alone.
 
 ### Correct left-edge placement problems
 
@@ -61,7 +59,7 @@ The configurator also offers per-workflow help from the `Menu` button or by pres
 
 ## Known window suggestions
 
-The configurator can populate Machine and Application choices from windows that are already known while `d2wc` is open.
+The configurator populates Machine and Application choices from windows that are already known while `d2wc` is open.
 
 This makes new rules easier to create because common values can be selected from dropdowns instead of typed from memory.
 
@@ -81,12 +79,6 @@ After installation, launch the configurator with:
 
 ```bash
 d2wc
-```
-
-The explicit configurator command is also available:
-
-```bash
-d2wc configure
 ```
 
 ## Qubes dom0 installation
@@ -112,9 +104,7 @@ Useful project documents:
 
 ## Project status
 
-`d2wc` is preparing for its first public release.
-
-The current release focus is Qubes OS with XFCE, a GTK configurator, guarded writes to the managed config, and clear installation documentation.
+`d2wc` is ready for its first public beta release.
 
 ## License
 
