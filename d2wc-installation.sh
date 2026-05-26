@@ -126,6 +126,12 @@ fi
 
 mkdir -p -- "$DEVILSPIE2_DIR"
 
+if python3 -m pip show d2wc >/dev/null 2>&1 || [ -x "$D2WC_BIN" ]; then
+  FIRST_INSTALL=0
+else
+  FIRST_INSTALL=1
+fi
+
 if [ -e "$D2WC_CONFIG" ]; then
   echo "Keeping existing config: $D2WC_CONFIG"
 else
@@ -161,4 +167,10 @@ cd "$BASE_DIR"
 
 python3 -c 'import d2wc; print("Using d2wc from:", d2wc.__file__)'
 
-"$D2WC_BIN"
+if [ "$FIRST_INSTALL" -eq 1 ]; then
+  echo "First install complete. Launching d2wc."
+  "$D2WC_BIN"
+else
+  echo "Updated d2wc."
+  echo "Launch it with: d2wc"
+fi
