@@ -6,8 +6,8 @@ This document describes the packaging and installation direction for `d2wc`.
 
 The first priority is to support the environments where `d2wc` is most likely to be used first:
 
-1. Qubes OS dom0 source-archive installation.
-2. Qubes OS app qubes and Fedora-family systems.
+1. Qubes OS dom0.
+2. Fedora-family systems.
 3. Debian-family systems later.
 4. Other Linux distributions after the architecture is stable.
 
@@ -17,7 +17,7 @@ The packaging plan should remain conservative until the first public release pat
 
 The repository currently contains:
 
-1. The active `devilspie2` Lua rules script.
+1. The active Devilspie2 Lua rules script.
 2. A Python package with the `d2wc` command entry point.
 3. Parser, validator, renderer, safe-save, backup, and guarded edit logic for the managed Lua sections.
 4. A GTK configurator for the managed config.
