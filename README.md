@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-Created by André in collaboration with ChatGPT.
+Created by André, with code developed in collaboration with ChatGPT and Codex.
 
 `d2wc` combines a `devilspie2` Lua rules script with a Python configurator core and GTK configurator. The Lua script remains the runtime engine. The Python side provides parser, validator, renderer, guarded CLI edit commands, safe-save behavior, event-data plumbing, known-window inventory parsing and stream capture, workflow grid row helpers, and the GTK managed-config editor.
 
