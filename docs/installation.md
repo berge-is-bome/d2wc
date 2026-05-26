@@ -5,9 +5,10 @@ In a disposable:
 3. Copy installer to temp.
 
 ```bash
+mkdir /tmp/d2wc
+cd /tmp/d2wc
 git clone git@github.com:berge-is-bome/d2wc.git
-git archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
-cp install.sh /tmp
+git archive --format=tar --prefix=d2wc/ HEAD | gzip > d2wc.tgz
 ```
 
 In dom0:
