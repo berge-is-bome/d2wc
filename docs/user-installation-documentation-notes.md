@@ -29,6 +29,11 @@ git archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
 ```
 
 4. Copy `d2wc-installation.sh` to `/tmp` in the same DisposableVM.
+
+```bash
+cp d2wc-installation.sh /tmp
+```
+
 5. In dom0, create `~/Qubes` if it does not already exist.
 6. Copy `/tmp/d2wc-installation.sh` from the DisposableVM into dom0.
 
