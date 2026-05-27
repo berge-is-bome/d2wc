@@ -270,6 +270,10 @@ choose_available_managed_filename() {
 migrate_devilspie2_regular_managed_file() {
   local source_root="$1"
 
+  if [ -L "$DEVILSPIE2_ENTRY" ]; then
+    return 0
+  fi
+
   if [ ! -f "$DEVILSPIE2_ENTRY" ]; then
     return 0
   fi
