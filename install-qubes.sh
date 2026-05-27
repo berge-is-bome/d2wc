@@ -216,18 +216,32 @@ is_safe_managed_filename() {
   local name="$1"
   [ -n "$name" ] || return 1
   case "$name" in
-    *.lua) ;;&
-    *) return 1;;
+    *.lua) ;;
+    *) return 1 ;;
   esac
   case "$name" in
-    */*|*..*) return 1;;
+    */*|*..*) return 1 ;;
   esac
 }
 
 is_d2wc_managed_lua_file() {
   local path="$1"
+  local source_root="$2"
   [ -f "$path" ] || return 1
-  grep -Fq -- "-- d2wc managed" "$path"
+  PYTHONPATH="$source_root/src" python3 - "$path" <<'PY'
+import sys
+from pathlib import Path
+from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.validation import validate_managed_blocks
+
+config = Path(sys.argv[1])
+try:
+    source = config.read_text(encoding="utf-8")
+    parsed = ManagedBlockParser().parse(source)
+except (OSError, ValueError):
+    raise SystemExit(1)
+raise SystemExit(0 if validate_managed_blocks(parsed.blocks).ok else 1)
+PY
 }
 
 choose_managed_filename() {
@@ -252,12 +266,66 @@ choose_managed_filename() {
   done
 }
 
+choose_available_managed_filename() {
+  local preferred="$1"
+  local name="$preferred"
+  if [ ! -e "$MANAGED_DIR/$name" ]; then
+    printf "%s\n" "$name"
+    return 0
+  fi
+
+  while true; do
+    read -rp "Managed config $name exists. Enter alternate .lua filename: " name
+    if ! is_safe_managed_filename "$name"; then
+      echo "ERROR: filename must be non-empty, end with .lua, and not contain / or .." >&2
+      continue
+    fi
+    if [ -e "$MANAGED_DIR/$name" ]; then
+      echo "ERROR: $MANAGED_DIR/$name already exists" >&2
+      continue
+    fi
+    printf "%s\n" "$name"
+    return 0
+  done
+}
+
+migrate_devilspie2_regular_managed_file() {
+  local source_root="$1"
+
+  if [ ! -f "$DEVILSPIE2_ENTRY" ]; then
+    return 0
+  fi
+
+  if ! is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY" "$source_root"; then
+    return 0
+  fi
+
+  local filename target
+  filename="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
+  target="$MANAGED_DIR/$filename"
+  cp -- "$DEVILSPIE2_ENTRY" "$target"
+  echo "Migrated managed Devilspie2 file to: $target"
+}
+
 link_devilspie2_entry_safely() {
   local managed_path="$1"
+  local source_root="$2"
   mkdir -p -- "$DEVILSPIE2_DIR"
 
-  if [ -e "$DEVILSPIE2_ENTRY" ] || [ -L "$DEVILSPIE2_ENTRY" ]; then
-    if [ -L "$DEVILSPIE2_ENTRY" ] || is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY"; then
+  if [ -L "$DEVILSPIE2_ENTRY" ]; then
+    local resolved managed_root
+    resolved="$(readlink -f -- "$DEVILSPIE2_ENTRY" || true)"
+    managed_root="$(readlink -f -- "$MANAGED_DIR" || true)"
+    case "$resolved" in
+      "$managed_root"/*) rm -f -- "$DEVILSPIE2_ENTRY" ;;
+      *)
+        echo "WARNING: leaving unrelated Devilspie2 symlink unchanged: $DEVILSPIE2_ENTRY -> $resolved" >&2
+        return 0
+        ;;
+    esac
+  elif [ -e "$DEVILSPIE2_ENTRY" ]; then
+    if is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY" "$source_root"; then
+      migrate_devilspie2_regular_managed_file "$source_root"
       rm -f -- "$DEVILSPIE2_ENTRY"
     else
       echo "WARNING: leaving existing unmanaged Devilspie2 file unchanged: $DEVILSPIE2_ENTRY" >&2
@@ -367,7 +435,9 @@ mkdir -p -- "$CACHEDIR"
 VM="$(choose_source_vm "$SOURCE_VM")"
 copy_archive_from_vm "$VM" "$ARCHIVE"
 
-TMP_SOURCE="$(mktemp -d --tmpdir="$HOME/.local/share/d2wc" d2wc-source.XXXXXX)"
+SOURCE_PARENT="$HOME/.local/share/d2wc"
+mkdir -p -- "$SOURCE_PARENT"
+TMP_SOURCE="$(mktemp -d --tmpdir="$SOURCE_PARENT" d2wc-source.XXXXXX)"
 trap 'rm -rf -- "$TMP_SOURCE"' EXIT
 
 tar xzf "$ARCHIVE" -C "$TMP_SOURCE"
@@ -403,12 +473,12 @@ if [ ! -e "$MANAGED_PATH" ]; then
   echo "Created managed config: $MANAGED_PATH"
 fi
 
-if ! is_d2wc_managed_lua_file "$MANAGED_PATH"; then
+if ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
   echo "ERROR: managed config is missing d2wc managed marker: $MANAGED_PATH" >&2
   exit 1
 fi
 
-link_devilspie2_entry_safely "$MANAGED_PATH"
+link_devilspie2_entry_safely "$MANAGED_PATH" "$SOURCE_ROOT"
 
 if python3 -m pip show d2wc >/dev/null 2>&1; then
   python3 -m pip uninstall -y d2wc
