@@ -1,8 +1,8 @@
 # Repository Layout
 
-This repository holds the current `devilspie2` Lua rules script, the Python configurator core, the GTK configurator, Qubes/dom0 installation helpers, tests, and project documentation.
+This repository holds the current `devilspie2` Lua rules script, the Python configurator core, the GTK configurator, Qubes/dom0 installation helper, tests, and project documentation.
 
-The README is intended to describe what `d2wc` is from a public user point of view. Technical status, development workflow, implementation notes, and repository structure belong in `docs/`.
+The README is intended to describe what `d2wc` is from a public user point of view. User-facing documentation belongs in `docs/user/`. Technical status, development workflow, implementation notes, and repository structure belong in `docs/project/`.
 
 ## Current layout
 
@@ -12,25 +12,26 @@ LICENSE
 pyproject.toml
 d2wc-installation.sh
 docs/
-  backup-archives.md
-  configurator-notification-settings.md
-  development-status.md
-  event-data-ui-direction.md
-  event-monitoring.md
-  implementation-plan.md
-  left-edge-correction-testing.md
-  lua-configurables.md
-  lua-design-history.md
-  mvp-scope.md
-  packaging.md
-  product-development-brief.md
-  qubes-dom0-installation.md
-  repository-layout.md
-  runtime-architecture.md
-  technology-evaluation.md
-  testing.md
-  ui-flow.md
-  user-installation-documentation-notes.md
+  user/
+    install-qubes.md
+  project/
+    backup-archives.md
+    configurator-notification-settings.md
+    development-status.md
+    event-data-ui-direction.md
+    event-monitoring.md
+    implementation-plan.md
+    left-edge-correction-testing.md
+    lua-configurables.md
+    lua-design-history.md
+    mvp-scope.md
+    packaging.md
+    product-development-brief.md
+    repository-layout.md
+    runtime-architecture.md
+    technology-evaluation.md
+    testing.md
+    ui-flow.md
 src/
   d2wc.lua
   d2wc/
@@ -69,6 +70,12 @@ tests/
 
 ## Document index
 
+### User documentation
+
+1. [Install/Update for Qubes](../user/install-qubes.md) describes the current Qubes dom0 source-archive install/update flow.
+
+### Project documentation
+
 1. [Backup Archives](backup-archives.md) describes backup archive behavior for guarded writes.
 2. [Configurator Notification Settings](configurator-notification-settings.md) records future Configure menu notification settings.
 3. [Development Status](development-status.md) records the active branch, latest verified baseline, current GTK behavior, Qubes/dom0 install behavior, known-window inventory behavior, current safe capability, and next work.
@@ -81,21 +88,25 @@ tests/
 10. [MVP Scope](mvp-scope.md) separates the safe manual configurator from post-resize automation.
 11. [Packaging](packaging.md) describes Fedora-first RPM direction, later Debian packaging, Qubes/dom0 offline installation routes, and current source-archive installation behavior.
 12. [Product Development Brief](product-development-brief.md) describes the product direction and intended user outcomes.
-13. [Qubes dom0 Installation](qubes-dom0-installation.md) describes the current Qubes dom0 source-archive install/update flow.
-14. [Repository Layout](repository-layout.md) describes this repository structure.
-15. [Runtime Architecture](runtime-architecture.md) describes the Lua script, configurator, helper process direction, runtime settings, save model, and reload model.
-16. [Technology Evaluation](technology-evaluation.md) explains the Python, GTK-first, Qt-roadmap direction.
-17. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
-18. [UI Flow](ui-flow.md) describes the configurator screens, entry points, generated split profiles, and user-facing workflows.
-19. [User Installation Documentation Notes](user-installation-documentation-notes.md) records the intended shape of future user-facing manual installation documentation.
+13. [Repository Layout](repository-layout.md) describes this repository structure.
+14. [Runtime Architecture](runtime-architecture.md) describes the Lua script, configurator, helper process direction, runtime settings, save model, and reload model.
+15. [Technology Evaluation](technology-evaluation.md) explains the Python, GTK-first, Qt-roadmap direction.
+16. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
+17. [UI Flow](ui-flow.md) describes the configurator screens, entry points, generated split profiles, and user-facing workflows.
 
 ## Directory purposes
 
-### `docs/`
+### `docs/user/`
 
-Project planning, product design, UI behavior, architecture, packaging, installation, development status, and development notes.
+User-facing documentation for installing, launching, and using `d2wc`.
 
-The documentation should describe `d2wc` from the user's point of view first, then map that behavior back to implementation details where a technical document calls for it.
+These documents should be practical and task-oriented.
+
+### `docs/project/`
+
+Project planning, product design, UI behavior, architecture, packaging, development status, and development notes.
+
+These documents may describe implementation details, development history, and technical direction.
 
 ### `src/`
 
@@ -138,9 +149,9 @@ Use short topic branches for repo changes. Examples:
 
 ## Documentation style
 
-Public-facing documents, especially the README, should explain what `d2wc` is and what the user can do with it.
+Public-facing documents, especially the README and files under `docs/user/`, should explain what `d2wc` is and what the user can do with it.
 
-Technical details should live in focused documents under `docs/`.
+Technical details should live in focused documents under `docs/project/`.
 
 Use inline Markdown links for documentation references:
 
