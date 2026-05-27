@@ -85,18 +85,18 @@ d2wc
 
 For Qubes users, the repository includes a source-archive installation flow for dom0.
 
-Use [Qubes dom0 Installation](docs/qubes-dom0-installation.md) for the full install/update flow.
+Use [Install/Update for Qubes](docs/user/install-qubes.md) for the full install/update flow.
 
 ## Documentation
 
 Useful project documents:
 
-1. [Qubes dom0 Installation](docs/qubes-dom0-installation.md) for the Qubes dom0 install and update flow.
-2. [Lua Configurables](docs/lua-configurables.md) for the supported rule types and user-editable sections.
-3. [Backup Archives](docs/backup-archives.md) for backup behavior during guarded writes.
-4. [Product Development Brief](docs/product-development-brief.md) for the product direction and intended user outcomes.
-5. [Development Status](docs/development-status.md) for current development status and verification notes.
-6. [Repository Layout](docs/repository-layout.md) for the repository structure and documentation index.
+1. [Install/Update for Qubes](docs/user/install-qubes.md) for the Qubes dom0 install and update flow.
+2. [Lua Configurables](docs/project/lua-configurables.md) for the supported rule types and user-editable sections.
+3. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
+4. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
+5. [Development Status](docs/project/development-status.md) for current development status and verification notes.
+6. [Repository Layout](docs/project/repository-layout.md) for the repository structure and documentation index.
 
 ## Project status
 
