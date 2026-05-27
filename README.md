@@ -95,8 +95,6 @@ Useful project documents:
 2. [Lua Configurables](docs/project/lua-configurables.md) for the supported rule types and user-editable sections.
 3. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
 4. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
-5. [Development Status](docs/project/development-status.md) for current development status and verification notes.
-6. [Repository Layout](docs/project/repository-layout.md) for the repository structure and documentation index.
 
 ## Project status
 
