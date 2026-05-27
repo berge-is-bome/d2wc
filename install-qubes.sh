@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_DIR="$HOME/Qubes"
-ARCHIVE="$BASE_DIR/d2wc.tgz"
-WORKDIR="$BASE_DIR/d2wc"
+CACHEDIR="$HOME/.cache/d2wc"
+ARCHIVE="$CACHEDIR/d2wc.tgz"
+SOURCE_ROOT="$HOME/.local/share/d2wc/source"
 SOURCE_ARCHIVE="/tmp/d2wc.tgz"
 
 LOCAL_BIN="$HOME/.local/bin"
 D2WC_BIN="$LOCAL_BIN/d2wc"
+MANAGED_DIR="$HOME/.config/d2wc/lua"
 DEVILSPIE2_DIR="$HOME/.config/devilspie2"
-D2WC_CONFIG="$DEVILSPIE2_DIR/d2wc.lua"
+DEVILSPIE2_ENTRY="$DEVILSPIE2_DIR/d2wc.lua"
+DEFAULT_MANAGED_FILENAME="d2wc.lua"
 PATH_BLOCK_START="# >>> d2wc local bin >>>"
 PATH_BLOCK_END="# <<< d2wc local bin <<<"
 
@@ -192,7 +194,7 @@ copy_archive_from_vm() {
   local destination="$2"
   local tmp_archive
 
-  tmp_archive="$(mktemp --tmpdir="$BASE_DIR" d2wc.tgz.XXXXXX)"
+  tmp_archive="$(mktemp --tmpdir="$CACHEDIR" d2wc.tgz.XXXXXX)"
 
   if ! qvm-run --pass-io -- "$vm" 'test -r /tmp/d2wc.tgz && cat /tmp/d2wc.tgz' > "$tmp_archive"; then
     rm -f -- "$tmp_archive"
@@ -209,6 +211,63 @@ copy_archive_from_vm() {
   echo "Copied and validated archive from $vm: $destination"
 }
 
+
+is_safe_managed_filename() {
+  local name="$1"
+  [ -n "$name" ] || return 1
+  case "$name" in
+    *.lua) ;;&
+    *) return 1;;
+  esac
+  case "$name" in
+    */*|*..*) return 1;;
+  esac
+}
+
+is_d2wc_managed_lua_file() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+  grep -Fq -- "-- d2wc managed" "$path"
+}
+
+choose_managed_filename() {
+  local name="$DEFAULT_MANAGED_FILENAME"
+  if [ ! -e "$MANAGED_DIR/$name" ]; then
+    printf '%s\n' "$name"
+    return 0
+  fi
+
+  while true; do
+    read -rp "Managed config $name exists. Enter alternate .lua filename: " name
+    if ! is_safe_managed_filename "$name"; then
+      echo "ERROR: filename must be non-empty, end with .lua, and not contain / or .." >&2
+      continue
+    fi
+    if [ -e "$MANAGED_DIR/$name" ]; then
+      echo "ERROR: $MANAGED_DIR/$name already exists" >&2
+      continue
+    fi
+    printf '%s\n' "$name"
+    return 0
+  done
+}
+
+link_devilspie2_entry_safely() {
+  local managed_path="$1"
+  mkdir -p -- "$DEVILSPIE2_DIR"
+
+  if [ -e "$DEVILSPIE2_ENTRY" ] || [ -L "$DEVILSPIE2_ENTRY" ]; then
+    if [ -L "$DEVILSPIE2_ENTRY" ] || is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY"; then
+      rm -f -- "$DEVILSPIE2_ENTRY"
+    else
+      echo "WARNING: leaving existing unmanaged Devilspie2 file unchanged: $DEVILSPIE2_ENTRY" >&2
+      return 0
+    fi
+  fi
+
+  ln -s -- "$managed_path" "$DEVILSPIE2_ENTRY"
+  echo "Configured Devilspie2 symlink: $DEVILSPIE2_ENTRY -> $managed_path"
+}
 add_local_bin_to_current_path() {
   case ":$PATH:" in
     *":$LOCAL_BIN:"*) ;;
@@ -303,28 +362,26 @@ ensure_local_bin_path_for_user_shell() {
 }
 
 parse_args "$@"
-mkdir -p -- "$BASE_DIR"
+mkdir -p -- "$CACHEDIR"
 
 VM="$(choose_source_vm "$SOURCE_VM")"
 copy_archive_from_vm "$VM" "$ARCHIVE"
 
-cd "$BASE_DIR"
+TMP_SOURCE="$(mktemp -d --tmpdir="$HOME/.local/share/d2wc" d2wc-source.XXXXXX)"
+trap 'rm -rf -- "$TMP_SOURCE"' EXIT
 
-rm -rf -- "$WORKDIR"
+tar xzf "$ARCHIVE" -C "$TMP_SOURCE"
+EXTRACTED="$TMP_SOURCE/d2wc"
 
-tar xzf "$ARCHIVE" -C "$BASE_DIR"
-
-if [ ! -f "$WORKDIR/pyproject.toml" ]; then
-  echo "ERROR: expected $WORKDIR/pyproject.toml after extracting archive" >&2
+if [ ! -f "$EXTRACTED/pyproject.toml" ]; then
+  echo "ERROR: expected $EXTRACTED/pyproject.toml after extracting archive" >&2
   exit 1
 fi
 
-if [ ! -f "$WORKDIR/src/d2wc.lua" ]; then
-  echo "ERROR: expected $WORKDIR/src/d2wc.lua after extracting archive" >&2
+if [ ! -f "$EXTRACTED/src/d2wc.lua" ]; then
+  echo "ERROR: expected $EXTRACTED/src/d2wc.lua after extracting archive" >&2
   exit 1
 fi
-
-mkdir -p -- "$DEVILSPIE2_DIR"
 
 if python3 -m pip show d2wc >/dev/null 2>&1 || [ -x "$D2WC_BIN" ]; then
   FIRST_INSTALL=0
@@ -332,12 +389,26 @@ else
   FIRST_INSTALL=1
 fi
 
-if [ -e "$D2WC_CONFIG" ]; then
-  echo "Keeping existing config: $D2WC_CONFIG"
-else
-  cp -- "$WORKDIR/src/d2wc.lua" "$D2WC_CONFIG"
-  echo "Created config: $D2WC_CONFIG"
+mkdir -p -- "$(dirname "$SOURCE_ROOT")"
+rm -rf -- "$SOURCE_ROOT"
+mkdir -p -- "$(dirname "$SOURCE_ROOT")"
+mv -- "$EXTRACTED" "$SOURCE_ROOT"
+
+mkdir -p -- "$MANAGED_DIR"
+MANAGED_FILENAME="$(choose_managed_filename)"
+MANAGED_PATH="$MANAGED_DIR/$MANAGED_FILENAME"
+
+if [ ! -e "$MANAGED_PATH" ]; then
+  cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+  echo "Created managed config: $MANAGED_PATH"
 fi
+
+if ! is_d2wc_managed_lua_file "$MANAGED_PATH"; then
+  echo "ERROR: managed config is missing d2wc managed marker: $MANAGED_PATH" >&2
+  exit 1
+fi
+
+link_devilspie2_entry_safely "$MANAGED_PATH"
 
 if python3 -m pip show d2wc >/dev/null 2>&1; then
   python3 -m pip uninstall -y d2wc
@@ -345,16 +416,8 @@ fi
 
 rm -f -- "$D2WC_BIN"
 
-cd "$WORKDIR"
-
-python3 -m pip install \
-  --user \
-  --no-index \
-  --no-build-isolation \
-  --no-deps \
-  --force-reinstall \
-  --no-warn-script-location \
-  .
+cd "$SOURCE_ROOT"
+python3 -m pip install --user --no-index --no-build-isolation --no-deps --force-reinstall --no-warn-script-location .
 
 if [ ! -x "$D2WC_BIN" ]; then
   echo "ERROR: expected executable $D2WC_BIN after install" >&2
@@ -362,9 +425,6 @@ if [ ! -x "$D2WC_BIN" ]; then
 fi
 
 ensure_local_bin_path_for_user_shell
-
-cd "$BASE_DIR"
-
 python3 -c 'import d2wc; print("Using d2wc from:", d2wc.__file__)'
 
 if [ "$FIRST_INSTALL" -eq 1 ]; then
