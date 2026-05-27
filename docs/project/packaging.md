@@ -22,32 +22,22 @@ The repository currently contains:
 3. Parser, validator, renderer, safe-save, backup, and guarded edit logic for the managed Lua sections.
 4. A GTK configurator for the managed config.
 5. Known-window inventory parsing, capture, stream, and GTK dropdown integration.
-6. Qubes/dom0 source-archive install and update helper scripts.
-7. Development and user-facing documentation.
+6. Qubes/dom0 source-archive install and update support.
+7. User-facing documentation under `docs/user/` and project documentation under `docs/project/`.
 
-The current public-release installation path is the Qubes/dom0 source-archive workflow documented in [Qubes dom0 Installation](qubes-dom0-installation.md).
+The current public-release installation path is documented in [Install/Update for Qubes](../user/install-qubes.md).
 
 Distribution packages are still future work.
 
 ## Current Qubes/dom0 source-archive installation model
 
-The current source-archive workflow uses two scripts:
+The current source-archive workflow is documented in [Install/Update for Qubes](../user/install-qubes.md).
 
-1. `d2wc-prepare-archive.sh`
-   1. Runs in a networked DisposableVM.
-   2. Clones or updates the repository checkout.
-   3. Creates `/tmp/d2wc.tgz` from the current Git checkout.
-   4. Copies `d2wc-installation.sh` to `/tmp/d2wc-installation.sh`.
-2. `d2wc-installation.sh`
-   1. Runs in dom0.
-   2. Copies `/tmp/d2wc.tgz` from the configured DisposableVM.
-   3. Extracts the archive to `~/Qubes/d2wc`.
-   4. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
-   5. Removes a previous user-site `d2wc` installation when present.
-   6. Installs the package into the dom0 user Python site without network access.
-   7. Configures `$HOME/.local/bin` for Bash or Fish using a managed shell-config block.
-   8. Launches `d2wc` on first install.
-   9. On later updates, reports that the configurator can be launched manually.
+The workflow uses:
+
+1. A networked DisposableVM to clone the repository and create `/tmp/d2wc.tgz`.
+2. dom0 to copy the installer and archive from the DisposableVM.
+3. The dom0 installer to extract, install, preserve the managed config, and configure the user command path.
 
 The current managed config path is:
 
