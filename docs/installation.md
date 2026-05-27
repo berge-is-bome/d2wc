@@ -17,7 +17,7 @@ git archive --format=tar --prefix=d2wc/ HEAD | gzip > d2wc.tgz
 ## In dom0:
 
 4. Copy `install.sh` from the disposable.
-5. Edit VM name to match your's.
+5. Edit dispVM name to match your's.
 6. Make the script executable.
 7. Run the script.
 8. Shutdown disposable.
