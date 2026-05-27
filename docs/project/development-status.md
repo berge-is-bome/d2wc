@@ -2,20 +2,26 @@
 
 ## Current repository status
 
-Current active branch:
+Public-release documentation branch:
 
 ```text
 documentation-update-public-release
 ```
 
-Current branch scope:
+Public-release documentation PR:
+
+```text
+PR #30: Prepare documentation for public release
+```
+
+PR #30 scope:
 
 1. Rewrite the README as a public-facing description of what `d2wc` is.
 2. Split documentation into user-facing documentation under `docs/user/` and project documentation under `docs/project/`.
 3. Replace the old Qubes installation notes and helper-archive documentation with [Install/Update for Qubes](../user/install-qubes.md).
-4. Refresh stale documentation before the first public release.
+4. Refresh stale documentation links and installer script references before the first public release.
 
-Current merged baseline:
+Current merged baseline before PR #30:
 
 ```text
 PR #29: Match action button width to dirty split state
@@ -227,9 +233,7 @@ The current Python core supports:
 
 ## Active next work
 
-The current active work is the public-release documentation pass.
-
-After this pass, the next planned development slice remains Lua event handoff.
+After PR #30, the next planned development slice remains Lua event handoff.
 
 Lua event handoff means:
 
