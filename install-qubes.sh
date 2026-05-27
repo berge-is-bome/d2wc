@@ -13,18 +13,15 @@ D2WC_CONFIG="$DEVILSPIE2_DIR/d2wc.lua"
 PATH_BLOCK_START="# >>> d2wc local bin >>>"
 PATH_BLOCK_END="# <<< d2wc local bin <<<"
 
-TEST_RUN=0
 SOURCE_VM=""
 
 usage() {
   cat <<'USAGE'
-install-qubes.sh [--test-run] [<source-vm>] | --help
+install-qubes.sh [<source-vm>] | --help
 
 Install or update d2wc in dom0 from /tmp/d2wc.tgz in a running source VM.
 
 Options:
-  --test-run    Select a source VM, copy and validate /tmp/d2wc.tgz, then stop
-                before replacing files, installing d2wc, or changing configs.
   -h, --help    Show this help.
 
 With no source VM argument, a zenity chooser is shown when available. The chooser
@@ -36,9 +33,6 @@ USAGE
 parse_args() {
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --test-run)
-        TEST_RUN=1
-        ;;
       -h|--help)
         usage
         exit 0
@@ -313,12 +307,6 @@ mkdir -p -- "$BASE_DIR"
 
 VM="$(choose_source_vm "$SOURCE_VM")"
 copy_archive_from_vm "$VM" "$ARCHIVE"
-
-if [ "$TEST_RUN" -eq 1 ]; then
-  echo "Test run successful. Archive copied and validated from VM: $VM"
-  echo "No source files, Python packages, or user configs were changed."
-  exit 0
-fi
 
 cd "$BASE_DIR"
 
