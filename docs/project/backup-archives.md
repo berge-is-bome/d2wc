@@ -2,13 +2,13 @@
 
 ## Purpose
 
-`d2wc` creates backups before guarded writes replace a Lua config file.
+`d2wc` creates backups before guarded writes replace a managed Lua config file.
 
 The active Lua file is not compressed and is not moved into an archive. Only backup snapshots are stored in the backup archive.
 
 ## Archive location
 
-For a config file named:
+For the installed managed config:
 
 ```text
 ~/.config/devilspie2/d2wc.lua
@@ -20,7 +20,7 @@ For a config file named:
 ~/.config/devilspie2/d2wc.lua.bak.tgz
 ```
 
-For the GTK test config:
+For the GTK development test config:
 
 ```text
 ~/.config/devilspie2/d2wc-test.lua
@@ -83,8 +83,8 @@ This keeps the archive transportable while preserving the safe-save model.
 Current behavior is intentionally limited:
 
 1. Backup archives are created only as part of guarded writes.
-2. The GTK UI still writes only to `~/.config/devilspie2/d2wc-test.lua`.
-3. Real-config GTK writes remain out of scope.
+2. The GTK configurator can load and edit the installed managed config at `~/.config/devilspie2/d2wc.lua`.
+3. The development test-config workflow remains available for isolated UI testing at `~/.config/devilspie2/d2wc-test.lua`.
 4. Backup retention is not implemented yet.
 5. Diff-based backups are not implemented.
 6. User-facing restore commands and GTK restore UI are not implemented yet.
