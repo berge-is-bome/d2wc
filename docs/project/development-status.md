@@ -11,8 +11,8 @@ documentation-update-public-release
 Current branch scope:
 
 1. Rewrite the README as a public-facing description of what `d2wc` is.
-2. Remove technical implementation sections from the README.
-3. Keep displaced technical and development information in `docs/`.
+2. Split documentation into user-facing documentation under `docs/user/` and project documentation under `docs/project/`.
+3. Replace the old Qubes installation notes and helper-archive documentation with [Install/Update for Qubes](../user/install-qubes.md).
 4. Refresh stale documentation before the first public release.
 
 Current merged baseline:
@@ -118,26 +118,28 @@ d2wc-configurator
 
 ## Qubes/dom0 install behavior
 
-The Qubes source-tarball workflow has two helper scripts:
+The current Qubes source-archive workflow is documented in [Install/Update for Qubes](../user/install-qubes.md).
 
-1. `d2wc-prepare-archive.sh`
-   1. Runs in a networked DisposableVM.
-   2. Clones or updates the repo checkout.
-   3. Creates `/tmp/d2wc.tgz`.
-   4. Copies `d2wc-installation.sh` to `/tmp/d2wc-installation.sh`.
-2. `d2wc-installation.sh`
-   1. Runs in dom0.
-   2. Uses `VM="disp1234"` as the documented placeholder.
-   3. Pulls `/tmp/d2wc.tgz` from that VM.
-   4. Extracts to `~/Qubes/d2wc`.
-   5. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
-   6. Removes a previous user-site `d2wc` installation when present.
-   7. Installs the new package into the dom0 user Python site without network access.
-   8. Configures `$HOME/.local/bin` for Bash or Fish with a managed shell-config block.
-   9. Launches the installed configurator on first install.
-   10. On later updates, reports that `d2wc` can be launched manually.
+The current flow is:
 
-Use [Qubes dom0 Installation](qubes-dom0-installation.md) for the full user-facing install guide.
+1. Clone the repository in a networked DisposableVM.
+2. Create `/tmp/d2wc.tgz` from the current Git checkout.
+3. Keep the DisposableVM running until dom0 installation is finished.
+4. Copy the dom0 installer from the DisposableVM into dom0.
+5. Edit the DisposableVM name in the dom0 installer when needed.
+6. Run the dom0 installer.
+7. Shut down the DisposableVM after the install/update completes.
+
+The dom0 installer behavior is:
+
+1. Pulls `/tmp/d2wc.tgz` from the configured DisposableVM.
+2. Extracts to `~/Qubes/d2wc`.
+3. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
+4. Removes a previous user-site `d2wc` installation when present.
+5. Installs the new package into the dom0 user Python site without network access.
+6. Configures `$HOME/.local/bin` for Bash or Fish with a managed shell-config block.
+7. Launches the installed configurator on first install.
+8. On later updates, reports that `d2wc` can be launched manually.
 
 The normal installed launch command is:
 
@@ -221,7 +223,7 @@ The current Python core supports:
 19. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
 20. Bounded and continuous known-window inventory capture helpers.
 21. Automatic GTK inventory monitor into Add-row dropdown values.
-22. Qubes/dom0 source-tarball install/update helper scripts.
+22. Qubes/dom0 source-tarball install/update support.
 
 ## Active next work
 
