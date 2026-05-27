@@ -11,7 +11,7 @@ This guide is for Qubes users who want to install/update `d2wc` in dom0.
 ```bash
 cd /tmp
 git clone git@github.com:berge-is-bome/d2wc.git
-git archive --format=tar --prefix=d2wc/ HEAD | gzip > d2wc.tgz
+git -C d2wc archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
 ```
 
 ## In dom0:
@@ -29,7 +29,7 @@ chmod 700 /tmp/install.sh
 /tmp/install.sh
 ```
 
-After the installer has finished, launch `d2wc`:
+When the install completes, launch `d2wc`:
 
 
 ```bash
