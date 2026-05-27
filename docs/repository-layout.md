@@ -10,7 +10,6 @@ The README is intended to describe what `d2wc` is from a public user point of vi
 README.md
 LICENSE
 pyproject.toml
-d2wc-prepare-archive.sh
 d2wc-installation.sh
 docs/
   backup-archives.md
