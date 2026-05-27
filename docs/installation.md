@@ -1,17 +1,20 @@
-In a disposable:
+# Install/Update
+
+This guide is for Qubes users who want to install/update `d2wc` in dom0.
+
+## In dispVM:
 
 1. Clone repository.
 2. Create archive.
-3. Copy installer to temp.
+3. Leave the disposable running until the dom0 installation is finished.
 
 ```bash
-mkdir /tmp/d2wc
-cd /tmp/d2wc
+cd /tmp
 git clone git@github.com:berge-is-bome/d2wc.git
 git archive --format=tar --prefix=d2wc/ HEAD | gzip > d2wc.tgz
 ```
 
-In dom0:
+## In dom0:
 
 4. Copy `install.sh` from the disposable.
 5. Edit VM name to match your's.
@@ -20,8 +23,16 @@ In dom0:
 8. Shutdown disposable.
 
 ```bash
-qvm-run --pass-io disp1234 'cat /tmp/install.sh' > ~/tmp/install.sh
+qvm-run --pass-io disp1234 'cat /tmp/d2wc/install.sh' > ~/tmp/install.sh
 nvim /tmp/install.sh
-sudo chmod +x
-./install.sh
+chmod 700 /tmp/install.sh
+/tmp/install.sh
 ```
+
+After the installer has finished, launch `d2wc`:
+
+
+```bash
+[<user>@dom0 ~]$ d2wc
+```
+
