@@ -292,7 +292,6 @@ migrate_devilspie2_regular_managed_file() {
 
 link_devilspie2_entry_safely() {
   local managed_path="$1"
-  local source_root="$2"
   mkdir -p -- "$DEVILSPIE2_DIR"
 
   if [ -L "$DEVILSPIE2_ENTRY" ]; then
@@ -307,13 +306,8 @@ link_devilspie2_entry_safely() {
         ;;
     esac
   elif [ -e "$DEVILSPIE2_ENTRY" ]; then
-    if is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY" "$source_root"; then
-      migrate_devilspie2_regular_managed_file "$source_root"
-      rm -f -- "$DEVILSPIE2_ENTRY"
-    else
-      echo "WARNING: leaving existing unmanaged Devilspie2 file unchanged: $DEVILSPIE2_ENTRY" >&2
-      return 0
-    fi
+    echo "WARNING: leaving existing unmanaged Devilspie2 file unchanged: $DEVILSPIE2_ENTRY" >&2
+    return 0
   fi
 
   ln -s -- "$managed_path" "$DEVILSPIE2_ENTRY"
@@ -451,6 +445,9 @@ MIGRATED_MANAGED_PATH=""
 mkdir -p -- "$MANAGED_DIR"
 if [ "$FIRST_INSTALL" -eq 1 ]; then
   migrate_devilspie2_regular_managed_file "$SOURCE_ROOT"
+  if [ -n "$MIGRATED_MANAGED_PATH" ] && [ -f "$DEVILSPIE2_ENTRY" ] && [ ! -L "$DEVILSPIE2_ENTRY" ]; then
+    rm -f -- "$DEVILSPIE2_ENTRY"
+  fi
 fi
 
 if [ -n "$MIGRATED_MANAGED_PATH" ]; then
@@ -473,7 +470,7 @@ if ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
   exit 1
 fi
 
-link_devilspie2_entry_safely "$MANAGED_PATH" "$SOURCE_ROOT"
+link_devilspie2_entry_safely "$MANAGED_PATH"
 
 if python3 -m pip show d2wc >/dev/null 2>&1; then
   python3 -m pip uninstall -y d2wc

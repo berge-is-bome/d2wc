@@ -376,7 +376,7 @@ Use these shell-level scenarios to validate installer branching in dom0:
 2. First install migrates legacy managed regular file before templating.
    - Preconditions: no existing package install, `~/.config/devilspie2/d2wc.lua` is a valid managed regular file.
    - Run: `./install-qubes.sh <source-vm>`.
-   - Expectation: legacy file is copied into `~/.config/d2wc/lua/` (prompting for alternate name only on collision), and `~/.config/devilspie2/d2wc.lua` becomes a symlink to migrated file.
+   - Expectation: legacy file is copied into `~/.config/d2wc/lua/` exactly once (prompting for alternate name only on collision), `~/.config/devilspie2/d2wc.lua` is not migrated a second time, and final `~/.config/devilspie2/d2wc.lua` becomes a symlink to migrated file.
 
 3. Unmanaged legacy regular file remains untouched.
    - Preconditions: `~/.config/devilspie2/d2wc.lua` exists but is not valid d2wc-managed Lua.
