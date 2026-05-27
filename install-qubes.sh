@@ -82,8 +82,8 @@ parse_args() {
 }
 
 list_source_vms() {
-  if qvm-ls --raw-data --fields NAME,STATE,CLASS >/dev/null 2>&1; then
-    qvm-ls --raw-data --fields NAME,STATE,CLASS 2>/dev/null |
+  if qvm-ls --raw-data >/dev/null 2>&1; then
+    qvm-ls --raw-data 2>/dev/null |
       awk -F'|' '
         {
           name=$1
