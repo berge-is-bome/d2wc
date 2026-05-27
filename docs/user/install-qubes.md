@@ -1,4 +1,4 @@
-# Install/Update
+# Install/Update for Qubes
 
 This guide is for Qubes users who want to install/update `d2wc` in dom0.
 
