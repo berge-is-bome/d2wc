@@ -17,9 +17,8 @@ from d2wc.test_config import (
     load_test_config_snapshot,
     prepare_test_config,
 )
+from d2wc.core.user_paths import default_managed_config_path
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
-
-DEFAULT_MANAGED_CONFIG_RELATIVE_PATH = Path(".config/devilspie2/d2wc.lua")
 
 
 @dataclass(frozen=True)
@@ -152,12 +151,6 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         test_config_snapshot=test_config_snapshot,
         prepare_result=prepare_result,
     )
-
-
-def default_managed_config_path() -> Path:
-    """Return the user-local d2wc-managed Devilspie2 Lua config path."""
-
-    return Path.home() / DEFAULT_MANAGED_CONFIG_RELATIVE_PATH
 
 
 def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> EventConfigAwareness:

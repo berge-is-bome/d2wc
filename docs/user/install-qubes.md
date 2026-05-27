@@ -37,7 +37,7 @@ The VM argument is optional. If it is omitted, the installer shows a `zenity` ch
 /tmp/install-qubes.sh
 ```
 
-Before replacing the extracted source tree in `~/Qubes/d2wc`, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
+Before replacing the local installation source, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
 
 When the install completes, launch `d2wc`:
 

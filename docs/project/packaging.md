@@ -39,13 +39,18 @@ The workflow uses:
 2. dom0 to copy the installer and archive from the DisposableVM.
 3. The dom0 installer to extract, install, preserve the managed config, and configure the user command path.
 
-The current managed config path is:
+Before replacing the extracted source tree in `~/.local/share/d2wc/source`, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
+
+Current user-path layout:
 
 ```text
+~/.cache/d2wc/
+~/.local/share/d2wc/source/
+~/.config/d2wc/lua/
 ~/.config/devilspie2/d2wc.lua
 ```
 
-Existing Devilspie2 scripts in `~/.config/devilspie2/` are not replaced by the installer.
+`~/.config/devilspie2/d2wc.lua` is the Devilspie2-facing symlink only and points to the active file under `~/.config/d2wc/lua/`. Unrelated Devilspie2 scripts and symlinks are not overwritten.
 
 ## Packaging phases
 
@@ -158,13 +163,13 @@ Optional tray behavior should not be required for packaging.
 
 The package should avoid interfering with unrelated `devilspie2` configurations.
 
-The current Qubes/dom0 installer creates or preserves only:
+The current Qubes/dom0 installer updates only the managed integration symlink when safe:
 
 ```text
 ~/.config/devilspie2/d2wc.lua
 ```
 
-It does not remove, replace, or rewrite other Lua scripts in `~/.config/devilspie2/`.
+It does not remove, replace, or rewrite unrelated Lua scripts or symlinks in `~/.config/devilspie2/`.
 
 The longer-term model is that `d2wc` should own the Devilspie2 instance that runs the managed `d2wc` Lua script.
 
