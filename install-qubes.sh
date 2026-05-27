@@ -244,28 +244,6 @@ raise SystemExit(0 if validate_managed_blocks(parsed.blocks).ok else 1)
 PY
 }
 
-choose_managed_filename() {
-  local name="$DEFAULT_MANAGED_FILENAME"
-  if [ ! -e "$MANAGED_DIR/$name" ]; then
-    printf '%s\n' "$name"
-    return 0
-  fi
-
-  while true; do
-    read -rp "Managed config $name exists. Enter alternate .lua filename: " name
-    if ! is_safe_managed_filename "$name"; then
-      echo "ERROR: filename must be non-empty, end with .lua, and not contain / or .." >&2
-      continue
-    fi
-    if [ -e "$MANAGED_DIR/$name" ]; then
-      echo "ERROR: $MANAGED_DIR/$name already exists" >&2
-      continue
-    fi
-    printf '%s\n' "$name"
-    return 0
-  done
-}
-
 choose_available_managed_filename() {
   local preferred="$1"
   local name="$preferred"
@@ -305,6 +283,7 @@ migrate_devilspie2_regular_managed_file() {
   target="$MANAGED_DIR/$filename"
   cp -- "$DEVILSPIE2_ENTRY" "$target"
   echo "Migrated managed Devilspie2 file to: $target"
+  MIGRATED_MANAGED_PATH="$target"
 }
 
 link_devilspie2_entry_safely() {
@@ -464,17 +443,29 @@ rm -rf -- "$SOURCE_ROOT"
 mkdir -p -- "$(dirname "$SOURCE_ROOT")"
 mv -- "$EXTRACTED" "$SOURCE_ROOT"
 
+MIGRATED_MANAGED_PATH=""
 mkdir -p -- "$MANAGED_DIR"
-MANAGED_FILENAME="$(choose_managed_filename)"
-MANAGED_PATH="$MANAGED_DIR/$MANAGED_FILENAME"
+if [ "$FIRST_INSTALL" -eq 1 ]; then
+  migrate_devilspie2_regular_managed_file "$SOURCE_ROOT"
+fi
 
-if [ ! -e "$MANAGED_PATH" ]; then
-  cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
-  echo "Created managed config: $MANAGED_PATH"
+if [ -n "$MIGRATED_MANAGED_PATH" ]; then
+  MANAGED_PATH="$MIGRATED_MANAGED_PATH"
+else
+  MANAGED_PATH="$MANAGED_DIR/$DEFAULT_MANAGED_FILENAME"
+  if [ ! -e "$MANAGED_PATH" ]; then
+    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    echo "Created managed config: $MANAGED_PATH"
+  elif [ "$FIRST_INSTALL" -eq 1 ] && ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
+    alt_name="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
+    MANAGED_PATH="$MANAGED_DIR/$alt_name"
+    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    echo "Created managed config: $MANAGED_PATH"
+  fi
 fi
 
 if ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
-  echo "ERROR: managed config is missing d2wc managed marker: $MANAGED_PATH" >&2
+  echo "ERROR: managed config is not a valid d2wc-managed Lua file: $MANAGED_PATH" >&2
   exit 1
 fi
 

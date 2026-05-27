@@ -39,16 +39,6 @@ The VM argument is optional. If it is omitted, the installer shows a `zenity` ch
 
 Before replacing the local installation source, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
 
-Installed layout:
-
-- Cached archive: `~/.cache/d2wc/d2wc.tgz`
-- Extracted source tree: `~/.local/share/d2wc/source/`
-- Managed Lua config files: `~/.config/d2wc/lua/`
-- Devilspie2 integration path: `~/.config/devilspie2/d2wc.lua` (symlink to the active managed file)
-- Executable: `~/.local/bin/d2wc`
-- Python package: user site-packages under `~/.local/lib/pythonX.Y/site-packages/`
-
-
 When the install completes, launch `d2wc`:
 
 ```bash
