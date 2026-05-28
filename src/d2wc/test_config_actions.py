@@ -1,4 +1,4 @@
-"""Generic managed-section actions for the dedicated d2wc UI test config."""
+"""Generic managed-section actions for d2wc managed configs."""
 
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ MANAGED_ACTION_OPERATIONS = ("add", "modify", "delete")
 
 @dataclass(frozen=True)
 class ManagedSectionActionRequest:
-    """One managed-section request from the GTK test-config editor."""
+    """One managed-section edit request from the GTK editor."""
 
     section: str
     operation: str
@@ -72,7 +72,7 @@ class ManagedSectionActionRequest:
 
 
 def apply_managed_section_action(config_path: Path, request: ManagedSectionActionRequest) -> TestConfigActionResult:
-    """Apply one managed-section action to the dedicated test config."""
+    """Apply one managed-section action to a d2wc managed config."""
 
     section = request.section.upper()
     operation = request.operation.lower()
