@@ -476,7 +476,7 @@ class _SearchableCombo:
                 callback(self)
 
     def _update_button_label(self) -> None:
-        self.widget.set_label(self.active_text or self.placeholder)
+        self.widget.set_label(self.active_text or "All")
 
 
 def _rows_for_section(
