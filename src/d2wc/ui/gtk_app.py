@@ -15,11 +15,10 @@ from d2wc.managed_config_file import (
 )
 from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
+from d2wc.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
 CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
 UI_FONT_POINT_INCREASE = 2
-DEFAULT_TOAST_TIMEOUT_SECONDS = 5
-DEFAULT_TOAST_OPACITY = 0.5
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -57,6 +56,7 @@ def run_configurator(
     """Open the GTK configurator proof window."""
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
+    ui_settings = load_ui_settings()
     Gtk, Gdk, GLib, Pango = _import_gtk()
     _set_configurator_window_class(Gdk, GLib)
     _apply_ui_css(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
@@ -77,8 +77,8 @@ def run_configurator(
     state: dict[str, object] = {
         "snapshot": test_config_snapshot,
         "editor": None,
-        "toast_timeout_seconds": DEFAULT_TOAST_TIMEOUT_SECONDS,
-        "toast_opacity": DEFAULT_TOAST_OPACITY,
+        "toast_timeout_seconds": ui_settings.toast_timeout_seconds,
+        "toast_opacity": ui_settings.toast_opacity,
     }
 
     def current_snapshot() -> TestConfigSnapshot | None:
@@ -86,8 +86,8 @@ def run_configurator(
         return snapshot if isinstance(snapshot, TestConfigSnapshot) else None
 
     def current_toast_settings() -> tuple[int, float]:
-        timeout = state.get("toast_timeout_seconds", DEFAULT_TOAST_TIMEOUT_SECONDS)
-        opacity = state.get("toast_opacity", DEFAULT_TOAST_OPACITY)
+        timeout = state.get("toast_timeout_seconds", ui_settings.toast_timeout_seconds)
+        opacity = state.get("toast_opacity", ui_settings.toast_opacity)
         return int(timeout), float(opacity)
 
     def update_window_state() -> None:
@@ -226,6 +226,12 @@ def run_configurator(
                 return
             state["toast_timeout_seconds"] = int(timeout_spin.get_value_as_int())
             state["toast_opacity"] = float(opacity_spin.get_value())
+            save_ui_settings(
+                UiSettings(
+                    toast_timeout_seconds=int(timeout_spin.get_value_as_int()),
+                    toast_opacity=float(opacity_spin.get_value()),
+                )
+            )
         finally:
             dialog.destroy()
 
@@ -396,7 +402,7 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
             f"Absolute upper-left X:  {_value_or_unknown_int(geometry.x)}",
             f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
             f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
-            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
+            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.y)}",
             f"Width: {_value_or_unknown_int(geometry.width)}",
             f"Height: {_value_or_unknown_int(geometry.height)}",
             f"Geometry: x={_value_or_unknown_int(geometry.x)} y={_value_or_unknown_int(geometry.y)} w={_value_or_unknown_int(geometry.width)} h={_value_or_unknown_int(geometry.height)}",
