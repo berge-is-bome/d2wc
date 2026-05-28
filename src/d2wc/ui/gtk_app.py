@@ -1,9 +1,18 @@
-"""GTK configurator proof for Devilspie2 test config editing."""
+"""GTK configurator proof for Devilspie2 managed config editing."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
+from d2wc.core.user_paths import default_managed_config_dir
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
+from d2wc.managed_config_file import (
+    activate_managed_config,
+    load_managed_config_snapshot,
+    managed_config_status_text,
+    save_managed_config_as,
+)
 from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 
@@ -55,30 +64,147 @@ def run_configurator(
     window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
     window.set_default_size(1280, 720)
     window.set_border_width(18)
-    def handle_destroy(_window) -> None:
-        editor.stop()
-        Gtk.main_quit()
-
-    window.connect("destroy", handle_destroy)
 
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
+
+    status_label = Gtk.Label()
+    status_label.set_xalign(0)
+    status_label.set_selectable(True)
+    status_label.set_line_wrap(True)
+    outer.pack_start(status_label, False, False, 0)
 
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     content.set_hexpand(True)
     content.set_vexpand(True)
     outer.pack_start(content, True, True, 0)
 
-    editor = build_managed_section_editor(Gtk, test_config_snapshot, _event, GLib=GLib)
-    content.pack_start(editor.widget, True, True, 0)
+    state: dict[str, object] = {
+        "snapshot": test_config_snapshot,
+        "editor": None,
+    }
+
+    def current_snapshot() -> TestConfigSnapshot | None:
+        snapshot = state.get("snapshot")
+        return snapshot if isinstance(snapshot, TestConfigSnapshot) else None
+
+    def update_window_state() -> None:
+        snapshot = current_snapshot()
+        if snapshot is not None:
+            window.set_title(f"d2wc Configurator - {snapshot.path.name}")
+        else:
+            window.set_title("d2wc Configurator")
+        status_label.set_text(managed_config_status_text(snapshot))
+
+    def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
+        old_editor = state.get("editor")
+        if old_editor is not None and hasattr(old_editor, "stop"):
+            old_editor.stop()
+        for child in content.get_children():
+            content.remove(child)
+        editor = build_managed_section_editor(Gtk, snapshot, _event, GLib=GLib)
+        state["snapshot"] = snapshot
+        state["editor"] = editor
+        content.pack_start(editor.widget, True, True, 0)
+        content.show_all()
+        update_window_state()
+
+    def open_managed_file(_item=None) -> None:
+        managed_dir = default_managed_config_dir()
+        managed_dir.mkdir(parents=True, exist_ok=True)
+        chooser = Gtk.FileChooserDialog(
+            title="Open d2wc managed Lua file",
+            parent=window,
+            action=Gtk.FileChooserAction.OPEN,
+        )
+        chooser.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
+        chooser.set_current_folder(str(managed_dir))
+        _add_lua_filter(Gtk, chooser)
+        try:
+            response = chooser.run()
+            if response != Gtk.ResponseType.OK:
+                return
+            selected = Path(chooser.get_filename())
+        finally:
+            chooser.destroy()
+
+        if not _is_under_managed_dir(selected, managed_dir):
+            _show_message(Gtk, window, f"Managed files must be opened from {managed_dir}")
+            return
+        snapshot = load_managed_config_snapshot(selected)
+        if not snapshot.ok:
+            _show_message(Gtk, window, managed_config_status_text(snapshot))
+            return
+        activation = activate_managed_config(selected)
+        rebuild_editor(snapshot)
+        if not activation.ok:
+            _show_message(Gtk, window, activation.message)
+
+    def save_managed_file_as(_item=None) -> None:
+        snapshot = current_snapshot()
+        if snapshot is None or not snapshot.exists:
+            _show_message(Gtk, window, "No managed config is loaded.")
+            return
+
+        managed_dir = default_managed_config_dir()
+        managed_dir.mkdir(parents=True, exist_ok=True)
+        chooser = Gtk.FileChooserDialog(
+            title="Save d2wc managed Lua file as",
+            parent=window,
+            action=Gtk.FileChooserAction.SAVE,
+        )
+        chooser.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_SAVE, Gtk.ResponseType.OK)
+        chooser.set_do_overwrite_confirmation(True)
+        chooser.set_current_folder(str(managed_dir))
+        chooser.set_current_name(snapshot.path.name)
+        _add_lua_filter(Gtk, chooser)
+        try:
+            response = chooser.run()
+            if response != Gtk.ResponseType.OK:
+                return
+            target = Path(chooser.get_filename())
+        finally:
+            chooser.destroy()
+
+        if not _is_under_managed_dir(target, managed_dir):
+            _show_message(Gtk, window, f"Managed files must be saved under {managed_dir}")
+            return
+        result = save_managed_config_as(snapshot.path, target, replace=target.exists())
+        if not result.ok or result.path is None:
+            _show_message(Gtk, window, result.message)
+            return
+        refreshed = load_managed_config_snapshot(result.path)
+        if not refreshed.ok:
+            _show_message(Gtk, window, managed_config_status_text(refreshed))
+            return
+        activation = activate_managed_config(result.path)
+        rebuild_editor(refreshed)
+        if activation.ok:
+            _show_message(Gtk, window, result.message)
+        else:
+            _show_message(Gtk, window, f"{result.message}\n\n{activation.message}")
+
+    def handle_destroy(_window) -> None:
+        editor = state.get("editor")
+        if editor is not None and hasattr(editor, "stop"):
+            editor.stop()
+        Gtk.main_quit()
+
+    window.connect("destroy", handle_destroy)
 
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
     menu_button = Gtk.MenuButton(label="Menu")
     menu = Gtk.Menu()
+    open_item = Gtk.MenuItem(label="File Open")
+    open_item.connect("activate", open_managed_file)
+    menu.append(open_item)
+    save_as_item = Gtk.MenuItem(label="Save As")
+    save_as_item.connect("activate", save_managed_file_as)
+    menu.append(save_as_item)
     help_item = Gtk.MenuItem(label="Help")
-    help_item.connect("activate", lambda _item: editor.show_help())
+    help_item.connect("activate", lambda _item: state["editor"].show_help() if state.get("editor") is not None else None)
     menu.append(help_item)
     menu.show_all()
     menu_button.set_popup(menu)
@@ -90,11 +216,14 @@ def run_configurator(
 
     def handle_key_press(_window, event) -> bool:
         if event.keyval == Gdk.KEY_F1:
-            editor.show_help()
+            editor = state.get("editor")
+            if editor is not None and hasattr(editor, "show_help"):
+                editor.show_help()
             return True
         return False
 
     window.connect("key-press-event", handle_key_press)
+    rebuild_editor(test_config_snapshot)
     window.show_all()
     Gtk.main()
     return 0
@@ -136,6 +265,33 @@ def _apply_ui_css(Gtk, Gdk, Pango, point_increase: int) -> None:
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
+
+
+def _add_lua_filter(Gtk, chooser) -> None:
+    lua_filter = Gtk.FileFilter()
+    lua_filter.set_name("Lua files")
+    lua_filter.add_pattern("*.lua")
+    chooser.add_filter(lua_filter)
+
+
+def _is_under_managed_dir(path: Path, managed_dir: Path) -> bool:
+    try:
+        path.resolve(strict=False).relative_to(managed_dir.resolve(strict=False))
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _show_message(Gtk, parent, text: str) -> None:
+    dialog = Gtk.MessageDialog(
+        transient_for=parent,
+        flags=0,
+        message_type=Gtk.MessageType.INFO,
+        buttons=Gtk.ButtonsType.OK,
+        text=text,
+    )
+    dialog.run()
+    dialog.destroy()
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
