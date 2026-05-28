@@ -188,6 +188,13 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
         )
 
     entry.symlink_to(target)
+    if not _symlink_points_to_path(entry, target):
+        return ActivationResult(
+            ok=False,
+            entry_path=entry,
+            target_path=target,
+            message=f"Devilspie2 integration was not activated as a symlink: {entry}",
+        )
     return ActivationResult(ok=True, entry_path=entry, target_path=target, message=f"Activated managed config: {entry} -> {target}")
 
 
@@ -204,3 +211,12 @@ def _is_within_directory(path: Path, directory: Path) -> bool:
     except (OSError, ValueError):
         return False
     return True
+
+
+def _symlink_points_to_path(path: Path, target: Path) -> bool:
+    if not path.is_symlink():
+        return False
+    try:
+        return path.resolve(strict=False) == target.resolve(strict=False)
+    except OSError:
+        return False
