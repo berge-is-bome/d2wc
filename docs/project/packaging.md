@@ -74,7 +74,8 @@ In summary:
 4. The configurator opens and saves only `d2wc` managed Lua files.
 5. The configurator opens the active symlink target on startup when the symlink is safe.
 6. The configurator stores UI preferences under `~/.config/d2wc/settings.json`.
-7. The configurator should not become a generic Devilspie2 Lua editor.
+7. The configurator displays empty match components as `All` while preserving the underlying managed Lua rule format.
+8. The configurator should not become a generic Devilspie2 Lua editor.
 
 ## Packaging phases
 
@@ -108,9 +109,11 @@ Supported behavior:
 5. Store extracted source under `~/.local/share/d2wc/source/`.
 6. Store managed Lua files under `~/.config/d2wc/lua/`.
 7. Preserve existing `~/.config/d2wc/settings.json` user settings.
-8. Activate Devilspie2 through `~/.config/devilspie2/d2wc.lua` when safe.
-9. Keep unrelated Devilspie2 scripts untouched.
-10. Launch the installed `d2wc` command.
+8. Preserve the active managed file selection during updates when the Devilspie2 integration symlink already points safely into `~/.config/d2wc/lua/`.
+9. Warn and wait during updates when one or more `d2wc` configurator instances are running.
+10. Activate Devilspie2 through `~/.config/devilspie2/d2wc.lua` when safe.
+11. Keep unrelated Devilspie2 scripts untouched.
+12. Launch the installed `d2wc` command.
 
 ### Phase 3: local package
 
@@ -228,11 +231,12 @@ Possible user layout for distribution packages:
 ```text
 ~/.config/d2wc/lua/
 ~/.config/d2wc/config.toml
+~/.config/d2wc/settings.json
 ~/.local/state/d2wc/backups/
 ~/.local/state/d2wc/logs/
 ```
 
-The current Qubes/dom0 source-archive flow deliberately uses `~/.config/d2wc/lua/` as the managed config home and `~/.config/devilspie2/d2wc.lua` as the Devilspie2 integration symlink.
+The current Qubes/dom0 source-archive flow deliberately uses `~/.config/d2wc/lua/` as the managed config home, `~/.config/d2wc/settings.json` as the UI settings file, and `~/.config/devilspie2/d2wc.lua` as the Devilspie2 integration symlink.
 
 ## Lua script installation model
 
