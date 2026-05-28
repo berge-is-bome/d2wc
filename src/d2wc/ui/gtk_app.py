@@ -37,14 +37,14 @@ def _import_gtk():
     try:
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gdk, GLib, Gtk, Pango
+        from gi.repository import Gdk, Gio, GLib, Gtk, Pango
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk, GLib, Pango
+    return Gtk, Gdk, Gio, GLib, Pango
 
 
 def run_configurator(
@@ -57,7 +57,7 @@ def run_configurator(
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
     ui_settings = load_ui_settings()
-    Gtk, Gdk, GLib, Pango = _import_gtk()
+    Gtk, Gdk, Gio, GLib, Pango = _import_gtk()
     _set_configurator_window_class(Gdk, GLib)
     _apply_ui_css(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
 
@@ -79,6 +79,9 @@ def run_configurator(
         "editor": None,
         "toast_timeout_seconds": ui_settings.toast_timeout_seconds,
         "toast_opacity": ui_settings.toast_opacity,
+        "config_monitor": None,
+        "config_monitor_path": None,
+        "config_monitor_reload_source": None,
     }
 
     def current_snapshot() -> TestConfigSnapshot | None:
@@ -97,6 +100,74 @@ def run_configurator(
         else:
             window.set_title("d2wc Configurator")
 
+    def stop_config_monitor() -> None:
+        source_id = state.get("config_monitor_reload_source")
+        if isinstance(source_id, int):
+            GLib.source_remove(source_id)
+        state["config_monitor_reload_source"] = None
+
+        monitor = state.get("config_monitor")
+        if monitor is not None and hasattr(monitor, "cancel"):
+            monitor.cancel()
+        state["config_monitor"] = None
+        state["config_monitor_path"] = None
+
+    def reload_changed_config(path: Path) -> bool:
+        state["config_monitor_reload_source"] = None
+        current = current_snapshot()
+        if current is None or current.path != path:
+            return False
+
+        refreshed = load_managed_config_snapshot(path)
+        rebuild_editor(refreshed)
+        timeout_seconds, opacity = current_toast_settings()
+        if refreshed.ok:
+            _show_toast(
+                Gtk,
+                outer,
+                "Reloaded managed config after file change.",
+                timeout_seconds=timeout_seconds,
+                opacity=opacity,
+            )
+        else:
+            _show_message(
+                Gtk,
+                window,
+                "The managed config changed on disk but could not be reloaded. "
+                "No changes were written. Fix the file before applying more edits.\n\n"
+                f"{managed_config_status_text(refreshed)}",
+            )
+        return False
+
+    def schedule_config_reload(path: Path, event_type) -> None:
+        if not _is_managed_config_reload_event(event_type):
+            return
+        if state.get("config_monitor_path") != path:
+            return
+        source_id = state.get("config_monitor_reload_source")
+        if isinstance(source_id, int):
+            GLib.source_remove(source_id)
+        state["config_monitor_reload_source"] = GLib.timeout_add(250, reload_changed_config, path)
+
+    def start_config_monitor(snapshot: TestConfigSnapshot | None) -> None:
+        if snapshot is None or not snapshot.path:
+            stop_config_monitor()
+            return
+        path = snapshot.path
+        if state.get("config_monitor_path") == path and state.get("config_monitor") is not None:
+            return
+
+        stop_config_monitor()
+        try:
+            monitor = Gio.File.new_for_path(str(path)).monitor_file(Gio.FileMonitorFlags.NONE, None)
+        except (GLib.Error, OSError) as exc:
+            _show_message(Gtk, window, f"Could not monitor managed config for changes:\n{path}\n\n{exc}")
+            return
+
+        monitor.connect("changed", lambda _monitor, _file, _other_file, event_type: schedule_config_reload(path, event_type))
+        state["config_monitor"] = monitor
+        state["config_monitor_path"] = path
+
     def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
         old_editor = state.get("editor")
         if old_editor is not None and hasattr(old_editor, "stop"):
@@ -109,6 +180,7 @@ def run_configurator(
         content.pack_start(editor.widget, True, True, 0)
         content.show_all()
         update_window_state()
+        start_config_monitor(snapshot)
 
     def open_managed_file(_item=None) -> None:
         managed_dir = default_managed_config_dir()
@@ -285,11 +357,52 @@ def run_configurator(
             return True
         return False
 
+    def handle_destroy(_window) -> None:
+        stop_config_monitor()
+        Gtk.main_quit()
+
     window.connect("key-press-event", handle_key_press)
+    window.connect("destroy", handle_destroy)
     rebuild_editor(test_config_snapshot)
     window.show_all()
     Gtk.main()
     return 0
+
+
+_MANAGED_CONFIG_RELOAD_EVENT_NAMES = {
+    "CHANGED",
+    "CHANGES_DONE_HINT",
+    "CREATED",
+    "DELETED",
+    "MOVED_IN",
+    "MOVED_OUT",
+    "RENAMED",
+}
+
+
+def _is_managed_config_reload_event(event_type) -> bool:
+    """Return whether a Gio.FileMonitor event should trigger a config reload."""
+
+    event_name = _file_monitor_event_name(event_type)
+    return event_name in _MANAGED_CONFIG_RELOAD_EVENT_NAMES
+
+
+def _file_monitor_event_name(event_type) -> str:
+    name = getattr(event_type, "name", None)
+    if name:
+        return str(name).upper().replace("-", "_")
+
+    value_nick = getattr(event_type, "value_nick", None)
+    if value_nick:
+        return str(value_nick).upper().replace("-", "_")
+
+    text = str(event_type).upper().replace("-", "_")
+    for event_name in sorted(_MANAGED_CONFIG_RELOAD_EVENT_NAMES, key=len, reverse=True):
+        if event_name in text:
+            return event_name
+    if "." in text:
+        text = text.rsplit(".", 1)[-1]
+    return text
 
 
 def _set_configurator_window_class(Gdk, GLib) -> None:
