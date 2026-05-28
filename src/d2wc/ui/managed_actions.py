@@ -1,4 +1,4 @@
-"""GTK widgets for editing managed sections in the dedicated test config."""
+"""GTK widgets for editing managed sections in a d2wc managed config."""
 
 from __future__ import annotations
 
@@ -11,7 +11,11 @@ from d2wc.core.rule_grammar import LEFT_EDGE_MODES
 from d2wc.event_data import WindowEventData
 from d2wc.event_inventory import KnownWindowTarget, merge_known_window_targets
 from d2wc.event_inventory_capture import stream_known_window_inventory
-from d2wc.test_config import TestConfigSnapshot, format_action_result, load_test_config_snapshot
+from d2wc.managed_config_file import (
+    ManagedConfigSnapshot,
+    format_managed_action_result,
+    load_managed_config_snapshot,
+)
 from d2wc.test_config_actions import MANAGED_ACTION_SECTIONS, ManagedSectionActionRequest, apply_managed_section_action
 from d2wc.ui.grid_rows import (
     ManagedGridRow,
@@ -150,14 +154,14 @@ class ManagedSectionEditor:
 
 def build_managed_section_editor(
     Gtk,
-    snapshot: TestConfigSnapshot | None,
+    snapshot: ManagedConfigSnapshot | None,
     event_data: WindowEventData | None = None,
     inventory_targets: tuple[KnownWindowTarget, ...] = (),
     *,
     GLib=None,
     inventory_stream=stream_known_window_inventory,
 ) -> ManagedSectionEditor:
-    """Build the section-focused managed editor for the dedicated test config."""
+    """Build the section-focused editor for a d2wc managed config."""
 
     main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
     main_box.set_margin_top(8)
@@ -183,8 +187,8 @@ def build_managed_section_editor(
 
     workspace_values = _workspace_values()
 
-    def current_snapshot() -> TestConfigSnapshot | None:
-        return state["snapshot"] if isinstance(state["snapshot"], TestConfigSnapshot) else None
+    def current_snapshot() -> ManagedConfigSnapshot | None:
+        return state["snapshot"] if isinstance(state["snapshot"], ManagedConfigSnapshot) else None
 
     def current_section() -> str:
         return _section_from_combo(section_combo)
@@ -225,7 +229,7 @@ def build_managed_section_editor(
     def apply_row_action(controls: _EditorControls) -> None:
         snapshot_value = current_snapshot()
         if snapshot_value is None:
-            _show_message(Gtk, main_box, "No test config is loaded.")
+            _show_message(Gtk, main_box, "No managed config is loaded.")
             return
 
         try:
@@ -235,12 +239,12 @@ def build_managed_section_editor(
             return
 
         result = apply_managed_section_action(snapshot_value.path, request)
-        result_text = format_action_result(result)
+        result_text = format_managed_action_result(result)
         if result.ok:
             _show_toast(Gtk, main_box, SUCCESS_TOAST_MESSAGE)
         else:
             _show_message(Gtk, main_box, result_text)
-        refreshed_snapshot = load_test_config_snapshot(snapshot_value.path)
+        refreshed_snapshot = load_managed_config_snapshot(snapshot_value.path)
         state["snapshot"] = refreshed_snapshot
         if result.ok:
             refresh_editor_rows()
@@ -468,7 +472,7 @@ class _SearchableCombo:
 
 
 def _rows_for_section(
-    snapshot: TestConfigSnapshot | None,
+    snapshot: ManagedConfigSnapshot | None,
     inventory_targets: tuple[KnownWindowTarget, ...],
     section: str,
 ) -> tuple[ManagedGridRow, ...]:
@@ -484,7 +488,7 @@ def _blank_add_row(section: str) -> ManagedGridRow:
 
 def _build_section_rows_panel(
     Gtk,
-    snapshot: TestConfigSnapshot | None,
+    snapshot: ManagedConfigSnapshot | None,
     section: str,
     rows: tuple[ManagedGridRow, ...],
     row_controls: list[_EditorControls],
@@ -601,7 +605,7 @@ def _build_action_row(Gtk, columns: tuple[str, ...], controls: _EditorControls, 
 
 def _build_row_controls(
     Gtk,
-    snapshot: TestConfigSnapshot | None,
+    snapshot: ManagedConfigSnapshot | None,
     section: str,
     row: ManagedGridRow,
     event_data: WindowEventData | None,
@@ -831,7 +835,7 @@ def _restore_control_values(controls: _EditorControls, values: tuple[str, ...]) 
     controls.h_entry.set_text(h_value)
 
 
-def _populate_geom_fields_from_profile(snapshot: TestConfigSnapshot | None, controls: _EditorControls) -> None:
+def _populate_geom_fields_from_profile(snapshot: ManagedConfigSnapshot | None, controls: _EditorControls) -> None:
     if controls.section != "GEOM" or snapshot is None or snapshot.config is None:
         return
     active_profile = controls.geometry_combo.get_active_text() or ""
