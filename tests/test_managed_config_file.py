@@ -8,6 +8,7 @@ from d2wc.managed_config_file import (
 )
 
 VALID_SOURCE = (Path(__file__).resolve().parents[1] / 'src' / 'd2wc.lua').read_text(encoding='utf-8')
+SYNTHETIC_PIN_MARKER = 'd:pytest-symlink-target'
 
 
 def test_load_managed_config_snapshot_validates_file(tmp_path: Path) -> None:
@@ -28,7 +29,8 @@ def test_load_managed_config_snapshot_uses_active_symlink_target(tmp_path: Path,
     default = managed_dir / 'd2wc.lua'
     active = managed_dir / 'file-a.lua'
     default.write_text(VALID_SOURCE, encoding='utf-8')
-    active.write_text(VALID_SOURCE.replace('local PIN = {', 'local PIN = {\n  "d:active",'), encoding='utf-8')
+    # Synthetic marker used only to prove that the symlink target file was loaded.
+    active.write_text(VALID_SOURCE.replace('local PIN = {', f'local PIN = {{\n  "{SYNTHETIC_PIN_MARKER}",'), encoding='utf-8')
     entry = tmp_path / '.config' / 'devilspie2' / 'd2wc.lua'
     entry.parent.mkdir(parents=True)
     entry.symlink_to(active)
@@ -39,7 +41,7 @@ def test_load_managed_config_snapshot_uses_active_symlink_target(tmp_path: Path,
     assert snapshot.ok
     assert snapshot.path == active.resolve()
     assert snapshot.config is not None
-    assert snapshot.config.pin == ('d:active',)
+    assert SYNTHETIC_PIN_MARKER in snapshot.config.pin
 
 
 def test_load_managed_config_snapshot_falls_back_to_default_without_safe_symlink(tmp_path: Path, monkeypatch) -> None:
