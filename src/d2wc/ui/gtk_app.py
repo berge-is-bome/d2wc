@@ -163,7 +163,6 @@ def run_configurator(
         except (GLib.Error, OSError) as exc:
             _show_message(Gtk, window, f"Could not monitor managed config for changes:\n{path}\n\n{exc}")
             return
-
         monitor.connect("changed", lambda _monitor, _file, _other_file, event_type: schedule_config_reload(path, event_type))
         state["config_monitor"] = monitor
         state["config_monitor_path"] = path
@@ -316,14 +315,6 @@ def run_configurator(
             opacity=opacity,
         )
 
-    def handle_destroy(_window) -> None:
-        editor = state.get("editor")
-        if editor is not None and hasattr(editor, "stop"):
-            editor.stop()
-        Gtk.main_quit()
-
-    window.connect("destroy", handle_destroy)
-
     button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
     outer.pack_end(button_box, False, False, 0)
 
@@ -359,6 +350,9 @@ def run_configurator(
 
     def handle_destroy(_window) -> None:
         stop_config_monitor()
+        editor = state.get("editor")
+        if editor is not None and hasattr(editor, "stop"):
+            editor.stop()
         Gtk.main_quit()
 
     window.connect("key-press-event", handle_key_press)
