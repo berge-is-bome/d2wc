@@ -122,7 +122,8 @@ def test_main_configure_passes_event_data_and_config_awareness(monkeypatch, tmp_
     assert event_data.class_instance_name == "personal:Example"
     assert event_data.window_geometry.x == 10.0
     assert config_awareness.status == "ok"
-    assert test_config_snapshot is None
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == config_path
     assert prepare_result is None
 
 
