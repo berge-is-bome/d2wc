@@ -14,9 +14,16 @@ from d2wc.core.user_paths import (
     is_safe_managed_filename,
     symlink_points_to_managed_dir,
 )
-from d2wc.test_config import TestConfigSnapshot, load_test_config_snapshot
+from d2wc.test_config import (
+    TestConfigActionResult,
+    TestConfigSnapshot,
+    format_action_result,
+    load_test_config_snapshot,
+)
 
 ManagedConfigSnapshot = TestConfigSnapshot
+ManagedConfigActionResult = TestConfigActionResult
+format_managed_action_result = format_action_result
 
 
 @dataclass(frozen=True)
