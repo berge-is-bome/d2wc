@@ -402,7 +402,7 @@ def format_active_window_info(window_info: ActiveWindowInfo) -> str:
             f"Absolute upper-left X:  {_value_or_unknown_int(geometry.x)}",
             f"Absolute upper-left Y:  {_value_or_unknown_int(geometry.y)}",
             f"Relative upper-left X:  {_value_or_unknown_int(geometry.relative_x)}",
-            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.y)}",
+            f"Relative upper-left Y:  {_value_or_unknown_int(geometry.relative_y)}",
             f"Width: {_value_or_unknown_int(geometry.width)}",
             f"Height: {_value_or_unknown_int(geometry.height)}",
             f"Geometry: x={_value_or_unknown_int(geometry.x)} y={_value_or_unknown_int(geometry.y)} w={_value_or_unknown_int(geometry.width)} h={_value_or_unknown_int(geometry.height)}",
