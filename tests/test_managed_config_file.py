@@ -2,6 +2,7 @@ from pathlib import Path
 
 from d2wc.managed_config_file import (
     activate_managed_config,
+    active_managed_config_path,
     load_managed_config_snapshot,
     save_managed_config_as,
 )
@@ -18,6 +19,38 @@ def test_load_managed_config_snapshot_validates_file(tmp_path: Path) -> None:
 
     assert snapshot.ok
     assert snapshot.path == config
+
+
+def test_load_managed_config_snapshot_uses_active_symlink_target(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
+    managed_dir = tmp_path / '.config' / 'd2wc' / 'lua'
+    managed_dir.mkdir(parents=True)
+    default = managed_dir / 'd2wc.lua'
+    active = managed_dir / 'file-a.lua'
+    default.write_text(VALID_SOURCE, encoding='utf-8')
+    active.write_text(VALID_SOURCE.replace('local PIN = {', 'local PIN = {\n  "d:active",'), encoding='utf-8')
+    entry = tmp_path / '.config' / 'devilspie2' / 'd2wc.lua'
+    entry.parent.mkdir(parents=True)
+    entry.symlink_to(active)
+
+    snapshot = load_managed_config_snapshot()
+
+    assert active_managed_config_path() == active.resolve()
+    assert snapshot.ok
+    assert snapshot.path == active.resolve()
+    assert snapshot.config is not None
+    assert snapshot.config.pin == ('d:active',)
+
+
+def test_load_managed_config_snapshot_falls_back_to_default_without_safe_symlink(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(Path, 'home', lambda: tmp_path)
+    managed_dir = tmp_path / '.config' / 'd2wc' / 'lua'
+    managed_dir.mkdir(parents=True)
+    default = managed_dir / 'd2wc.lua'
+    default.write_text(VALID_SOURCE, encoding='utf-8')
+
+    assert active_managed_config_path() == default
+    assert load_managed_config_snapshot().path == default
 
 
 def test_save_managed_config_as_requires_managed_directory(tmp_path: Path, monkeypatch) -> None:
