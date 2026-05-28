@@ -45,10 +45,23 @@ class ActivationResult:
     message: str
 
 
+def active_managed_config_path() -> Path:
+    """Return the active managed config path for configurator startup."""
+
+    managed_dir = default_managed_config_dir()
+    entry = devilspie2_entry_path()
+    if entry.is_symlink() and symlink_points_to_managed_dir(entry, managed_dir):
+        try:
+            return entry.resolve(strict=False)
+        except OSError:
+            pass
+    return default_managed_config_path()
+
+
 def load_managed_config_snapshot(path: Path | None = None) -> ManagedConfigSnapshot:
     """Load and validate a d2wc managed Lua file."""
 
-    return load_test_config_snapshot(path or default_managed_config_path())
+    return load_test_config_snapshot(path or active_managed_config_path())
 
 
 def managed_config_status_text(snapshot: ManagedConfigSnapshot | None) -> str:
