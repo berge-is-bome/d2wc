@@ -69,12 +69,6 @@ def run_configurator(
     outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     window.add(outer)
 
-    status_label = Gtk.Label()
-    status_label.set_xalign(0)
-    status_label.set_selectable(True)
-    status_label.set_line_wrap(True)
-    outer.pack_start(status_label, False, False, 0)
-
     content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
     content.set_hexpand(True)
     content.set_vexpand(True)
@@ -102,7 +96,6 @@ def run_configurator(
             window.set_title(f"d2wc Configurator - {snapshot.path.name}")
         else:
             window.set_title("d2wc Configurator")
-        status_label.set_text(managed_config_status_text(snapshot))
 
     def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
         old_editor = state.get("editor")
