@@ -76,6 +76,10 @@ The installer then:
 6. Leaves unrelated `~/.config/devilspie2/` files and symlinks unchanged.
 7. Leaves existing `~/.config/d2wc/settings.json` user settings unchanged.
 
+On update, the installer preserves the active managed file selection when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
+
+On update, if one or more `d2wc` configurator instances are running, the installer warns the user to close them and waits before continuing. The update continues only after no running `d2wc` process candidates remain.
+
 ## Configurator behavior
 
 The configurator tracks the currently open managed Lua file.
@@ -90,6 +94,8 @@ When launched with `--config`, the supplied managed Lua file is opened directly.
 All edit operations, validation, guarded writes, and backups target the currently open managed file.
 
 The active managed file name is shown in the window title.
+
+The configurator does not currently auto-reload when the managed Lua file changes on disk. Users can edit managed Lua files by hand, but they should reopen the configurator or reopen the file after external edits to avoid stale UI state.
 
 ## File Open
 
@@ -157,6 +163,12 @@ Current settings:
 2. Toast opacity.
 
 The settings file is user-owned runtime configuration and must not be overwritten by installer updates.
+
+## Dropdown display rules
+
+Machine, Application, and similar target dropdowns use `All` to display an empty match component.
+
+For example, if Machine is `All`, the generated rule has no `d:` component. This keeps the Lua rule format unchanged while making the UI clearer.
 
 ## Backup behavior
 
