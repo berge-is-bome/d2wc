@@ -1,4 +1,5 @@
 ------------------------------------------------------------
+-- d2wc managed
 -- devilspie2 workspace configurator
 -- version 0.1.12.3
 -- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens

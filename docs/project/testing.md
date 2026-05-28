@@ -363,3 +363,32 @@ The next immediate test priorities are:
 6. Keep rule-editing UI writes deferred until preview and confirmation paths are implemented.
 
 No UI save workflow should be built before the read-only event-data UI proof is working.
+
+## Installer decision-flow manual checks
+
+Use these shell-level scenarios to validate installer branching in dom0:
+
+1. Update path keeps existing managed default without prompting.
+   - Preconditions: `~/.config/d2wc/lua/d2wc.lua` exists and is a valid managed file, package already installed.
+   - Run: `./install-qubes.sh <source-vm>`.
+   - Expectation: no alternate filename prompt; managed file remains active.
+
+2. First install migrates legacy managed regular file before templating.
+   - Preconditions: no existing package install, `~/.config/devilspie2/d2wc.lua` is a valid managed regular file.
+   - Run: `./install-qubes.sh <source-vm>`.
+   - Expectation: legacy file is copied into `~/.config/d2wc/lua/` exactly once (prompting for alternate name only on collision), `~/.config/devilspie2/d2wc.lua` is not migrated a second time, and final `~/.config/devilspie2/d2wc.lua` becomes a symlink to migrated file.
+
+3. Unmanaged legacy regular file remains untouched.
+   - Preconditions: `~/.config/devilspie2/d2wc.lua` exists but is not valid d2wc-managed Lua.
+   - Run: `./install-qubes.sh <source-vm>`.
+   - Expectation: warning is printed; existing file is not replaced.
+
+4. Existing safe symlink remains update-safe.
+   - Preconditions: `~/.config/devilspie2/d2wc.lua` symlink points inside `~/.config/d2wc/lua/`.
+   - Run: `./install-qubes.sh <source-vm>`.
+   - Expectation: symlink can be refreshed safely without alternate filename prompt on normal updates.
+
+5. External symlink remains untouched.
+   - Preconditions: `~/.config/devilspie2/d2wc.lua` symlink points outside `~/.config/d2wc/lua/`.
+   - Run: `./install-qubes.sh <source-vm>`.
+   - Expectation: warning is printed; external symlink is left unchanged.

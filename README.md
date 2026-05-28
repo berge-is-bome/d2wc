@@ -65,13 +65,25 @@ This makes new rules easier to create because common values can be selected from
 
 ## Installed user config
 
-The installed configurator uses this managed Devilspie2 file by default:
+The installed configurator stores `d2wc` managed Lua files under:
+
+```text
+~/.config/d2wc/lua/
+```
+
+The default managed file is:
+
+```text
+~/.config/d2wc/lua/d2wc.lua
+```
+
+Devilspie2 reads the active managed file through this integration path:
 
 ```text
 ~/.config/devilspie2/d2wc.lua
 ```
 
-Existing Devilspie2 scripts in the same directory are not replaced by the installer.
+That integration path is a symlink to the active managed file. Existing unrelated Devilspie2 scripts in `~/.config/devilspie2/` are not replaced by the installer.
 
 ## Launching d2wc
 
@@ -93,8 +105,9 @@ Useful project documents:
 
 1. [Install/Update for Qubes](docs/user/install-qubes.md) for the Qubes dom0 install and update flow.
 2. [Lua Configurables](docs/project/lua-configurables.md) for the supported rule types and user-editable sections.
-3. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
-4. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
+3. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
+4. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
+5. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
 
 ## Project status
 

@@ -22,7 +22,7 @@ def test_main_without_args_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
 
-    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+    monkeypatch.setattr(__main__, "load_managed_config_snapshot", lambda path=None: __main__.load_test_config_snapshot(config_path if path is None else path))
 
     def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
         calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
@@ -46,7 +46,7 @@ def test_main_configure_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
 
-    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+    monkeypatch.setattr(__main__, "load_managed_config_snapshot", lambda path=None: __main__.load_test_config_snapshot(config_path if path is None else path))
 
     def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
         calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
@@ -69,7 +69,7 @@ def test_main_configure_reports_missing_gtk(monkeypatch, tmp_path, capsys) -> No
     config_path = tmp_path / "d2wc.lua"
     config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
 
-    monkeypatch.setattr(__main__, "default_managed_config_path", lambda: config_path)
+    monkeypatch.setattr(__main__, "load_managed_config_snapshot", lambda path=None: __main__.load_test_config_snapshot(config_path if path is None else path))
 
     def fake_run_configurator(_event_data, _config_awareness, _test_config_snapshot, _prepare_result) -> int:
         raise __main__.GtkConfiguratorImportError("GTK is missing")
@@ -122,7 +122,8 @@ def test_main_configure_passes_event_data_and_config_awareness(monkeypatch, tmp_
     assert event_data.class_instance_name == "personal:Example"
     assert event_data.window_geometry.x == 10.0
     assert config_awareness.status == "ok"
-    assert test_config_snapshot is None
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == config_path
     assert prepare_result is None
 
 
