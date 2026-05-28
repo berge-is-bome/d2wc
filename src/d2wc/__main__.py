@@ -18,7 +18,6 @@ from d2wc.test_config import (
     load_test_config_snapshot,
     prepare_test_config,
 )
-from d2wc.core.user_paths import default_managed_config_path
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
 
 
@@ -140,7 +139,7 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     elif args.config is not None:
         test_config_snapshot = load_managed_config_snapshot(args.config)
     else:
-        test_config_snapshot = load_managed_config_snapshot(default_managed_config_path())
+        test_config_snapshot = load_managed_config_snapshot()
 
     config_awareness = None
     if test_config_snapshot is not None and test_config_snapshot.path.exists():
