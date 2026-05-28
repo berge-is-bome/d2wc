@@ -11,6 +11,7 @@ from pathlib import Path
 from d2wc.cli import main as cli_main
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
 from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
+from d2wc.managed_config_file import load_managed_config_snapshot
 from d2wc.test_config import (
     TestConfigPrepareResult,
     TestConfigSnapshot,
@@ -74,7 +75,7 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
         "--config",
         type=Path,
         default=None,
-        help="Optional d2wc.lua path to inspect read-only for existing matching rules.",
+        help="Optional d2wc managed Lua file to open in the configurator.",
     )
     parser.add_argument(
         "--test-config",
@@ -136,13 +137,13 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     test_config_snapshot = None
     if args.test_config or args.init_test_config or args.replace_test_config:
         test_config_snapshot = load_test_config_snapshot(args.test_config_path)
-    elif args.config is None:
-        test_config_snapshot = load_test_config_snapshot(default_managed_config_path())
+    elif args.config is not None:
+        test_config_snapshot = load_managed_config_snapshot(args.config)
+    else:
+        test_config_snapshot = load_managed_config_snapshot(default_managed_config_path())
 
     config_awareness = None
-    if args.config is not None:
-        config_awareness = _read_config_awareness(args.config, event_data)
-    elif test_config_snapshot is not None and test_config_snapshot.path.exists():
+    if test_config_snapshot is not None and test_config_snapshot.path.exists():
         config_awareness = _read_config_awareness(test_config_snapshot.path, event_data)
 
     return ConfigureInput(
