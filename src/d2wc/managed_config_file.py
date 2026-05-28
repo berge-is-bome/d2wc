@@ -11,7 +11,6 @@ from d2wc.core.user_paths import (
     default_managed_config_dir,
     default_managed_config_path,
     devilspie2_entry_path,
-    is_d2wc_managed_lua_file,
     is_safe_managed_filename,
     symlink_points_to_managed_dir,
 )
@@ -153,7 +152,6 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
     target = Path(managed_path)
     managed_dir = default_managed_config_dir()
     entry = devilspie2_entry_path()
-    preserved_regular_entry: Path | None = None
 
     if not _is_within_directory(target, managed_dir):
         return ActivationResult(
@@ -182,23 +180,12 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
             )
         entry.unlink()
     elif entry.exists():
-        if not (entry.is_file() and is_d2wc_managed_lua_file(entry)):
-            return ActivationResult(
-                ok=False,
-                entry_path=entry,
-                target_path=target,
-                message=f"leaving existing Devilspie2 file unchanged: {entry}",
-            )
-        try:
-            preserved_regular_entry = _preserve_regular_integration_file(entry, managed_dir)
-            entry.unlink()
-        except OSError as exc:
-            return ActivationResult(
-                ok=False,
-                entry_path=entry,
-                target_path=target,
-                message=f"could not replace regular Devilspie2 integration file: {exc}",
-            )
+        return ActivationResult(
+            ok=False,
+            entry_path=entry,
+            target_path=target,
+            message=f"leaving existing Devilspie2 file unchanged: {entry}",
+        )
 
     entry.symlink_to(target)
     if not _symlink_points_to_path(entry, target):
@@ -208,11 +195,7 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
             target_path=target,
             message=f"Devilspie2 integration was not activated as a symlink: {entry}",
         )
-
-    message = f"Activated managed config: {entry} -> {target}"
-    if preserved_regular_entry is not None:
-        message = f"{message}\nPreserved previous regular integration file at: {preserved_regular_entry}"
-    return ActivationResult(ok=True, entry_path=entry, target_path=target, message=message)
+    return ActivationResult(ok=True, entry_path=entry, target_path=target, message=f"Activated managed config: {entry} -> {target}")
 
 
 def _same_directory(path: Path, directory: Path) -> bool:
@@ -237,15 +220,3 @@ def _symlink_points_to_path(path: Path, target: Path) -> bool:
         return path.resolve(strict=False) == target.resolve(strict=False)
     except OSError:
         return False
-
-
-def _preserve_regular_integration_file(entry: Path, managed_dir: Path) -> Path:
-    managed_dir.mkdir(parents=True, exist_ok=True)
-    stem = "d2wc-devilspie2-regular"
-    candidate = managed_dir / f"{stem}.lua"
-    index = 2
-    while candidate.exists():
-        candidate = managed_dir / f"{stem}-{index}.lua"
-        index += 1
-    shutil.copy2(entry, candidate)
-    return candidate
