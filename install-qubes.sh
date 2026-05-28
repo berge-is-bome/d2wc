@@ -313,6 +313,50 @@ link_devilspie2_entry_safely() {
   ln -s -- "$managed_path" "$DEVILSPIE2_ENTRY"
   echo "Configured Devilspie2 symlink: $DEVILSPIE2_ENTRY -> $managed_path"
 }
+
+running_d2wc_processes() {
+  local user_id pattern
+  user_id="$(id -u)"
+  pattern='(^|[ /])d2wc($|[[:space:]])|python[0-9.]*([[:space:]].*)?-m[[:space:]]+d2wc'
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -u "$user_id" -fa "$pattern" || true
+    return 0
+  fi
+
+  ps -u "$user_id" -o pid=,args= |
+    awk '
+      /(^|[ \/])d2wc($|[[:space:]])|python[0-9.]*([[:space:]].*)?-m[[:space:]]+d2wc/ {
+        print
+      }
+    '
+}
+
+wait_until_d2wc_closed_for_update() {
+  local running
+
+  while true; do
+    running="$(running_d2wc_processes)"
+
+    if [ -z "$running" ]; then
+      return 0
+    fi
+
+    echo "WARNING: d2wc appears to be running." >&2
+    echo "Close all d2wc configurator windows before updating." >&2
+    echo >&2
+    echo "Running d2wc process candidates:" >&2
+    echo "$running" >&2
+    echo >&2
+
+    if [ ! -t 0 ]; then
+      echo "ERROR: cannot wait for d2wc to close because stdin is not interactive." >&2
+      exit 1
+    fi
+
+    read -rp "After closing d2wc, press Enter to continue, or press Ctrl+C to abort. "
+  done
+}
 add_local_bin_to_current_path() {
   case ":$PATH:" in
     *":$LOCAL_BIN:"*) ;;
@@ -434,6 +478,10 @@ if python3 -m pip show d2wc >/dev/null 2>&1 || [ -x "$D2WC_BIN" ]; then
   FIRST_INSTALL=0
 else
   FIRST_INSTALL=1
+fi
+
+if [ "$FIRST_INSTALL" -eq 0 ]; then
+  wait_until_d2wc_closed_for_update
 fi
 
 mkdir -p -- "$(dirname "$SOURCE_ROOT")"
