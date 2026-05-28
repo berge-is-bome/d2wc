@@ -18,7 +18,8 @@ from d2wc.ui.managed_actions import build_managed_section_editor
 
 CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
 UI_FONT_POINT_INCREASE = 2
-TOAST_OPACITY = 0.5
+DEFAULT_TOAST_TIMEOUT_SECONDS = 5
+DEFAULT_TOAST_OPACITY = 0.5
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -82,11 +83,18 @@ def run_configurator(
     state: dict[str, object] = {
         "snapshot": test_config_snapshot,
         "editor": None,
+        "toast_timeout_seconds": DEFAULT_TOAST_TIMEOUT_SECONDS,
+        "toast_opacity": DEFAULT_TOAST_OPACITY,
     }
 
     def current_snapshot() -> TestConfigSnapshot | None:
         snapshot = state.get("snapshot")
         return snapshot if isinstance(snapshot, TestConfigSnapshot) else None
+
+    def current_toast_settings() -> tuple[int, float]:
+        timeout = state.get("toast_timeout_seconds", DEFAULT_TOAST_TIMEOUT_SECONDS)
+        opacity = state.get("toast_opacity", DEFAULT_TOAST_OPACITY)
+        return int(timeout), float(opacity)
 
     def update_window_state() -> None:
         snapshot = current_snapshot()
@@ -102,7 +110,7 @@ def run_configurator(
             old_editor.stop()
         for child in content.get_children():
             content.remove(child)
-        editor = build_managed_section_editor(Gtk, snapshot, _event, GLib=GLib)
+        editor = build_managed_section_editor(Gtk, snapshot, _event, GLib=GLib, toast_settings=current_toast_settings)
         state["snapshot"] = snapshot
         state["editor"] = editor
         content.pack_start(editor.widget, True, True, 0)
@@ -179,10 +187,63 @@ def run_configurator(
             return
         activation = activate_managed_config(result.path)
         rebuild_editor(refreshed)
+        timeout_seconds, opacity = current_toast_settings()
         if activation.ok:
-            _show_message(Gtk, window, result.message)
+            _show_toast(Gtk, outer, result.message, timeout_seconds=timeout_seconds, opacity=opacity)
         else:
             _show_message(Gtk, window, f"{result.message}\n\n{activation.message}")
+
+    def configure_toasts(_item=None) -> None:
+        timeout_seconds, opacity = current_toast_settings()
+        dialog = Gtk.Dialog(title="Configure", transient_for=window, flags=0)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        dialog.set_default_response(Gtk.ResponseType.OK)
+
+        box = dialog.get_content_area()
+        grid = Gtk.Grid()
+        grid.set_column_spacing(10)
+        grid.set_row_spacing(10)
+        grid.set_margin_top(12)
+        grid.set_margin_bottom(12)
+        grid.set_margin_start(12)
+        grid.set_margin_end(12)
+        box.add(grid)
+
+        timeout_label = Gtk.Label(label="Toast timeout seconds")
+        timeout_label.set_xalign(0)
+        timeout_adjustment = Gtk.Adjustment(value=timeout_seconds, lower=1, upper=60, step_increment=1, page_increment=5)
+        timeout_spin = Gtk.SpinButton(adjustment=timeout_adjustment, climb_rate=1, digits=0)
+        timeout_spin.set_numeric(True)
+
+        opacity_label = Gtk.Label(label="Toast opacity")
+        opacity_label.set_xalign(0)
+        opacity_adjustment = Gtk.Adjustment(value=opacity, lower=0.1, upper=1.0, step_increment=0.05, page_increment=0.1)
+        opacity_spin = Gtk.SpinButton(adjustment=opacity_adjustment, climb_rate=0.05, digits=2)
+        opacity_spin.set_numeric(True)
+
+        grid.attach(timeout_label, 0, 0, 1, 1)
+        grid.attach(timeout_spin, 1, 0, 1, 1)
+        grid.attach(opacity_label, 0, 1, 1, 1)
+        grid.attach(opacity_spin, 1, 1, 1, 1)
+        dialog.show_all()
+
+        try:
+            response = dialog.run()
+            if response != Gtk.ResponseType.OK:
+                return
+            state["toast_timeout_seconds"] = int(timeout_spin.get_value_as_int())
+            state["toast_opacity"] = float(opacity_spin.get_value())
+        finally:
+            dialog.destroy()
+
+        timeout_seconds, opacity = current_toast_settings()
+        _show_toast(
+            Gtk,
+            outer,
+            f"Toast settings updated: {timeout_seconds}s, opacity {opacity:.2f}",
+            timeout_seconds=timeout_seconds,
+            opacity=opacity,
+        )
 
     def handle_destroy(_window) -> None:
         editor = state.get("editor")
@@ -203,6 +264,9 @@ def run_configurator(
     save_as_item = Gtk.MenuItem(label="Save As")
     save_as_item.connect("activate", save_managed_file_as)
     menu.append(save_as_item)
+    configure_item = Gtk.MenuItem(label="Configure")
+    configure_item.connect("activate", configure_toasts)
+    menu.append(configure_item)
     help_item = Gtk.MenuItem(label="Help")
     help_item.connect("activate", lambda _item: state["editor"].show_help() if state.get("editor") is not None else None)
     menu.append(help_item)
@@ -254,7 +318,7 @@ def _apply_ui_css(Gtk, Gdk, Pango, point_increase: int) -> None:
     provider.load_from_data(
         (
             f"* {{ font-size: {font_size_pt + point_increase}pt; }}\n"
-            f"infobar {{ opacity: {TOAST_OPACITY}; padding: 2px; }}\n"
+            "infobar { padding: 2px; }\n"
             "infobar label { padding: 2px 6px; }\n"
         ).encode("utf-8")
     )
@@ -292,6 +356,35 @@ def _show_message(Gtk, parent, text: str) -> None:
     )
     dialog.run()
     dialog.destroy()
+
+
+def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int, opacity: float) -> None:
+    toast = Gtk.InfoBar()
+    toast.set_message_type(Gtk.MessageType.INFO)
+    toast.set_show_close_button(True)
+    toast.set_opacity(opacity)
+
+    content = toast.get_content_area()
+    label = Gtk.Label(label=text)
+    label.set_xalign(0)
+    label.set_selectable(False)
+    label.set_line_wrap(True)
+    content.add(label)
+
+    def dismiss() -> bool:
+        if toast.get_parent() is not None:
+            parent.remove(toast)
+        return False
+
+    toast.connect("response", lambda _toast, _response: dismiss())
+    parent.pack_end(toast, False, False, 0)
+    toast.show_all()
+
+    try:
+        from gi.repository import GLib
+    except (ImportError, ValueError):  # pragma: no cover
+        return
+    GLib.timeout_add_seconds(timeout_seconds, dismiss)
 
 
 def format_active_window_info(window_info: ActiveWindowInfo) -> str:
