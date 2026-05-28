@@ -8,9 +8,15 @@ from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.validation import validate_managed_blocks
 
 MANAGED_CONFIG_FILENAME = "d2wc.lua"
-MANAGED_CONFIG_RELATIVE_DIR = Path(".config/d2wc/lua")
+D2WC_CONFIG_RELATIVE_DIR = Path(".config/d2wc")
+MANAGED_CONFIG_RELATIVE_DIR = D2WC_CONFIG_RELATIVE_DIR / "lua"
 DEVILSPIE2_RELATIVE_DIR = Path(".config/devilspie2")
 DEVILSPIE2_ENTRY_FILENAME = "d2wc.lua"
+
+
+def d2wc_config_dir(home: Path | None = None) -> Path:
+    root = Path.home() if home is None else home
+    return root / D2WC_CONFIG_RELATIVE_DIR
 
 
 def default_managed_config_dir(home: Path | None = None) -> Path:
