@@ -48,6 +48,7 @@ Current user-path layout:
 ~/.cache/d2wc/
 ~/.local/share/d2wc/source/
 ~/.config/d2wc/lua/
+~/.config/d2wc/settings.json
 ~/.config/devilspie2/d2wc.lua
 ```
 
@@ -56,6 +57,8 @@ Current user-path layout:
 `~/.local/share/d2wc/source/` stores the extracted local installation source used by the dom0 installer.
 
 `~/.config/d2wc/lua/` stores user-owned `d2wc` managed Lua files.
+
+`~/.config/d2wc/settings.json` stores user UI preferences such as toast timeout and opacity.
 
 `~/.config/devilspie2/d2wc.lua` is the Devilspie2-facing symlink only and points to the active file under `~/.config/d2wc/lua/`. Unrelated Devilspie2 scripts and symlinks are not overwritten.
 
@@ -68,8 +71,10 @@ In summary:
 1. `d2wc` owns managed Lua files under `~/.config/d2wc/lua/`.
 2. Devilspie2 continues to load the active managed file through `~/.config/devilspie2/d2wc.lua`.
 3. The Devilspie2-facing path is an integration symlink, not the primary config store.
-4. The configurator should open and save only `d2wc` managed Lua files.
-5. The configurator should not become a generic Devilspie2 Lua editor.
+4. The configurator opens and saves only `d2wc` managed Lua files.
+5. The configurator opens the active symlink target on startup when the symlink is safe.
+6. The configurator stores UI preferences under `~/.config/d2wc/settings.json`.
+7. The configurator should not become a generic Devilspie2 Lua editor.
 
 ## Packaging phases
 
@@ -102,9 +107,10 @@ Supported behavior:
 4. Store the copied archive under `~/.cache/d2wc/`.
 5. Store extracted source under `~/.local/share/d2wc/source/`.
 6. Store managed Lua files under `~/.config/d2wc/lua/`.
-7. Activate Devilspie2 through `~/.config/devilspie2/d2wc.lua` when safe.
-8. Keep unrelated Devilspie2 scripts untouched.
-9. Launch the installed `d2wc` command.
+7. Preserve existing `~/.config/d2wc/settings.json` user settings.
+8. Activate Devilspie2 through `~/.config/devilspie2/d2wc.lua` when safe.
+9. Keep unrelated Devilspie2 scripts untouched.
+10. Launch the installed `d2wc` command.
 
 ### Phase 3: local package
 
