@@ -290,6 +290,28 @@ migrate_devilspie2_regular_managed_file() {
   MIGRATED_MANAGED_PATH="$target"
 }
 
+current_safe_devilspie2_managed_path() {
+  local resolved managed_root
+
+  [ -L "$DEVILSPIE2_ENTRY" ] || return 1
+
+  resolved="$(readlink -f -- "$DEVILSPIE2_ENTRY" || true)"
+  managed_root="$(readlink -f -- "$MANAGED_DIR" || true)"
+
+  [ -n "$resolved" ] || return 1
+  [ -n "$managed_root" ] || return 1
+
+  case "$resolved" in
+    "$managed_root"/*)
+      [ -f "$resolved" ] || return 1
+      printf "%s\n" "$resolved"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
 link_devilspie2_entry_safely() {
   local managed_path="$1"
   mkdir -p -- "$DEVILSPIE2_DIR"
@@ -500,6 +522,8 @@ fi
 
 if [ -n "$MIGRATED_MANAGED_PATH" ]; then
   MANAGED_PATH="$MIGRATED_MANAGED_PATH"
+elif [ "$FIRST_INSTALL" -eq 0 ] && MANAGED_PATH="$(current_safe_devilspie2_managed_path)"; then
+  echo "Keeping active managed config: $MANAGED_PATH"
 else
   MANAGED_PATH="$MANAGED_DIR/$DEFAULT_MANAGED_FILENAME"
   if [ ! -e "$MANAGED_PATH" ]; then
