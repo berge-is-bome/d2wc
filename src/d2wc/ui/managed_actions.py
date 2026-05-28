@@ -160,6 +160,7 @@ def build_managed_section_editor(
     *,
     GLib=None,
     inventory_stream=stream_known_window_inventory,
+    toast_settings=lambda: (5, 0.5),
 ) -> ManagedSectionEditor:
     """Build the section-focused editor for a d2wc managed config."""
 
@@ -241,7 +242,14 @@ def build_managed_section_editor(
         result = apply_managed_section_action(snapshot_value.path, request)
         result_text = format_managed_action_result(result)
         if result.ok:
-            _show_toast(Gtk, main_box, SUCCESS_TOAST_MESSAGE)
+            timeout_seconds, opacity = toast_settings()
+            _show_toast(
+                Gtk,
+                main_box,
+                SUCCESS_TOAST_MESSAGE,
+                timeout_seconds=timeout_seconds,
+                opacity=opacity,
+            )
         else:
             _show_message(Gtk, main_box, result_text)
         refreshed_snapshot = load_managed_config_snapshot(snapshot_value.path)
@@ -446,7 +454,7 @@ class _SearchableCombo:
                 continue
             row = self.Gtk.ListBoxRow()
             row._d2wc_value = value
-            label = self.Gtk.Label(label=value or "(none)")
+            label = self.Gtk.Label(label=value or "All")
             label.set_xalign(0)
             label.set_margin_top(4)
             label.set_margin_bottom(4)
@@ -967,7 +975,7 @@ def _column_width_chars(column_name: str) -> int:
 
 
 
-def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int = 5) -> None:
+def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int = 5, opacity: float = 0.5) -> None:
     try:
         from gi.repository import GLib
     except (ImportError, ValueError):  # pragma: no cover
@@ -977,6 +985,7 @@ def _show_toast(Gtk, parent, text: str, *, timeout_seconds: int = 5) -> None:
     toast = Gtk.InfoBar()
     toast.set_message_type(Gtk.MessageType.INFO)
     toast.set_show_close_button(True)
+    toast.set_opacity(opacity)
 
     content = toast.get_content_area()
     label = _text_label(Gtk, text)
