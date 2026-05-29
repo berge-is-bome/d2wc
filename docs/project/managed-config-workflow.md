@@ -72,13 +72,45 @@ The installer then:
 2. Installs the Python package with the user-site pip flow.
 3. Creates `~/.config/d2wc/lua/` if needed.
 4. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled template if a managed file is needed.
-5. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
-6. Leaves unrelated `~/.config/devilspie2/` files and symlinks unchanged.
-7. Leaves existing `~/.config/d2wc/settings.json` user settings unchanged.
+5. Runs targeted runtime migrations for marked managed Lua files under `~/.config/d2wc/lua/`.
+6. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
+7. Leaves unrelated `~/.config/devilspie2/` files and symlinks unchanged.
+8. Leaves existing `~/.config/d2wc/settings.json` user settings unchanged.
 
 On update, the installer preserves the active managed file selection when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
 
 On update, if one or more `d2wc` configurator instances are running, the installer warns the user to close them and waits before continuing. The update continues only after no running `d2wc` process candidates remain.
+
+## Managed Lua runtime migrations
+
+Installer runtime migrations are targeted insertions into marked managed Lua files.
+
+The migration helper requires the managed marker:
+
+```text
+d2wc managed
+```
+
+Files without that marker are skipped.
+
+For marked managed files, the migration may add missing runtime pieces such as:
+
+1. latest header version comments,
+2. `D2WC_EVENT_HANDOFF_ENABLED`,
+3. `D2WC_CONFIGURATOR_CLASS`,
+4. Lua event handoff helper code,
+5. already-configured window suppression helper code,
+6. the Lua event handoff call.
+
+The migration must not rewrite the full bundled template. It must preserve user rules, user comments, spacing, and existing toggle values.
+
+For example, if a user has already set:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENABLED = false
+```
+
+an installer update must not change it back to `true`.
 
 ## Configurator behavior
 
@@ -157,10 +189,23 @@ The configurator stores UI settings in:
 ~/.config/d2wc/settings.json
 ```
 
-Current settings:
+Current settings file values:
 
 1. Toast timeout seconds.
 2. Toast opacity.
+
+The GTK `Configure` dialog is grouped into:
+
+1. `Window events`
+2. `Notifications`
+
+`Window events` controls this active managed Lua setting:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENABLED = true
+```
+
+`Notifications` controls the persisted toast timeout and toast opacity values.
 
 The settings file is user-owned runtime configuration and must not be overwritten by installer updates.
 
@@ -186,5 +231,7 @@ For example:
 ## Current implementation notes
 
 The installer and configurator now use the new path model.
+
+The active managed Lua file may optionally open `d2wc` automatically for unconfigured normal windows through the Lua event handoff flow documented in [Lua Event Handoff](lua-event-handoff.md).
 
 The remaining intentional distinction is that test-only helpers still exist for development and automated tests, while public user workflows use managed-config language and paths.

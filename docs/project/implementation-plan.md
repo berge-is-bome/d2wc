@@ -22,35 +22,39 @@ The repository currently contains:
 8. [Lua Configurables](lua-configurables.md) documentation.
 9. [Lua Design History Notes](lua-design-history.md) recovered from archived pre-repository script versions.
 10. [Managed Config Workflow](managed-config-workflow.md) documentation for the installed user-path model.
-11. Python package skeleton for the configurator core.
-12. Parser, validator, renderer, settings, split-profile, backup archive path and member name, duplicate-validation, shadow-validation, and managed-user-path tests.
-13. Core safe-save helper and temporary-directory tests.
-14. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
-15. Guarded CLI save command requiring `--write` before modifying a config file.
-16. Guarded add, modify, and delete commands for every managed Lua section:
+11. [Lua Event Handoff](lua-event-handoff.md) documentation for automatic window-event launching.
+12. Python package skeleton for the configurator core.
+13. Parser, validator, renderer, settings, split-profile, backup archive path and member name, duplicate-validation, shadow-validation, and managed-user-path tests.
+14. Core safe-save helper and temporary-directory tests.
+15. Save preview behavior where `save` without `--write` reports the planned save and modifies nothing.
+16. Guarded CLI save command requiring `--write` before modifying a config file.
+17. Guarded add, modify, and delete commands for every managed Lua section:
     1. `GEOM`
     2. `WORKSPACE_PLACEMENT`
     3. `WORKSPACE_ROUTES`
     4. `PIN`
     5. `EXCLUDE`
     6. `LEFT_EDGE_CORRECTION`
-17. Read-only GTK launch proof.
-18. Read-only Qubes/dom0 selected-window geometry proof.
-19. Event-data UI direction notes in [Event-Data GTK UI Direction](event-data-ui-direction.md).
-20. Dedicated GTK test-config workflow for isolated development tests.
-21. Workflow-focused GTK grid editor for all six managed sections.
-22. Known-window inventory parser foundation in `src/d2wc/event_inventory.py`.
-23. Known-window row-source helpers in `src/d2wc/ui/grid_rows.py`.
-24. Bounded and continuous known-window inventory capture helpers in `src/d2wc/event_inventory_capture.py`.
-25. Automatic GTK known-window inventory monitor integration.
-26. Qubes/dom0 source-archive installation and update helper scripts.
-27. Installed `d2wc` command that opens the GTK configurator directly.
-28. Managed-config GTK editor for the active `d2wc` managed Lua file.
-29. File Open and Save As for `d2wc` managed Lua files.
-30. XDG-style user paths for source cache, installed source, managed Lua files, and UI settings.
-31. Development status notes in [Development Status](development-status.md).
+18. Read-only GTK launch proof.
+19. Read-only Qubes/dom0 selected-window geometry proof.
+20. Event-data UI direction notes in [Event-Data GTK UI Direction](event-data-ui-direction.md).
+21. Dedicated GTK test-config workflow for isolated development tests.
+22. Workflow-focused GTK grid editor for all six managed sections.
+23. Known-window inventory parser foundation in `src/d2wc/event_inventory.py`.
+24. Known-window row-source helpers in `src/d2wc/ui/grid_rows.py`.
+25. Bounded and continuous known-window inventory capture helpers in `src/d2wc/event_inventory_capture.py`.
+26. Automatic GTK known-window inventory monitor integration.
+27. Qubes/dom0 source-archive installation and update helper scripts.
+28. Installed `d2wc` command that opens the GTK configurator directly.
+29. Managed-config GTK editor for the active `d2wc` managed Lua file.
+30. File Open and Save As for `d2wc` managed Lua files.
+31. XDG-style user paths for source cache, installed source, managed Lua files, and UI settings.
+32. Lua event handoff from managed Lua to the bare `d2wc` command.
+33. Configured-window suppression for automatic handoff.
+34. Configurator `Window events` setting for `D2WC_EVENT_HANDOFF_ENABLED`.
+35. Development status notes in [Development Status](development-status.md).
 
-The Lua script remains the execution layer while the configurator UI is developed. User-owned managed Lua files live under `~/.config/d2wc/lua/`, and Devilspie2 reads the active managed file through the integration symlink at `~/.config/devilspie2/d2wc.lua`.
+The Lua script remains the execution layer. User-owned managed Lua files live under `~/.config/d2wc/lua/`, and Devilspie2 reads the active managed file through the integration symlink at `~/.config/devilspie2/d2wc.lua`.
 
 ## Guiding decisions
 
@@ -74,7 +78,7 @@ The implementation should follow these decisions:
 16. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
 17. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
 18. Build the GTK UI around representative Devilspie2/Lua event data, not around live target-selection experiments.
-19. Accept duplicate configurator openings for intermediary events for now; later suppression should prevent automatic configurator launches for already-known windows.
+19. Allow automatic configurator launching only for unconfigured normal windows when the user enables the Lua event handoff setting.
 20. Use dedicated test-config paths for isolated GTK UI testing.
 21. Store user-owned managed Lua files under `~/.config/d2wc/lua/`.
 22. Use `~/.config/devilspie2/d2wc.lua` only as the Devilspie2-facing integration symlink for the active managed file.
@@ -82,6 +86,7 @@ The implementation should follow these decisions:
 24. Keep File Open and Save As scoped to `d2wc` managed Lua files, not arbitrary Devilspie2 scripts.
 25. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
 26. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
+27. Keep installer managed-Lua refreshes targeted; do not rewrite whole user-managed Lua files from the bundled template.
 
 ## Completed stages
 
@@ -186,7 +191,7 @@ Research outcomes:
 5. Lua can call the needed functions directly.
 6. `debug_print` is only needed when a proof needs to emit values to Python through stdout.
 7. Perfect target selection should not block UI work.
-8. Duplicate configurator launches are acceptable for now and should later be reduced through suppression of already-known windows.
+8. Duplicate configurator launches are acceptable only for intermediary proof stages and should be reduced through suppression of already-known windows.
 
 See [Event-Data GTK UI Direction](event-data-ui-direction.md).
 
@@ -315,10 +320,11 @@ Current behavior:
 6. Allow later debug output to add newly opened domain/class pairs while the monitor is running.
 7. Return parsed `KnownWindowTarget` values through core APIs.
 8. Avoid persistent changes to the user's real Devilspie2 config.
+9. Terminate the temporary Devilspie2 process when the GTK monitor is stopped.
 
 ### Stage 24: automatic GTK inventory monitor integration
 
-Complete through PR #28.
+Complete through PR #28 and the `lua-event-handoff` branch cleanup.
 
 Current behavior:
 
@@ -330,7 +336,8 @@ Current behavior:
 6. Keep one top `Add` row per workflow, with configured rows below it.
 7. Feed captured machine/application values into the top `Add` row dropdowns.
 8. Stop the monitor when the GTK window closes.
-9. Keep status visibility and non-blocking monitor error UX as future polish.
+9. Stop the stream through a stop event so temporary inventory processes do not accumulate.
+10. Keep status visibility and non-blocking monitor error UX as future polish.
 
 ### Stage 25: installed command and first public Qubes installer polish
 
@@ -381,39 +388,27 @@ Current behavior:
 16. File Open and Save As update the Devilspie2 integration symlink only when safe.
 17. Blank Machine/Application match components are displayed as `All` while preserving generated Lua rule format.
 
+### Stage 28: Lua event handoff and configured-window suppression
+
+Complete on the `lua-event-handoff` branch.
+
+Current behavior:
+
+1. The managed Lua script can launch bare `d2wc` through `os.execute()` when a normal application window opens.
+2. The launch is controlled by `D2WC_EVENT_HANDOFF_ENABLED` in the active managed Lua file.
+3. The configurator exposes the toggle under `Menu -> Configure -> Window events`.
+4. The configurator publishes the stable GTK/X11 class `d2wc-configurator`.
+5. Lua suppresses configurator recursion by comparing the current window class to `D2WC_CONFIGURATOR_CLASS`.
+6. Lua suppresses automatic launching for windows that already match configured target rules.
+7. Configured-window suppression covers `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION`.
+8. `GEOM` alone does not suppress handoff, because geometry profiles do not target windows by themselves.
+9. Installer updates run targeted managed Lua runtime migrations for marked managed files.
+10. Missing `d2wc managed` marker remains an expected skip/error condition.
+11. Existing user comments, managed rules, spacing, and existing toggle values are preserved.
+
 ## Future implementation stages
 
-### Stage 28: event-data handoff proof from Lua to Python
-
-After the UI layout and managed-config editing workflow are proven, prove the handoff path from Lua event data to the configurator command.
-
-Required behavior:
-
-1. Lua captures event data directly from Devilspie2 functions.
-2. Lua passes the event data to the configurator command through a safe handoff mechanism.
-3. GTK displays exactly the event data it received.
-4. Writes remain guarded and backed up.
-
-### Stage 29: suppression for already-known windows
-
-Add logic to avoid automatically opening the configurator for windows that already have a profile or handling rule.
-
-Candidate known handling rules:
-
-1. `WORKSPACE_PLACEMENT`
-2. `WORKSPACE_ROUTES`
-3. `PIN`
-4. `EXCLUDE`
-5. `LEFT_EDGE_CORRECTION`
-
-Purpose:
-
-1. Allow duplicate configurator launches early.
-2. Let the user configure intermediary menu/launcher events once.
-3. Suppress repeated prompts for already-known windows later.
-4. Make the real application-window configurator flow less noisy over time.
-
-### Stage 30: applied-write restore and backup recovery
+### Stage 29: applied-write restore and backup recovery
 
 Add a user-facing restore workflow for changes that have already been applied to a managed config.
 
@@ -427,40 +422,6 @@ Required behavior:
 6. Reuse the same staged write, sync, and backup safety rules as normal guarded writes.
 7. Document how restore interacts with backup retention before enabling it broadly.
 
-### Stage 31: generated split profiles
+### Stage 30: generated split profiles
 
-Implement generated split-profile support.
-
-Required behavior:
-
-1. Derive left/right split profiles from available screen geometry.
-2. Account for the configured window border width.
-3. Preview generated values before writing.
-4. Allow user override when needed.
-5. Keep generated profile settings outside ad hoc rule strings.
-
-### Stage 32: managed-file external change handling
-
-Decide whether the configurator should automatically reload when the currently open managed Lua file changes on disk.
-
-Required behavior if this is reintroduced:
-
-1. Monitor only the currently open managed Lua file.
-2. Debounce rapid change notifications.
-3. Reload only valid managed Lua files.
-4. Avoid overwriting invalid external edits.
-5. Report invalid reloads clearly without writing anything.
-6. Keep File Open and Save As monitor transitions safe.
-
-### Stage 33: real public packaging
-
-Build distribution-quality packaging after the source-archive public-release path has settled.
-
-Required behavior:
-
-1. Define package file layout.
-2. Define package dependencies.
-3. Install the `d2wc` command.
-4. Install a managed Lua template without overwriting user config.
-5. Include documentation.
-6. Validate install, update, and uninstall behavior.
+Generated split-profile work remains future work and should be kept separate from the Lua event handoff branch.

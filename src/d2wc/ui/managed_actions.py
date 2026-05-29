@@ -294,7 +294,7 @@ def build_managed_section_editor(
 
     def monitor_inventory() -> None:
         try:
-            for event in inventory_stream():
+            for event in inventory_stream(stop_event=inventory_stop_event):
                 if inventory_stop_event.is_set():
                     break
                 if event.targets and GLib is not None:
@@ -314,6 +314,8 @@ def build_managed_section_editor(
 
     def stop_inventory_monitor() -> None:
         inventory_stop_event.set()
+        if monitor_thread is not None and monitor_thread.is_alive():
+            monitor_thread.join(timeout=1.0)
 
     section_combo.connect("changed", lambda _combo: refresh_editor_rows())
     refresh_editor_rows()

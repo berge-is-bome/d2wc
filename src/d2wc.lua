@@ -1,6 +1,10 @@
 ------------------------------------------------------------
 -- d2wc managed
 -- devilspie2 workspace configurator
+-- version 0.1.12.5
+-- changes: suppress Lua event handoff for windows that already match managed rules
+-- version 0.1.12.4
+-- changes: Lua event handoff proof launches bare d2wc from supported window-open events
 -- version 0.1.12.3
 -- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
 -- version 0.1.12.2
@@ -11,6 +15,13 @@
 
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
+
+-- Lua event handoff proof.
+-- When enabled, supported window-open events launch the d2wc configurator.
+-- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
+-- Windows that already match a managed target rule are suppressed.
+local D2WC_EVENT_HANDOFF_ENABLED = true
+local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
 
 -- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION
 -- All rules use space-separated tokens with explicit prefixes:
@@ -125,7 +136,8 @@ local LEFT_EDGE_CORRECTION = {
 -- Only act on real app windows
 -- Filters out non-normal windows like menus, splash screens, panels, and notifications so only real application windows are processed.
 ------------------------------------------------------------
-if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
+local window_type = get_window_type()
+if (window_type ~= "WINDOW_TYPE_NORMAL") then
   return
 end
 
@@ -133,6 +145,14 @@ end
 -- Helpers
 ------------------------------------------------------------
 local function lc(s) return (s or ""):lower() end
+
+local function launch_d2wc_event_handoff(event_class, is_configured)
+  if not D2WC_EVENT_HANDOFF_ENABLED then return end
+  if event_class == D2WC_CONFIGURATOR_CLASS then return end
+  if is_configured then return end
+
+  os.execute("d2wc >/dev/null 2>&1 &")
+end
 
 -- Split a rule string into prefixed tokens and validate duplicates.
 -- Returns { d=..., c=..., g=..., le=... }, is_valid
@@ -211,6 +231,35 @@ local function pick_profile(map, actual_cls)
     if r > best_r then best_r, best_p = r, prof end
   end
   return best_p
+end
+
+local function exact_lookup_matches_window(exact_map, domain_map, class_map, d, c)
+  if d then
+    local key = d .. "." .. c
+    if exact_map[key] or domain_map[d] then return true end
+  end
+  return class_map[c] == true
+end
+
+local function rule_matches_window(rule, d, c)
+  local R, ok = parse_prefixed_rule(rule)
+  if not ok then return false end
+
+  local rd, rc = R.d, R.c
+  if not rd and not rc then return false end
+  if rd and rd ~= d then return false end
+  if rc and class_match_rank(rc, c) == 0 then return false end
+
+  return true
+end
+
+local function list_rule_matches_window(list, d, c)
+  for _, rule in ipairs(list) do
+    if rule and rule ~= "" and rule_matches_window(rule, d, c) then
+      return true
+    end
+  end
+  return false
 end
 
 ------------------------------------------------------------
@@ -324,6 +373,15 @@ for wsnum, list in pairs(WORKSPACE_ROUTES) do
   end
 end
 
+local function window_has_managed_rule(d, c)
+  if exact_lookup_matches_window(EX_EXACT, EX_DOMAIN, EX_CLASS, d, c) then return true end
+  if exact_lookup_matches_window(PIN_EXACT, PIN_DOMAIN, PIN_CLASS, d, c) then return true end
+  if exact_lookup_matches_window(WS_EXACT, WS_DOMAIN, WS_CLASS, d, c) then return true end
+  if list_rule_matches_window(WORKSPACE_PLACEMENT, d, c) then return true end
+  if list_rule_matches_window(LEFT_EDGE_CORRECTION, d, c) then return true end
+  return false
+end
+
 ------------------------------------------------------------
 -- Qubes domain and class extraction
 ------------------------------------------------------------
@@ -347,6 +405,11 @@ local function get_lower_class()
 end
 
 local cls = get_lower_class()
+
+------------------------------------------------------------
+-- Lua event handoff proof
+------------------------------------------------------------
+launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls))
 
 ------------------------------------------------------------
 -- Apply exclusions

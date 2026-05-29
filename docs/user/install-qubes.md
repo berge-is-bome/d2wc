@@ -37,10 +37,32 @@ The VM argument is optional. If it is omitted, the installer shows a `zenity` ch
 /tmp/install-qubes.sh
 ```
 
+## Installer update behavior
+
+The installer copies and validates `/tmp/d2wc.tgz` before replacing the local source tree.
+
+On update, the installer preserves the active managed file when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
+
+The installer also refreshes marked managed Lua files under `~/.config/d2wc/lua/` with missing runtime code needed by the current bundled managed script. This is a targeted migration, not a full template rewrite. Existing user rules, comments, spacing, and existing toggle values are preserved.
+
+Only files that contain the managed marker are migrated:
+
+```text
+-- d2wc managed
+```
+
+Files without that marker are skipped by the migration helper and are not considered valid active `d2wc` managed files by the installer.
+
 ## Launching d2wc
 
 When the install completes, launch `d2wc`:
 
 ```bash
 d2wc
+```
+
+The explicit configurator subcommand remains supported:
+
+```bash
+d2wc configure
 ```

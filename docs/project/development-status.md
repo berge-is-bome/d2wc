@@ -4,7 +4,9 @@
 
 The current `main` branch is the first public beta baseline for the Qubes OS and Devilspie2 workflow.
 
-Recent public-release milestones:
+The `lua-event-handoff` branch adds the next implementation slice on top of that baseline.
+
+Recent public-release milestones already merged to `main`:
 
 1. PR #30: `Prepare documentation for public release`
    1. Reworked the README as a public-facing description of what `d2wc` is.
@@ -18,17 +20,26 @@ Recent public-release milestones:
    5. Kept `~/.config/devilspie2/d2wc.lua` as the Devilspie2-facing integration symlink.
    6. Added configurator File Open and Save As support for `d2wc` managed Lua files.
    7. Preserved unrelated Devilspie2 scripts and unrelated symlinks.
+3. PR #32: `Rework Qubes installer and managed-config XDG integration`
+   1. Preserved the active managed file through safe symlink handling.
+   2. Kept bare `d2wc` as the normal installed configurator launch command.
+   3. Kept `d2wc configure` as the explicit supported configurator subcommand.
 
-Recent merged baseline before the public-release documentation and installer workflow work:
+Recent branch work on `lua-event-handoff`:
 
-```text
-PR #29: Match action button width to dirty split state
-Merge commit: d466f8d59f53abf0e390a3e1f68a31ed74f7414d
-```
+1. Added Lua event handoff from `src/d2wc.lua` to the bare `d2wc` command.
+2. Added `D2WC_EVENT_HANDOFF_ENABLED` as the per-managed-file handoff toggle.
+3. Added configurator recursion suppression through the stable GTK/X11 class `d2wc-configurator`.
+4. Added automatic configurator suppression for windows that already match managed target rules.
+5. Added targeted managed Lua runtime migration during installer updates.
+6. Kept missing `d2wc managed` marker as an expected skip/error condition.
+7. Fixed temporary Devilspie2 inventory debug process cleanup on configurator close.
+8. Added a grouped `Menu -> Configure` dialog with `Window events` and `Notifications` sections.
+9. Added the `Window events` checkbox for toggling automatic handoff in the active managed Lua file.
 
 ## Latest confirmed verification
 
-Latest verification reported for PR #31:
+Latest verification reported for the `lua-event-handoff` branch:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -41,17 +52,17 @@ Result:
 295 passed
 ```
 
-Manual validation reported for PR #31:
+Manual validation reported for the `lua-event-handoff` branch:
 
-1. Installer update warns when `d2wc` is already running.
-2. Installer update preserves the active managed file symlink.
-3. `d2wc` opens the active symlink target on startup.
-4. Configure toast settings persist after close, reopen, and update.
-5. Save As and File Open safely update `~/.config/devilspie2/d2wc.lua`.
-6. Selecting `All` immediately displays `All`, not `Machine/Application`.
-7. Dropdown placement behavior is fixed.
+1. Automatic launching works when `D2WC_EVENT_HANDOFF_ENABLED = true`.
+2. Configured windows are suppressed and do not repeatedly open the configurator.
+3. The configurator does not recursively launch itself.
+4. The temporary inventory Devilspie2 process exits after closing `d2wc`.
+5. The installer refreshes marked managed Lua files with targeted runtime snippets.
+6. Existing user rules, comments, spacing, and toggle values are preserved.
+7. The configurator `Configure` dialog toggles `D2WC_EVENT_HANDOFF_ENABLED` as intended.
 
-Before tagging or publishing the first public beta, run the normal local verification path again from current `main`:
+Before tagging or publishing the first public beta, run the normal local verification path again from current `main` after merge:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -69,6 +80,7 @@ Current public target:
 3. User-managed `d2wc` Lua files, not arbitrary pre-existing Devilspie2 Lua scripts.
 4. Source-archive install/update flow for dom0.
 5. GTK configurator as the normal user path for managing rules.
+6. Optional automatic configurator launch for unconfigured normal windows through Lua event handoff.
 
 Broader X11/Linux desktop use remains part of the project direction, but should be treated as experimental until tested deliberately.
 
@@ -124,6 +136,11 @@ d2wc-configurator
 23. Window title shows the active managed file.
 24. Edit operations, validation, guarded writes, and backups follow the currently open managed file.
 25. Machine, Application, and similar target dropdowns display blank match components as `All` while preserving the generated Lua rule format.
+26. `Menu -> Configure` opens a grouped settings dialog:
+    1. `Window events`
+    2. `Notifications`
+27. `Window events` toggles `D2WC_EVENT_HANDOFF_ENABLED` in the active managed Lua file.
+28. `Notifications` controls toast timeout and toast opacity.
 
 The configurator does not currently auto-reload when the managed Lua file changes on disk. Users who edit a managed Lua file externally should reopen the configurator or reopen the file before continuing UI edits.
 
@@ -138,7 +155,7 @@ The current flow is:
 3. Keep the source VM running until dom0 installation is finished.
 4. Copy the dom0 installer from the source VM into dom0.
 5. Run the dom0 installer with the source VM name as an argument, or let the installer show a `zenity` chooser or command-line prompt.
-6. Shut down the source VM after the install/update completes.
+6. If the source VM was a disposable it can now be closed.
 
 The current user-path layout is:
 
@@ -157,11 +174,12 @@ The dom0 installer behavior is:
 3. Extracts the local installation source under `~/.local/share/d2wc/source/`.
 4. Installs the Python package into the dom0 user Python site without dom0 network access.
 5. Creates `~/.config/d2wc/lua/` if needed.
-6. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled managed template only when a managed file is needed.
-7. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
-8. Preserves unrelated files and symlinks under `~/.config/devilspie2/`.
-9. Preserves existing `~/.config/d2wc/settings.json` user settings.
-10. Warns and waits if one or more `d2wc` configurator instances are running during an update.
+6. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled managed template on first install.
+7. Runs targeted runtime migrations over marked managed Lua files under `~/.config/d2wc/lua/`.
+8. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
+9. Preserves unrelated files and symlinks under `~/.config/devilspie2/`.
+10. Preserves existing `~/.config/d2wc/settings.json` user settings.
+11. Warns and waits if one or more `d2wc` configurator instances are running during an update.
 
 The normal installed launch command is:
 
@@ -199,6 +217,28 @@ That path is expected to be a symlink into `~/.config/d2wc/lua/` when managed by
 
 `d2wc` must not overwrite arbitrary Devilspie2 Lua scripts or unrelated symlinks. File Open and Save As are only for `d2wc` managed Lua files that pass the managed-file validation rules.
 
+## Lua event handoff behavior
+
+Lua event handoff is documented in [Lua Event Handoff](lua-event-handoff.md).
+
+Current behavior:
+
+1. Devilspie2 runs the active managed Lua file on window events.
+2. `d2wc.lua` filters to `WINDOW_TYPE_NORMAL` windows.
+3. The Lua handoff launches bare `d2wc` with `os.execute()` when enabled.
+4. `D2WC_EVENT_HANDOFF_ENABLED` controls automatic launching per managed Lua file.
+5. The configurator's GTK/X11 class `d2wc-configurator` is suppressed to avoid recursive configurator launches.
+6. Windows already matching managed target rules are suppressed.
+7. `GEOM` alone does not suppress handoff because geometry profiles do not target windows by themselves.
+
+Configured-window suppression counts these managed sections:
+
+1. `EXCLUDE`
+2. `PIN`
+3. `WORKSPACE_ROUTES`
+4. `WORKSPACE_PLACEMENT`
+5. `LEFT_EDGE_CORRECTION`
+
 ## Known-window inventory parser, capture, stream, and row source
 
 Current parser behavior:
@@ -223,6 +263,7 @@ Current capture and stream behavior:
 7. Later debug output can add newly opened domain/class pairs while the monitor is running.
 8. Repeated observations are kept internal and do not produce visible duplicate targets.
 9. Stream behavior is tested with mocked process/output objects, so pytest does not require real Devilspie2.
+10. The stream is stoppable and terminates its temporary Devilspie2 process when the configurator closes.
 
 Current row-source behavior:
 
@@ -273,19 +314,16 @@ The current Python core supports:
 23. Bounded and continuous known-window inventory capture helpers.
 24. Automatic GTK inventory monitor into Add-row dropdown values.
 25. Qubes/dom0 source-archive install/update support.
+26. Lua event handoff from managed Lua to bare `d2wc`.
+27. Configured-window suppression for automatic Lua handoff.
+28. Targeted managed Lua runtime migrations during installer updates.
+29. Configurator toggle for `D2WC_EVENT_HANDOFF_ENABLED`.
 
 ## Active next work
 
-The next planned development slice remains Lua event handoff.
+The Lua event handoff slice is implemented on the `lua-event-handoff` branch.
 
-Lua event handoff means:
-
-1. Devilspie2 Lua event captures event data directly.
-2. Event data is passed safely into `python3 -m d2wc` or `d2wc`.
-3. GTK opens with that specific event context.
-4. This lower-level plumbing comes before any future automatic `configure this new window?` prompt flow.
-
-The three-option user flow and suppression behavior should come after the handoff proof.
+The remaining active work before merging this branch is final review and branch/PR handling, not additional feature implementation.
 
 ## Future restore work
 
@@ -374,6 +412,7 @@ Known behavior:
 5. The current `d2wc.lua` already filters non-normal windows with `WINDOW_TYPE_NORMAL`.
 6. The known-window inventory monitor treats this as list building, not single target selection.
 7. Startup output builds the initial list and later output adds newly opened domain/class targets.
+8. Lua can launch the installed configurator with bare `d2wc` through `os.execute()`.
 
 ## Historical Lua script preservation
 
