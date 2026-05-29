@@ -240,6 +240,7 @@ def run_configurator(
         sidebar.pack_start(notifications_button, False, False, 0)
 
         back_button = Gtk.Button(label="Back")
+        back_button.set_halign(Gtk.Align.START)
         back_button.connect("clicked", lambda _button: rebuild_editor(current_snapshot()))
         sidebar.pack_end(back_button, False, False, 0)
 
