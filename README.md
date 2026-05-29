@@ -75,28 +75,6 @@ Menu -> Configure -> Behavior
 
 The same Configure view also contains notification settings for toast timeout and opacity.
 
-## Installed user config
-
-The installed configurator stores `d2wc` managed Lua files under:
-
-```text
-~/.config/d2wc/lua/
-```
-
-The default managed file is:
-
-```text
-~/.config/d2wc/lua/d2wc.lua
-```
-
-Devilspie2 reads the active managed file through this integration path:
-
-```text
-~/.config/devilspie2/d2wc.lua
-```
-
-That integration path is a symlink to the active managed file. Existing unrelated Devilspie2 scripts in `~/.config/devilspie2/` are not replaced by the installer.
-
 ## Launching d2wc
 
 After installation, launch the configurator with:
