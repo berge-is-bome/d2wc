@@ -70,10 +70,10 @@ The active managed Lua file can open the configurator automatically when Devilsp
 This behavior is controlled in the configurator:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
-The same dialog also contains notification settings for toast timeout and opacity.
+The same Configure view also contains notification settings for toast timeout and opacity.
 
 ## Installed user config
 
@@ -124,7 +124,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The same setting can be changed from the configurator:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
 The checkbox is:
