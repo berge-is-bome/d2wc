@@ -11,6 +11,8 @@ from d2wc.core.lua_blocks import ManagedBlockParser
 from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
 from d2wc.core.validation import validate_managed_blocks
 
+MANAGED_MARKER = "d2wc managed"
+
 HANDOFF_SETTINGS = '''-- Lua event handoff proof.
 -- When enabled, supported window-open events launch the d2wc configurator.
 -- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
@@ -112,6 +114,9 @@ def refresh_lua_runtime_file(path: Path) -> LuaRuntimeMigrationResult:
         source = path.read_text(encoding="utf-8")
     except OSError as exc:
         return LuaRuntimeMigrationResult(path, "error", f"could not read: {exc}")
+
+    if MANAGED_MARKER not in source:
+        return LuaRuntimeMigrationResult(path, "skipped", "missing d2wc managed marker")
 
     try:
         _validate_migrated_source(source)
