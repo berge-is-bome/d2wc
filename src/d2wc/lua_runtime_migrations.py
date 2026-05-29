@@ -12,18 +12,9 @@ from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_c
 from d2wc.core.validation import validate_managed_blocks
 
 MANAGED_MARKER = "d2wc managed"
-USER_CUSTOMIZATION_MARKER = "-- USER CUSTOMIZATION"
 USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
 QUBES_DOMAIN_MARKER = "------------------------------------------------------------\n-- Qubes domain and class extraction"
 
-CURRENT_HEADER = """------------------------------------------------------------
--- d2wc managed
--- devilspie2 workspace configurator
--- version 0.1.12.5
--- changes: suppress Lua event handoff for windows that already match managed rules
-------------------------------------------------------------
-
-"""
 LATEST_VERSION_LINES = """-- version 0.1.12.5
 -- changes: suppress Lua event handoff for windows that already match managed rules
 """
@@ -161,7 +152,7 @@ class LuaRuntimeMigrationResult:
 def apply_lua_runtime_migrations(source: str) -> str:
     """Apply missing runtime-code migrations without editing existing comments."""
 
-    migrated = _ensure_managed_header(source)
+    migrated = _ensure_latest_header_comments(source)
     migrated = _ensure_handoff_settings(migrated)
 
     if "local window_type = get_window_type()" not in migrated:
@@ -186,6 +177,9 @@ def refresh_lua_runtime_file(path: Path) -> LuaRuntimeMigrationResult:
         source = path.read_text(encoding="utf-8")
     except OSError as exc:
         return LuaRuntimeMigrationResult(path, "error", f"could not read: {exc}")
+
+    if MANAGED_MARKER not in source:
+        return LuaRuntimeMigrationResult(path, "skipped", "missing d2wc managed marker")
 
     try:
         _validate_migrated_source(source)
@@ -226,10 +220,7 @@ def refresh_lua_runtime_dir(managed_dir: Path) -> tuple[LuaRuntimeMigrationResul
     return tuple(results)
 
 
-def _ensure_managed_header(source: str) -> str:
-    if MANAGED_MARKER not in source:
-        return CURRENT_HEADER + source
-
+def _ensure_latest_header_comments(source: str) -> str:
     if "-- version 0.1.12.5" in source:
         return source
 
@@ -238,11 +229,7 @@ def _ensure_managed_header(source: str) -> str:
         insert_at = anchor_index + len(HEADER_ANCHOR)
         return source[:insert_at] + LATEST_VERSION_LINES + source[insert_at:]
 
-    user_customization_index = source.find(USER_CUSTOMIZATION_MARKER)
-    if user_customization_index != -1:
-        return source[:user_customization_index] + LATEST_VERSION_LINES + source[user_customization_index:]
-
-    return LATEST_VERSION_LINES + source
+    return source
 
 
 def _ensure_handoff_settings(source: str) -> str:
