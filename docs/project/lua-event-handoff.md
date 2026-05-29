@@ -171,19 +171,3 @@ ps aux | grep 'devilspie2 --debug --folder /tmp/d2wc-devilspie2-inventory-' | gr
 ```
 
 No stale inventory process should remain.
-
-## Configure dialog layout
-
-The GTK `Configure` dialog is grouped into sections:
-
-1. `Window events`
-2. `Notifications`
-
-`Window events` contains the automatic handoff toggle.
-
-`Notifications` contains:
-
-1. toast timeout seconds,
-2. toast opacity.
-
-This keeps the settings dialog from becoming a flat list of unrelated options.
