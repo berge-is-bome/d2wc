@@ -108,7 +108,6 @@ list_source_vms() {
 
 is_allowed_source_vm() {
   local vm="$1"
-
   [ -n "$vm" ] || return 1
   list_source_vms | grep -Fx -- "$vm" >/dev/null 2>&1
 }
@@ -211,7 +210,6 @@ copy_archive_from_vm() {
   echo "Copied and validated archive from $vm: $destination"
 }
 
-
 is_safe_managed_filename() {
   local name="$1"
   [ -n "$name" ] || return 1
@@ -237,11 +235,23 @@ from d2wc.core.validation import validate_managed_blocks
 config = Path(sys.argv[1])
 try:
     source = config.read_text(encoding="utf-8")
+    if "d2wc managed" not in source:
+        raise SystemExit(1)
     parsed = ManagedBlockParser().parse(source)
 except (OSError, ValueError):
     raise SystemExit(1)
 raise SystemExit(0 if validate_managed_blocks(parsed.blocks).ok else 1)
 PY
+}
+
+refresh_managed_lua_runtime_files() {
+  local source_root="$1"
+
+  echo "Refreshing d2wc managed Lua runtime files in: $MANAGED_DIR"
+  if ! PYTHONPATH="$source_root/src" python3 -m d2wc.lua_runtime_migrations "$MANAGED_DIR"; then
+    echo "ERROR: failed to refresh managed Lua runtime files" >&2
+    exit 1
+  fi
 }
 
 choose_available_managed_filename() {
@@ -379,6 +389,7 @@ wait_until_d2wc_closed_for_update() {
     read -rp "After closing d2wc, press Enter to continue, or press Ctrl+C to abort. "
   done
 }
+
 add_local_bin_to_current_path() {
   case ":$PATH:" in
     *":$LOCAL_BIN:"*) ;;
@@ -536,6 +547,8 @@ else
     echo "Created managed config: $MANAGED_PATH"
   fi
 fi
+
+refresh_managed_lua_runtime_files "$SOURCE_ROOT"
 
 if ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
   echo "ERROR: managed config is not a valid d2wc-managed Lua file: $MANAGED_PATH" >&2
