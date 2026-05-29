@@ -63,6 +63,18 @@ The configurator populates Machine and Application choices from windows that are
 
 This makes new rules easier to create because common values can be selected from dropdowns instead of typed from memory.
 
+## Automatic window-event launching
+
+The active managed Lua file can open the configurator automatically when Devilspie2 sees a new normal application window that is not already covered by a managed rule.
+
+This behavior is controlled in the configurator:
+
+```text
+Menu -> Configure -> Window events
+```
+
+The same dialog also contains notification settings for toast timeout and opacity.
+
 ## Installed user config
 
 The installed configurator stores `d2wc` managed Lua files under:
@@ -106,8 +118,9 @@ Useful project documents:
 1. [Install/Update for Qubes](docs/user/install-qubes.md) for the Qubes dom0 install and update flow.
 2. [Lua Configurables](docs/project/lua-configurables.md) for the supported rule types and user-editable sections.
 3. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
-4. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
-5. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
+4. [Lua Event Handoff](docs/project/lua-event-handoff.md) for automatic window-event launching and suppression behavior.
+5. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
+6. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
 
 ## Project status
 
