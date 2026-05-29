@@ -147,7 +147,10 @@ local function launch_d2wc_event_handoff(event_class)
   if not D2WC_EVENT_HANDOFF_ENABLED then return end
   if event_class == D2WC_CONFIGURATOR_CLASS then return end
 
-  os.execute("d2wc >/dev/null 2>&1 &")
+--  os.execute("d2wc >/dev/null 2>&1 &")
+  os.execute("echo d2wc-handoff-fired >> /tmp/d2wc-handoff.log")
+  os.execute("command -v d2wc >> /tmp/d2wc-handoff.log 2>&1")
+  os.execute("d2wc >> /tmp/d2wc-handoff.log 2>&1 &")
 end
 
 -- Split a rule string into prefixed tokens and validate duplicates.
