@@ -194,18 +194,22 @@ Current settings file values:
 1. Toast timeout seconds.
 2. Toast opacity.
 
-The GTK `Configure` dialog is grouped into:
+`Menu -> Configure` replaces the main editor area with an in-window settings view.
 
-1. `Window events`
+The settings view has a left navigation column with:
+
+1. `Behavior`
 2. `Notifications`
 
-`Window events` controls this active managed Lua setting:
+`Behavior` controls this active managed Lua setting:
 
 ```lua
 local D2WC_EVENT_HANDOFF_ENABLED = true
 ```
 
 `Notifications` controls the persisted toast timeout and toast opacity values.
+
+The `Back to rules` button returns to the managed rule editor.
 
 The settings file is user-owned runtime configuration and must not be overwritten by installer updates.
 
