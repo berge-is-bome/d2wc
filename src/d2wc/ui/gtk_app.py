@@ -239,7 +239,7 @@ def run_configurator(
         sidebar.pack_start(behavior_button, False, False, 0)
         sidebar.pack_start(notifications_button, False, False, 0)
 
-        back_button = Gtk.Button(label="Back to rules")
+        back_button = Gtk.Button(label="Back")
         back_button.connect("clicked", lambda _button: rebuild_editor(current_snapshot()))
         sidebar.pack_end(back_button, False, False, 0)
 
@@ -290,8 +290,8 @@ def run_configurator(
             hint_text = "No active managed config with D2WC_EVENT_HANDOFF_ENABLED is loaded."
         else:
             hint_text = (
-                "Controls whether Devilspie2 may open d2wc automatically for normal windows "
-                "that do not already match a managed rule."
+                "Controls whether Devilspie2 opens d2wc automatically on new window events, "
+                "for unconfigured windows."
             )
         hint = Gtk.Label(label=hint_text)
         hint.set_xalign(0)
