@@ -304,13 +304,12 @@ def _ensure_handoff_call(source: str) -> str:
         return source.replace(OLD_HANDOFF_CALL, HANDOFF_CALL, 1)
     if "launch_d2wc_event_handoff(cls)" in source:
         return source.replace("launch_d2wc_event_handoff(cls)", "launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls))", 1)
-    if "launch_d2wc_event_handoff" not in source:
-        index = source.find(CLASS_CAPTURE)
-        if index == -1:
-            raise LuaRuntimeMigrationError("could not find class capture")
-        insert_at = index + len(CLASS_CAPTURE)
-        return source[:insert_at] + HANDOFF_CALL + source[insert_at:]
-    raise LuaRuntimeMigrationError("could not migrate handoff call")
+
+    index = source.find(CLASS_CAPTURE)
+    if index == -1:
+        raise LuaRuntimeMigrationError("could not find class capture")
+    insert_at = index + len(CLASS_CAPTURE)
+    return source[:insert_at] + HANDOFF_CALL + source[insert_at:]
 
 
 def _validate_migrated_source(source: str) -> None:
