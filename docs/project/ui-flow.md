@@ -80,7 +80,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The configurator exposes this as:
 
 ```text
-Menu -> Configure -> Window events -> Automatically open d2wc for unconfigured windows
+Menu -> Configure -> Behavior -> Automatically open d2wc for unconfigured windows
 ```
 
 ### Handoff behavior
@@ -147,16 +147,16 @@ It currently includes:
 13. File Open and Save As for managed Lua files.
 14. Window title showing the active managed file.
 
-## Configure dialog
+## Configure view
 
-`Menu -> Configure` opens a grouped settings dialog.
+`Menu -> Configure` replaces the main editor area with an in-window settings view.
 
-Current sections:
+The settings view has a left navigation column with:
 
-1. `Window events`
+1. `Behavior`
 2. `Notifications`
 
-`Window events` contains:
+`Behavior` contains:
 
 ```text
 Automatically open d2wc for unconfigured windows
@@ -174,6 +174,8 @@ Toast settings are stored in:
 ```text
 ~/.config/d2wc/settings.json
 ```
+
+The `Back to rules` button returns to the managed rule editor.
 
 ## File Open
 
