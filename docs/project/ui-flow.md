@@ -46,7 +46,11 @@ The UI should expose these concepts in user language.
 
 ## Entry point 1: command or keyboard shortcut
 
-The stable manual entry point should be a command that opens the configurator.
+The stable manual entry point is the installed command that opens the configurator:
+
+```bash
+d2wc
+```
 
 This command can be assigned to a desktop keyboard shortcut by the user. That is likely the cleanest day-to-day workflow after the workspace has mostly been configured, because `d2wc` can keep running in the background without needing a permanently visible tray icon.
 
@@ -58,13 +62,13 @@ Example user flow:
 4. User captures geometry, creates a route, creates a placement rule, pins the window, or excludes it.
 5. User saves or cancels.
 
-The exact command name is not settled yet. Possible names:
+The explicit configurator subcommand also remains supported:
 
-1. `d2wc configure`
-2. `d2wc-configure`
-3. `d2wc --configure`
+```bash
+d2wc configure
+```
 
-The command should also be usable from a terminal for debugging.
+The command is also usable from a terminal for debugging.
 
 ## Entry point 2: optional tray menu
 
@@ -180,7 +184,7 @@ The header should show:
 5. Current screen or monitor.
 6. Current geometry as `{ x, y, w, h }`.
 
-For non-Qubes systems, the domain field may be empty or replaced by a future grouping concept. The UI should not make Qubes-specific fields mandatory for non-Qubes use.
+For non-Qubes systems, the domain field may be empty or replaced by a future non-Qubes grouping concept. The UI should not make Qubes-specific fields mandatory for non-Qubes use.
 
 ### Suggested actions area
 
