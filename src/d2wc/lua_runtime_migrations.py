@@ -12,14 +12,15 @@ from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_c
 from d2wc.core.validation import validate_managed_blocks
 
 MANAGED_MARKER = "d2wc managed"
+USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
 
-HANDOFF_SETTINGS = '''-- Lua event handoff proof.
+HANDOFF_COMMENT_BLOCK = '''-- Lua event handoff proof.
 -- When enabled, supported window-open events launch the d2wc configurator.
 -- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
-local D2WC_EVENT_HANDOFF_ENABLED = true
-local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
-
 '''
+HANDOFF_ENABLED_SETTING = "local D2WC_EVENT_HANDOFF_ENABLED = true\n"
+HANDOFF_CLASS_SETTING = 'local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"\n'
+HANDOFF_SETTINGS = HANDOFF_COMMENT_BLOCK + HANDOFF_ENABLED_SETTING + HANDOFF_CLASS_SETTING + "\n"
 
 OLD_WINDOW_TYPE_GATE = '''if (get_window_type() ~= "WINDOW_TYPE_NORMAL") then
   return
@@ -74,14 +75,7 @@ class LuaRuntimeMigrationResult:
 def apply_lua_runtime_migrations(source: str) -> str:
     """Apply missing runtime-code migrations without editing existing comments."""
 
-    migrated = source
-
-    if "local D2WC_EVENT_HANDOFF_ENABLED" not in migrated:
-        marker = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
-        index = migrated.find(marker)
-        if index == -1:
-            raise LuaRuntimeMigrationError("could not find user configuration marker")
-        migrated = migrated[:index] + HANDOFF_SETTINGS + migrated[index:]
+    migrated = _ensure_handoff_settings(source)
 
     if "local window_type = get_window_type()" not in migrated:
         if OLD_WINDOW_TYPE_GATE not in migrated:
@@ -155,6 +149,36 @@ def refresh_lua_runtime_dir(managed_dir: Path) -> tuple[LuaRuntimeMigrationResul
         if path.is_file() or path.is_symlink():
             results.append(refresh_lua_runtime_file(path))
     return tuple(results)
+
+
+def _ensure_handoff_settings(source: str) -> str:
+    has_enabled = "local D2WC_EVENT_HANDOFF_ENABLED" in source
+    has_class = "local D2WC_CONFIGURATOR_CLASS" in source
+
+    if has_enabled and has_class:
+        return source
+
+    if not has_enabled and not has_class:
+        index = source.find(USER_CONFIG_MARKER)
+        if index == -1:
+            raise LuaRuntimeMigrationError("could not find user configuration marker")
+        return source[:index] + HANDOFF_SETTINGS + source[index:]
+
+    if not has_enabled:
+        class_index = source.find("local D2WC_CONFIGURATOR_CLASS")
+        if class_index == -1:
+            raise LuaRuntimeMigrationError("could not find handoff class setting")
+        return source[:class_index] + HANDOFF_ENABLED_SETTING + source[class_index:]
+
+    enabled_line_start = source.find("local D2WC_EVENT_HANDOFF_ENABLED")
+    if enabled_line_start == -1:
+        raise LuaRuntimeMigrationError("could not find handoff enabled setting")
+    enabled_line_end = source.find("\n", enabled_line_start)
+    if enabled_line_end == -1:
+        insert_at = len(source)
+    else:
+        insert_at = enabled_line_end + 1
+    return source[:insert_at] + HANDOFF_CLASS_SETTING + source[insert_at:]
 
 
 def _validate_migrated_source(source: str) -> None:
