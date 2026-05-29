@@ -2,49 +2,33 @@
 
 ## Current repository status
 
-Public-release documentation branch:
+The current `main` branch is the first public beta baseline for the Qubes OS and Devilspie2 workflow.
 
-```text
-documentation-update-public-release
-```
+Recent public-release milestones:
 
-Public-release documentation PR:
+1. PR #30: `Prepare documentation for public release`
+   1. Reworked the README as a public-facing description of what `d2wc` is.
+   2. Split documentation into user-facing documentation under `docs/user/` and project documentation under `docs/project/`.
+   3. Replaced old Qubes installation notes with [Install/Update for Qubes](../user/install-qubes.md).
+2. PR #31: `Rework Qubes installer and managed config workflow`
+   1. Removed the hardcoded source VM from `install-qubes.sh`.
+   2. Added positional source-VM, `zenity`, and command-line prompt installer paths.
+   3. Moved user-owned managed Lua files under `~/.config/d2wc/lua/`.
+   4. Moved the extracted local installation source under `~/.local/share/d2wc/source/`.
+   5. Kept `~/.config/devilspie2/d2wc.lua` as the Devilspie2-facing integration symlink.
+   6. Added configurator File Open and Save As support for `d2wc` managed Lua files.
+   7. Preserved unrelated Devilspie2 scripts and unrelated symlinks.
 
-```text
-PR #30: Prepare documentation for public release
-```
-
-PR #30 scope:
-
-1. Rewrite the README as a public-facing description of what `d2wc` is.
-2. Split documentation into user-facing documentation under `docs/user/` and project documentation under `docs/project/`.
-3. Replace the old Qubes installation notes and helper-archive documentation with [Install/Update for Qubes](../user/install-qubes.md).
-4. Refresh stale documentation links and installer script references before the first public release.
-
-Current merged baseline before PR #30:
+Recent merged baseline before the public-release documentation and installer workflow work:
 
 ```text
 PR #29: Match action button width to dirty split state
 Merge commit: d466f8d59f53abf0e390a3e1f68a31ed74f7414d
 ```
 
-Recent merged baseline before PR #29:
-
-```text
-PR #28: Add known-window inventory integration
-Merge commit: e45725c7a89c953eb5cd5da265e2db966c909247
-```
-
-Recent merged baseline before PR #28:
-
-```text
-PR #27: Polish GTK configurator grid editor
-Merge commit: fe36986712e4e985ea3b7e06f925d94ab4f7649c
-```
-
 ## Latest confirmed verification
 
-Final verification before PR #29 was merged:
+Latest verification reported for PR #31:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -54,24 +38,39 @@ python3 -m pytest
 Result:
 
 ```text
-282 passed
+295 passed
 ```
 
-Manual verification reported during PR #29:
+Manual validation reported for PR #31:
 
-1. `python3 -m d2wc` opens the GTK configurator on the test machine.
-2. `python3 -m d2wc configure` loads `~/.config/devilspie2/d2wc.lua` on the test machine.
-3. The Qubes/dom0 source-tarball install flow works.
-4. The dom0 installer preserves an existing `~/.config/devilspie2/d2wc.lua`.
-5. The installed dom0 command opens the configurator from the real managed config after local config validation issues were corrected.
-6. Normal `Apply` buttons match the width of the dirty `Undo` / `Apply` split state.
+1. Installer update warns when `d2wc` is already running.
+2. Installer update preserves the active managed file symlink.
+3. `d2wc` opens the active symlink target on startup.
+4. Configure toast settings persist after close, reopen, and update.
+5. Save As and File Open safely update `~/.config/devilspie2/d2wc.lua`.
+6. Selecting `All` immediately displays `All`, not `Machine/Application`.
+7. Dropdown placement behavior is fixed.
 
-Before merging the public-release documentation branch, run the normal local verification path:
+Before tagging or publishing the first public beta, run the normal local verification path again from current `main`:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
 python3 -m pytest
 ```
+
+## Public beta scope
+
+`d2wc` is ready for its first public beta release for the intended Qubes OS and Devilspie2 workflow.
+
+Current public target:
+
+1. Qubes OS with XFCE.
+2. Devilspie2 window rules.
+3. User-managed `d2wc` Lua files, not arbitrary pre-existing Devilspie2 Lua scripts.
+4. Source-archive install/update flow for dom0.
+5. GTK configurator as the normal user path for managing rules.
+
+Broader X11/Linux desktop use remains part of the project direction, but should be treated as experimental until tested deliberately.
 
 ## Current GTK UI behavior
 
@@ -108,19 +107,25 @@ The GTK managed-config editor currently supports:
     2. `Modify` = purple
     3. `Delete` = red
 13. Header row stays visible while configured rule rows scroll.
-14. Compact success toast:
-    1. text: `Operation completed successfully.`
-    2. detailed write target and backup output is no longer shown on success.
-15. Errors and validation failures still use blocking dialogs.
-16. Per-workflow help from `Menu -> Help`.
-17. `F1` shortcut for the current workflow help.
-18. Stable GTK/X11 class for Devilspie2 matching:
+14. Compact success toasts.
+15. Persistent toast timeout and opacity settings under `~/.config/d2wc/settings.json`.
+16. Errors and validation failures still use blocking dialogs.
+17. Per-workflow help from `Menu -> Help`.
+18. `F1` shortcut for the current workflow help.
+19. Stable GTK/X11 class for Devilspie2 matching:
 
 ```text
 d2wc-configurator
 ```
 
-19. Automatic inventory monitor captures startup and later known-window targets and adds their machine/application values to the top `Add` row dropdowns.
+20. Automatic inventory monitor captures startup and later known-window targets and adds their machine/application values to the top `Add` row dropdowns.
+21. File Open for choosing another `d2wc` managed Lua file.
+22. Save As for saving the current managed Lua file under a safe new name.
+23. Window title shows the active managed file.
+24. Edit operations, validation, guarded writes, and backups follow the currently open managed file.
+25. Machine, Application, and similar target dropdowns display blank match components as `All` while preserving the generated Lua rule format.
+
+The configurator does not currently auto-reload when the managed Lua file changes on disk. Users who edit a managed Lua file externally should reopen the configurator or reopen the file before continuing UI edits.
 
 ## Qubes/dom0 install behavior
 
@@ -128,24 +133,35 @@ The current Qubes source-archive workflow is documented in [Install/Update for Q
 
 The current flow is:
 
-1. Clone the repository in a networked DisposableVM.
+1. Clone the repository in a networked source VM.
 2. Create `/tmp/d2wc.tgz` from the current Git checkout.
-3. Keep the DisposableVM running until dom0 installation is finished.
-4. Copy the dom0 installer from the DisposableVM into dom0.
-5. Edit the DisposableVM name in the dom0 installer when needed.
-6. Run the dom0 installer.
-7. Shut down the DisposableVM after the install/update completes.
+3. Keep the source VM running until dom0 installation is finished.
+4. Copy the dom0 installer from the source VM into dom0.
+5. Run the dom0 installer with the source VM name as an argument, or let the installer show a `zenity` chooser or command-line prompt.
+6. Shut down the source VM after the install/update completes.
+
+The current user-path layout is:
+
+```text
+~/.cache/d2wc/
+~/.local/share/d2wc/source/
+~/.config/d2wc/lua/
+~/.config/d2wc/settings.json
+~/.config/devilspie2/d2wc.lua
+```
 
 The dom0 installer behavior is:
 
-1. Pulls `/tmp/d2wc.tgz` from the configured DisposableVM.
-2. Extracts to `~/Qubes/d2wc`.
-3. Creates `~/.config/devilspie2/d2wc.lua` from bundled `src/d2wc.lua` only if missing.
-4. Removes a previous user-site `d2wc` installation when present.
-5. Installs the new package into the dom0 user Python site without network access.
-6. Configures `$HOME/.local/bin` for Bash or Fish with a managed shell-config block.
-7. Launches the installed configurator on first install.
-8. On later updates, reports that `d2wc` can be launched manually.
+1. Copies and validates `/tmp/d2wc.tgz` from the selected source VM before replacing the local source tree.
+2. Stages the copied archive under `~/.cache/d2wc/`.
+3. Extracts the local installation source under `~/.local/share/d2wc/source/`.
+4. Installs the Python package into the dom0 user Python site without dom0 network access.
+5. Creates `~/.config/d2wc/lua/` if needed.
+6. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled managed template only when a managed file is needed.
+7. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
+8. Preserves unrelated files and symlinks under `~/.config/devilspie2/`.
+9. Preserves existing `~/.config/d2wc/settings.json` user settings.
+10. Warns and waits if one or more `d2wc` configurator instances are running during an update.
 
 The normal installed launch command is:
 
@@ -158,6 +174,30 @@ The explicit subcommand remains supported:
 ```bash
 d2wc configure
 ```
+
+## Managed config model
+
+User-owned `d2wc` managed Lua files live under:
+
+```text
+~/.config/d2wc/lua/
+```
+
+The default managed file is:
+
+```text
+~/.config/d2wc/lua/d2wc.lua
+```
+
+Devilspie2 reads the active managed file through:
+
+```text
+~/.config/devilspie2/d2wc.lua
+```
+
+That path is expected to be a symlink into `~/.config/d2wc/lua/` when managed by `d2wc`.
+
+`d2wc` must not overwrite arbitrary Devilspie2 Lua scripts or unrelated symlinks. File Open and Save As are only for `d2wc` managed Lua files that pass the managed-file validation rules.
 
 ## Known-window inventory parser, capture, stream, and row source
 
@@ -225,15 +265,18 @@ The current Python core supports:
 15. Exact duplicate target rejection where duplicates would make behavior ambiguous.
 16. GTK event-data fixture and command-argument plumbing.
 17. Dedicated test-config preparation and loading for development.
-18. Managed-config GTK editor for `~/.config/devilspie2/d2wc.lua` by default.
-19. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
-20. Bounded and continuous known-window inventory capture helpers.
-21. Automatic GTK inventory monitor into Add-row dropdown values.
-22. Qubes/dom0 source-tarball install/update support.
+18. Managed-config GTK editor for the active managed file.
+19. File Open and Save As for `d2wc` managed Lua files.
+20. Safe Devilspie2 integration symlink updates for the active managed file.
+21. Persistent UI settings under `~/.config/d2wc/settings.json`.
+22. Known-window inventory parser/model foundation for captured Devilspie2 debug/event text.
+23. Bounded and continuous known-window inventory capture helpers.
+24. Automatic GTK inventory monitor into Add-row dropdown values.
+25. Qubes/dom0 source-archive install/update support.
 
 ## Active next work
 
-After PR #30, the next planned development slice remains Lua event handoff.
+The next planned development slice remains Lua event handoff.
 
 Lua event handoff means:
 
