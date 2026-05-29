@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 
+from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
 from d2wc.core.user_paths import default_managed_config_dir
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
@@ -19,6 +21,11 @@ from d2wc.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
 CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
 UI_FONT_POINT_INCREASE = 2
+D2WC_EVENT_HANDOFF_PATTERN = re.compile(
+    r"(?m)^(?P<prefix>\s*local\s+D2WC_EVENT_HANDOFF_ENABLED\s*=\s*)"
+    r"(?P<value>true|false)"
+    r"(?P<suffix>\s*(?:--.*)?)$"
+)
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -186,8 +193,13 @@ def run_configurator(
         else:
             _show_message(Gtk, window, f"{result.message}\n\n{activation.message}")
 
-    def configure_toasts(_item=None) -> None:
+    def configure_preferences(_item=None) -> None:
+        snapshot = current_snapshot()
         timeout_seconds, opacity = current_toast_settings()
+        current_handoff_enabled = None
+        if snapshot is not None and snapshot.exists:
+            current_handoff_enabled = _read_event_handoff_enabled(snapshot.path)
+
         dialog = Gtk.Dialog(title="Configure", transient_for=window, flags=0)
         dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
         dialog.set_default_response(Gtk.ResponseType.OK)
@@ -202,6 +214,26 @@ def run_configurator(
         grid.set_margin_end(12)
         box.add(grid)
 
+        event_heading = Gtk.Label(label="Window events")
+        event_heading.set_xalign(0)
+        if hasattr(event_heading, "set_markup"):
+            event_heading.set_markup("<b>Window events</b>")
+        event_handoff_check = Gtk.CheckButton(label="Automatically open d2wc for unconfigured windows")
+        event_handoff_check.set_active(bool(current_handoff_enabled))
+        event_handoff_check.set_sensitive(current_handoff_enabled is not None)
+
+        if current_handoff_enabled is None:
+            event_hint = Gtk.Label(label="No active managed config with D2WC_EVENT_HANDOFF_ENABLED is loaded.")
+        else:
+            event_hint = Gtk.Label(label="Updates D2WC_EVENT_HANDOFF_ENABLED in the active managed Lua file.")
+        event_hint.set_xalign(0)
+        event_hint.set_line_wrap(True)
+
+        notifications_heading = Gtk.Label(label="Notifications")
+        notifications_heading.set_xalign(0)
+        if hasattr(notifications_heading, "set_markup"):
+            notifications_heading.set_markup("<b>Notifications</b>")
+
         timeout_label = Gtk.Label(label="Toast timeout seconds")
         timeout_label.set_xalign(0)
         timeout_adjustment = Gtk.Adjustment(value=timeout_seconds, lower=1, upper=60, step_increment=1, page_increment=5)
@@ -214,32 +246,69 @@ def run_configurator(
         opacity_spin = Gtk.SpinButton(adjustment=opacity_adjustment, climb_rate=0.05, digits=2)
         opacity_spin.set_numeric(True)
 
-        grid.attach(timeout_label, 0, 0, 1, 1)
-        grid.attach(timeout_spin, 1, 0, 1, 1)
-        grid.attach(opacity_label, 0, 1, 1, 1)
-        grid.attach(opacity_spin, 1, 1, 1, 1)
+        grid.attach(event_heading, 0, 0, 2, 1)
+        grid.attach(event_handoff_check, 0, 1, 2, 1)
+        grid.attach(event_hint, 0, 2, 2, 1)
+        grid.attach(notifications_heading, 0, 3, 2, 1)
+        grid.attach(timeout_label, 0, 4, 1, 1)
+        grid.attach(timeout_spin, 1, 4, 1, 1)
+        grid.attach(opacity_label, 0, 5, 1, 1)
+        grid.attach(opacity_spin, 1, 5, 1, 1)
         dialog.show_all()
 
+        handoff_changed = False
         try:
             response = dialog.run()
             if response != Gtk.ResponseType.OK:
                 return
-            state["toast_timeout_seconds"] = int(timeout_spin.get_value_as_int())
-            state["toast_opacity"] = float(opacity_spin.get_value())
+
+            new_timeout = int(timeout_spin.get_value_as_int())
+            new_opacity = float(opacity_spin.get_value())
+            new_handoff_enabled = bool(event_handoff_check.get_active())
+
+            state["toast_timeout_seconds"] = new_timeout
+            state["toast_opacity"] = new_opacity
             save_ui_settings(
                 UiSettings(
-                    toast_timeout_seconds=int(timeout_spin.get_value_as_int()),
-                    toast_opacity=float(opacity_spin.get_value()),
+                    toast_timeout_seconds=new_timeout,
+                    toast_opacity=new_opacity,
                 )
             )
+
+            if (
+                snapshot is not None
+                and snapshot.exists
+                and current_handoff_enabled is not None
+                and new_handoff_enabled != current_handoff_enabled
+            ):
+                try:
+                    _set_event_handoff_enabled(snapshot.path, new_handoff_enabled)
+                except ValueError as exc:
+                    _show_message(Gtk, window, str(exc))
+                    return
+                except SaveValidationError as exc:
+                    _show_message(Gtk, window, "Could not save handoff setting:\n" + "\n".join(exc.validation.errors))
+                    return
+                except (OSError, SaveConfigError) as exc:
+                    _show_message(Gtk, window, f"Could not save handoff setting:\n{exc}")
+                    return
+                refreshed = load_managed_config_snapshot(snapshot.path)
+                if refreshed.ok:
+                    state["snapshot"] = refreshed
+                handoff_changed = True
         finally:
             dialog.destroy()
 
         timeout_seconds, opacity = current_toast_settings()
+        if handoff_changed:
+            handoff_text = "enabled" if _read_event_handoff_enabled(snapshot.path) else "disabled"
+            toast_text = f"Settings updated: event handoff {handoff_text}; toast {timeout_seconds}s, opacity {opacity:.2f}"
+        else:
+            toast_text = f"Toast settings updated: {timeout_seconds}s, opacity {opacity:.2f}"
         _show_toast(
             Gtk,
             outer,
-            f"Toast settings updated: {timeout_seconds}s, opacity {opacity:.2f}",
+            toast_text,
             timeout_seconds=timeout_seconds,
             opacity=opacity,
         )
@@ -264,7 +333,7 @@ def run_configurator(
     save_as_item.connect("activate", save_managed_file_as)
     menu.append(save_as_item)
     configure_item = Gtk.MenuItem(label="Configure")
-    configure_item.connect("activate", configure_toasts)
+    configure_item.connect("activate", configure_preferences)
     menu.append(configure_item)
     help_item = Gtk.MenuItem(label="Help")
     help_item.connect("activate", lambda _item: state["editor"].show_help() if state.get("editor") is not None else None)
@@ -343,6 +412,32 @@ def _is_under_managed_dir(path: Path, managed_dir: Path) -> bool:
     except (OSError, ValueError):
         return False
     return True
+
+
+def _read_event_handoff_enabled(config_path: Path) -> bool | None:
+    try:
+        source = Path(config_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = D2WC_EVENT_HANDOFF_PATTERN.search(source)
+    if match is None:
+        return None
+    return match.group("value") == "true"
+
+
+def _set_event_handoff_enabled(config_path: Path, enabled: bool) -> None:
+    path = Path(config_path)
+    source = path.read_text(encoding="utf-8")
+    replacement_value = "true" if enabled else "false"
+
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}{replacement_value}{match.group('suffix')}"
+
+    updated, count = D2WC_EVENT_HANDOFF_PATTERN.subn(replace, source, count=1)
+    if count != 1:
+        raise ValueError("The active managed config does not contain D2WC_EVENT_HANDOFF_ENABLED.")
+
+    save_source_config(path, updated)
 
 
 def _show_message(Gtk, parent, text: str) -> None:
