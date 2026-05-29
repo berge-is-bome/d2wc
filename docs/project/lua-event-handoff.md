@@ -73,7 +73,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The GTK configurator exposes this setting from:
 
 ```text
-Menu -> Configure -> Behavior
+Menu -> Configure -> Window events
 ```
 
 The checkbox label is:
@@ -172,20 +172,18 @@ ps aux | grep 'devilspie2 --debug --folder /tmp/d2wc-devilspie2-inventory-' | gr
 
 No stale inventory process should remain.
 
-## Configure view layout
+## Configure dialog layout
 
-`Menu -> Configure` replaces the main editor area with an in-window settings view.
+The GTK `Configure` dialog is grouped into sections:
 
-The settings view has a left navigation column with:
-
-1. `Behavior`
+1. `Window events`
 2. `Notifications`
 
-`Behavior` contains the automatic handoff toggle.
+`Window events` contains the automatic handoff toggle.
 
 `Notifications` contains:
 
 1. toast timeout seconds,
 2. toast opacity.
 
-The `Back to rules` button returns to the managed rule editor.
+This keeps the settings dialog from becoming a flat list of unrelated options.
