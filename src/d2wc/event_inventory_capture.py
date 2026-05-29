@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import select
 import subprocess
 import tempfile
-from typing import Callable, Iterator, Sequence
+import threading
+from typing import Callable, Iterator, Sequence, TextIO
 
 from d2wc.event_inventory import (
     KnownWindowCandidate,
@@ -16,6 +18,7 @@ from d2wc.event_inventory import (
 )
 
 DEFAULT_CAPTURE_TIMEOUT_SECONDS = 2.0
+DEFAULT_STREAM_POLL_SECONDS = 0.2
 PROBE_SCRIPT_NAME = "d2wc-known-window-inventory.lua"
 PROBE_SCRIPT = """local function d2wc_value(value)
   if value == nil then
@@ -141,11 +144,15 @@ def stream_known_window_inventory(
     *,
     devilspie2_command: str = "devilspie2",
     popen_factory: PopenFactory | None = None,
+    stop_event: threading.Event | None = None,
+    poll_seconds: float = DEFAULT_STREAM_POLL_SECONDS,
 ) -> Iterator[Devilspie2InventoryStreamEvent]:
     """Continuously stream newly seen known-window targets from Devilspie2.
 
     Startup output creates the initial inventory. Later debug output can add
-    newly opened domain/class pairs while the monitor is running.
+    newly opened domain/class pairs while the monitor is running. When a
+    stop_event is supplied, the stream checks it between reads so the temporary
+    Devilspie2 process can be terminated promptly on configurator shutdown.
     """
 
     with tempfile.TemporaryDirectory(prefix="d2wc-devilspie2-inventory-") as temp_dir:
@@ -163,7 +170,7 @@ def stream_known_window_inventory(
         try:
             if process.stdout is None:
                 return
-            for line in process.stdout:
+            for line in _iter_process_stdout_lines(process, process.stdout, stop_event, poll_seconds):
                 yield from parser.feed_line(line)
             yield from parser.finish()
         finally:
@@ -201,6 +208,32 @@ def _run_capture_command(
     return _combine_output(completed.stdout, completed.stderr), False, completed.returncode
 
 
+def _iter_process_stdout_lines(
+    process: subprocess.Popen[str],
+    stdout: TextIO | Iterator[str],
+    stop_event: threading.Event | None,
+    poll_seconds: float,
+) -> Iterator[str]:
+    if stop_event is None or not hasattr(stdout, "fileno"):
+        for line in stdout:
+            if stop_event is not None and stop_event.is_set():
+                break
+            yield line
+        return
+
+    while not stop_event.is_set():
+        if process.poll() is not None:
+            yield from stdout
+            return
+        readable, _, _ = select.select([stdout], [], [], poll_seconds)
+        if not readable:
+            continue
+        line = stdout.readline()
+        if line == "":
+            return
+        yield line
+
+
 def _terminate_process(process: subprocess.Popen[str]) -> None:
     if process.poll() is not None:
         return
@@ -208,7 +241,8 @@ def _terminate_process(process: subprocess.Popen[str]) -> None:
     try:
         process.wait(timeout=2)
     except subprocess.TimeoutExpired:
-        return
+        process.kill()
+        process.wait(timeout=2)
 
 
 def _combine_output(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
