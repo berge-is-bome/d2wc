@@ -262,15 +262,6 @@ local function list_rule_matches_window(list, d, c)
   return false
 end
 
-local function window_has_managed_rule(d, c)
-  if exact_lookup_matches_window(EX_EXACT, EX_DOMAIN, EX_CLASS, d, c) then return true end
-  if exact_lookup_matches_window(PIN_EXACT, PIN_DOMAIN, PIN_CLASS, d, c) then return true end
-  if exact_lookup_matches_window(WS_EXACT, WS_DOMAIN, WS_CLASS, d, c) then return true end
-  if list_rule_matches_window(WORKSPACE_PLACEMENT, d, c) then return true end
-  if list_rule_matches_window(LEFT_EDGE_CORRECTION, d, c) then return true end
-  return false
-end
-
 ------------------------------------------------------------
 -- Build lookups for EXCLUDE
 ------------------------------------------------------------
@@ -380,6 +371,15 @@ for wsnum, list in pairs(WORKSPACE_ROUTES) do
       end
     end
   end
+end
+
+local function window_has_managed_rule(d, c)
+  if exact_lookup_matches_window(EX_EXACT, EX_DOMAIN, EX_CLASS, d, c) then return true end
+  if exact_lookup_matches_window(PIN_EXACT, PIN_DOMAIN, PIN_CLASS, d, c) then return true end
+  if exact_lookup_matches_window(WS_EXACT, WS_DOMAIN, WS_CLASS, d, c) then return true end
+  if list_rule_matches_window(WORKSPACE_PLACEMENT, d, c) then return true end
+  if list_rule_matches_window(LEFT_EDGE_CORRECTION, d, c) then return true end
+  return false
 end
 
 ------------------------------------------------------------
