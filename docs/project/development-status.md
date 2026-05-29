@@ -155,7 +155,7 @@ The current flow is:
 3. Keep the source VM running until dom0 installation is finished.
 4. Copy the dom0 installer from the source VM into dom0.
 5. Run the dom0 installer with the source VM name as an argument, or let the installer show a `zenity` chooser or command-line prompt.
-6. Shut down the source VM after the install/update completes.
+6. If the source VM was a disposable it can now be closed.
 
 The current user-path layout is:
 
@@ -174,7 +174,7 @@ The dom0 installer behavior is:
 3. Extracts the local installation source under `~/.local/share/d2wc/source/`.
 4. Installs the Python package into the dom0 user Python site without dom0 network access.
 5. Creates `~/.config/d2wc/lua/` if needed.
-6. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled managed template only when a managed file is needed.
+6. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled managed template on first install.
 7. Runs targeted runtime migrations over marked managed Lua files under `~/.config/d2wc/lua/`.
 8. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
 9. Preserves unrelated files and symlinks under `~/.config/devilspie2/`.
