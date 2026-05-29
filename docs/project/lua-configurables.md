@@ -27,7 +27,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The configurator exposes this setting at:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
 Existing user values are preserved by installer runtime migrations. If a user has set the value to `false`, an update must not change it back to `true`.
