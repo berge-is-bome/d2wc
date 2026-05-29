@@ -2,7 +2,7 @@
 -- d2wc managed
 -- devilspie2 workspace configurator
 -- version 0.1.12.4
--- changes: Lua event handoff proof launches d2wc from supported window-open events
+-- changes: Lua event handoff proof launches bare d2wc from supported window-open events
 -- version 0.1.12.3
 -- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
 -- version 0.1.12.2
@@ -15,7 +15,7 @@
 ------------------------------------------------------------
 
 -- Lua event handoff proof.
--- When enabled, supported window-open events launch d2wc with the current event data.
+-- When enabled, supported window-open events launch the d2wc configurator.
 -- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
 local D2WC_EVENT_HANDOFF_ENABLED = true
 local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
@@ -143,40 +143,11 @@ end
 ------------------------------------------------------------
 local function lc(s) return (s or ""):lower() end
 
-local function shell_quote(value)
-  if value == nil then return nil end
-  return "'" .. tostring(value):gsub("'", [['"'"']]) .. "'"
-end
-
-local function append_cli_arg(args, flag, value)
-  local quoted = shell_quote(value)
-  if quoted == nil then return end
-  args[#args+1] = flag
-  args[#args+1] = quoted
-end
-
-local function launch_d2wc_event_handoff(event_domain, event_class)
+local function launch_d2wc_event_handoff(event_class)
   if not D2WC_EVENT_HANDOFF_ENABLED then return end
   if event_class == D2WC_CONFIGURATOR_CLASS then return end
 
-  local screen_width, screen_height = get_screen_geometry()
-  local window_x, window_y, window_width, window_height = get_window_geometry()
-
-  local args = { "d2wc" }
-  append_cli_arg(args, "--domain", event_domain)
-  append_cli_arg(args, "--application-name", get_application_name())
-  append_cli_arg(args, "--window-name", get_window_name())
-  append_cli_arg(args, "--window-type", window_type)
-  append_cli_arg(args, "--class-instance-name", get_class_instance_name())
-  append_cli_arg(args, "--window-class", get_window_class())
-  append_cli_arg(args, "--screen-width", screen_width)
-  append_cli_arg(args, "--screen-height", screen_height)
-  append_cli_arg(args, "--window-x", window_x)
-  append_cli_arg(args, "--window-y", window_y)
-  append_cli_arg(args, "--window-width", window_width)
-  append_cli_arg(args, "--window-height", window_height)
-
-  os.execute(table.concat(args, " ") .. " >/dev/null 2>&1 &")
+  os.execute("d2wc >/dev/null 2>&1 &")
 end
 
 -- Split a rule string into prefixed tokens and validate duplicates.
@@ -396,7 +367,7 @@ local cls = get_lower_class()
 ------------------------------------------------------------
 -- Lua event handoff proof
 ------------------------------------------------------------
-launch_d2wc_event_handoff(domain, cls)
+launch_d2wc_event_handoff(cls)
 
 ------------------------------------------------------------
 -- Apply exclusions
