@@ -20,7 +20,6 @@ from d2wc.ui.managed_actions import build_managed_section_editor
 from d2wc.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
 CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
-UI_FONT_POINT_INCREASE = 2
 D2WC_EVENT_HANDOFF_PATTERN = re.compile(
     r"(?m)^(?P<prefix>\s*local\s+D2WC_EVENT_HANDOFF_ENABLED\s*=\s*)"
     r"(?P<value>true|false)"
@@ -44,14 +43,14 @@ def _import_gtk():
     try:
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gdk, GLib, Gtk, Pango
+        from gi.repository import Gdk, GLib, Gtk
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk, GLib, Pango
+    return Gtk, Gdk, GLib
 
 
 def run_configurator(
@@ -64,9 +63,9 @@ def run_configurator(
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
     ui_settings = load_ui_settings()
-    Gtk, Gdk, GLib, Pango = _import_gtk()
+    Gtk, Gdk, GLib = _import_gtk()
     _set_configurator_window_class(Gdk, GLib)
-    _apply_ui_css(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
+    _apply_ui_css(Gtk, Gdk)
 
     window = Gtk.Window(title="d2wc Configurator")
     window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
@@ -480,24 +479,12 @@ def _set_configurator_window_class(Gdk, GLib) -> None:
     Gdk.set_program_class(CONFIGURATOR_WINDOW_CLASS)
 
 
-def _apply_ui_css(Gtk, Gdk, Pango, point_increase: int) -> None:
+def _apply_ui_css(Gtk, Gdk) -> None:
     """Apply application-scoped GTK CSS tweaks."""
 
-    settings = Gtk.Settings.get_default()
-    if settings is None:
-        return
-
-    font_name = settings.get_property("gtk-font-name") or ""
-    font_description = Pango.FontDescription(font_name)
-    theme_font_size = font_description.get_size()
-    if theme_font_size <= 0:
-        return
-
-    font_size_pt = int(round(theme_font_size / Pango.SCALE))
     provider = Gtk.CssProvider()
     provider.load_from_data(
         (
-            f"* {{ font-size: {font_size_pt + point_increase}pt; }}\n"
             "infobar { padding: 2px; }\n"
             "infobar label { padding: 2px 6px; }\n"
         ).encode("utf-8")
