@@ -37,10 +37,86 @@ The VM argument is optional. If it is omitted, the installer shows a `zenity` ch
 /tmp/install-qubes.sh
 ```
 
+## Installer update behavior
+
+The installer copies and validates `/tmp/d2wc.tgz` before replacing the local source tree.
+
+The copied archive is cached under:
+
+```text
+~/.cache/d2wc/
+```
+
+The extracted local source is stored under:
+
+```text
+~/.local/share/d2wc/source/
+```
+
+User-owned managed Lua files are stored under:
+
+```text
+~/.config/d2wc/lua/
+```
+
+The active Devilspie2 integration path is:
+
+```text
+~/.config/devilspie2/d2wc.lua
+```
+
+When managed by `d2wc`, that path is a symlink to the active managed Lua file under `~/.config/d2wc/lua/`.
+
+On update, the installer preserves the active managed file when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
+
+The installer also refreshes marked managed Lua files under `~/.config/d2wc/lua/` with missing runtime code needed by the current bundled managed script. This is a targeted migration, not a full template rewrite. Existing user rules, comments, spacing, and existing toggle values are preserved.
+
+Only files that contain the managed marker are migrated:
+
+```text
+d2wc managed
+```
+
+Files without that marker are skipped by the migration helper and are not considered valid active `d2wc` managed files by the installer.
+
 ## Launching d2wc
 
 When the install completes, launch `d2wc`:
 
 ```bash
 d2wc
+```
+
+The explicit configurator subcommand remains supported:
+
+```bash
+d2wc configure
+```
+
+## Automatic window-event launching
+
+The active managed Lua file can open `d2wc` automatically when Devilspie2 sees a new normal application window that does not already match a managed rule.
+
+The setting lives in the active managed Lua file:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENABLED = true
+```
+
+Set it to `false` to disable automatic launching:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENABLED = false
+```
+
+The same setting can be changed from the configurator:
+
+```text
+Menu -> Configure -> Window events
+```
+
+The checkbox is:
+
+```text
+Automatically open d2wc for unconfigured windows
 ```
