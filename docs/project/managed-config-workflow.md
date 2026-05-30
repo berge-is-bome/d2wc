@@ -85,10 +85,10 @@ On update, if one or more `d2wc` configurator instances are running, the install
 
 Installer runtime migrations are targeted insertions into marked managed Lua files.
 
-The migration helper requires the managed marker:
+The migration helper requires this managed marker:
 
-```text
-d2wc managed
+```lua
+local D2WC_MANAGED = true
 ```
 
 Files without that marker are skipped.
@@ -97,10 +97,12 @@ For marked managed files, the migration may add missing runtime pieces such as:
 
 1. latest header version comments,
 2. `D2WC_EVENT_HANDOFF_ENABLED`,
-3. `D2WC_CONFIGURATOR_CLASS`,
-4. Lua event handoff helper code,
-5. already-configured window suppression helper code,
-6. the Lua event handoff call.
+3. `D2WC_EVENT_HANDOFF_ENTRY_POINT`,
+4. `D2WC_CONFIGURATOR_CLASS`,
+5. `D2WC_ACTION_PROMPT_CLASS`,
+6. Lua event handoff helper code,
+7. already-configured window suppression helper code,
+8. the Lua event handoff call.
 
 The migration must not rewrite the full bundled template. It must preserve user rules, user comments, spacing, and existing toggle values.
 
@@ -201,15 +203,18 @@ The settings view has a left navigation column with:
 1. `Behavior`
 2. `Notifications`
 
-`Behavior` controls this active managed Lua setting:
+`Behavior` controls these active managed Lua settings:
 
 ```lua
 local D2WC_EVENT_HANDOFF_ENABLED = true
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
 ```
+
+`D2WC_EVENT_HANDOFF_ENTRY_POINT` selects whether automatic opening opens the configurator directly or shows the Cancel/Configure prompt button first.
 
 `Notifications` controls the persisted toast timeout and toast opacity values.
 
-The `Back to rules` button returns to the managed rule editor.
+The `Back` button returns to the managed rule editor.
 
 The settings file is user-owned runtime configuration and must not be overwritten by installer updates.
 
@@ -237,5 +242,3 @@ For example:
 The installer and configurator now use the new path model.
 
 The active managed Lua file may optionally open `d2wc` automatically for unconfigured normal windows through the Lua event handoff flow documented in [Lua Event Handoff](lua-event-handoff.md).
-
-The remaining intentional distinction is that test-only helpers still exist for development and automated tests, while public user workflows use managed-config language and paths.
