@@ -51,8 +51,6 @@ local D2WC_MANAGED = true
 
 Files without that marker are not treated as `d2wc` managed Lua files.
 
-The old comment marker is no longer used as the managed-file test.
-
 ## Handoff toggle
 
 The handoff is controlled in each managed Lua file by:
@@ -78,8 +76,6 @@ The checkbox label is:
 ```text
 Automatically open d2wc for unconfigured windows
 ```
-
-Changing this setting updates the active managed Lua file through the same safe-save path used by other configurator writes. Existing comments and managed rules are preserved.
 
 ## Handoff entry point
 
@@ -138,7 +134,7 @@ The prompt displays a compact action window with:
 1. `Cancel`
 2. `Configure`
 
-The pointer is positioned on `Cancel` so the safer action is the immediate click target.
+The pointer is positioned on `Cancel` automatically..
 
 Choosing `Configure` opens the normal GTK configurator. Choosing `Cancel` closes the prompt without opening the configurator.
 
@@ -168,8 +164,6 @@ When geometry capture succeeds, prompt mode passes these command-line arguments 
 ```
 
 The prompt uses those values to place itself near the bottom-right corner of the window that triggered the event.
-
-The geometry path avoids relying on `_NET_ACTIVE_WINDOW` or inferring the event window after launch.
 
 ## Recursion suppression
 
