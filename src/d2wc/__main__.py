@@ -18,6 +18,7 @@ from d2wc.test_config import (
     load_test_config_snapshot,
     prepare_test_config,
 )
+from d2wc.ui.action_prompt import run_action_prompt
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
 
 
@@ -42,12 +43,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args[:1] == ["configure"]:
         return _run_configure(args[1:])
 
+    if args[:1] == ["prompt"]:
+        return _run_prompt(args[1:])
+
     return cli_main(args)
 
 
 def _run_configure(argv: Sequence[str]) -> int:
     try:
-        configure_input = _parse_configure_args(argv)
+        configure_input = _parse_configure_args(argv, prog="d2wc configure")
         return run_configurator(
             configure_input.event_data,
             configure_input.config_awareness,
@@ -59,9 +63,26 @@ def _run_configure(argv: Sequence[str]) -> int:
         return 2
 
 
-def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
+def _run_prompt(argv: Sequence[str]) -> int:
+    try:
+        configure_input = _parse_configure_args(argv, prog="d2wc prompt")
+        decision = run_action_prompt(configure_input.event_data)
+        if decision != "configure":
+            return 0
+        return run_configurator(
+            configure_input.event_data,
+            configure_input.config_awareness,
+            configure_input.test_config_snapshot,
+            configure_input.prepare_result,
+        )
+    except GtkConfiguratorImportError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _parse_configure_args(argv: Sequence[str], *, prog: str) -> ConfigureInput:
     parser = argparse.ArgumentParser(
-        prog="d2wc configure",
+        prog=prog,
         description="Open the GTK d2wc managed-config editor.",
     )
     parser.add_argument(
