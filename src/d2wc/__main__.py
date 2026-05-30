@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
+import fcntl
+import os
+import sys
 from pathlib import Path
 
 from d2wc.cli import main as cli_main
+from d2wc.core.user_paths import d2wc_config_dir
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
 from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
 from d2wc.managed_config_file import load_managed_config_snapshot
@@ -20,6 +24,8 @@ from d2wc.test_config import (
 )
 from d2wc.ui.action_prompt import run_action_prompt
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
+
+CONFIGURATOR_LOCK_FILENAME = "configurator.lock"
 
 
 @dataclass(frozen=True)
@@ -52,12 +58,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _run_configure(argv: Sequence[str]) -> int:
     try:
         configure_input = _parse_configure_args(argv, prog="d2wc configure")
-        return run_configurator(
-            configure_input.event_data,
-            configure_input.config_awareness,
-            configure_input.test_config_snapshot,
-            configure_input.prepare_result,
-        )
+        return _run_configurator_once(configure_input)
     except GtkConfiguratorImportError as exc:
         print(f"ERROR: {exc}")
         return 2
@@ -69,15 +70,46 @@ def _run_prompt(argv: Sequence[str]) -> int:
         decision = run_action_prompt(configure_input.event_data)
         if decision != "configure":
             return 0
+        return _run_configurator_once(configure_input)
+    except GtkConfiguratorImportError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _run_configurator_once(configure_input: ConfigureInput) -> int:
+    with _configurator_instance_lock() as acquired:
+        if not acquired:
+            return 0
         return run_configurator(
             configure_input.event_data,
             configure_input.config_awareness,
             configure_input.test_config_snapshot,
             configure_input.prepare_result,
         )
-    except GtkConfiguratorImportError as exc:
-        print(f"ERROR: {exc}")
-        return 2
+
+
+@contextmanager
+def _configurator_instance_lock() -> Iterator[bool]:
+    """Hold a non-blocking process lock while one configurator window is open."""
+
+    lock_dir = d2wc_config_dir()
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / CONFIGURATOR_LOCK_FILENAME
+    with lock_path.open("w", encoding="utf-8") as lock_file:
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+
+        try:
+            lock_file.seek(0)
+            lock_file.truncate()
+            lock_file.write(f"{os.getpid()}\n")
+            lock_file.flush()
+            yield True
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
 def _parse_configure_args(argv: Sequence[str], *, prog: str) -> ConfigureInput:
