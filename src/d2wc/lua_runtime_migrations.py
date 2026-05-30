@@ -6,20 +6,21 @@ import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
-from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.lua_blocks import ManagedBlockParser, is_d2wc_managed_source
 from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
 from d2wc.core.validation import validate_managed_blocks
 
-MANAGED_MARKER = "d2wc managed"
 USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
 QUBES_DOMAIN_MARKER = "------------------------------------------------------------\n-- Qubes domain and class extraction"
 
-LATEST_VERSION_LINES = """-- version 0.1.12.8
-"""
+LATEST_VERSION_LINE = "-- version 0.1.13"
 HEADER_ANCHOR = "-- devilspie2 workspace configurator\n"
+VERSION_LINE_PATTERN = re.compile(r"(?m)^-- version \d+\.\d+\.\d+(?:\.\d+)?$")
+MANAGED_ASSIGNMENT_SETTING = "local D2WC_MANAGED = true\n\n"
 
-HANDOFF_COMMENT_BLOCK = '''-- Lua event handoff proof.
+HANDOFF_COMMENT_BLOCK = '''-- Lua event handoff.
 -- When enabled, supported window-open events launch the selected d2wc entry point.
 -- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
 '''
@@ -263,7 +264,7 @@ launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls))
 '''
 HANDOFF_CALL = '''
 ------------------------------------------------------------
--- Lua event handoff proof
+-- Lua event handoff
 ------------------------------------------------------------
 launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls), domain)
 '''
@@ -294,6 +295,7 @@ def apply_lua_runtime_migrations(source: str) -> str:
     """Apply missing runtime-code migrations without editing existing comments."""
 
     migrated = _ensure_latest_header_comments(source)
+    migrated = _ensure_managed_assignment(migrated)
     migrated = _ensure_handoff_settings(migrated)
 
     if "local window_type = get_window_type()" not in migrated:
@@ -319,7 +321,7 @@ def refresh_lua_runtime_file(path: Path) -> LuaRuntimeMigrationResult:
     except OSError as exc:
         return LuaRuntimeMigrationResult(path, "error", f"could not read: {exc}")
 
-    if MANAGED_MARKER not in source:
+    if not is_d2wc_managed_source(source):
         return LuaRuntimeMigrationResult(path, "skipped", "missing d2wc managed marker")
 
     try:
@@ -362,15 +364,37 @@ def refresh_lua_runtime_dir(managed_dir: Path) -> tuple[LuaRuntimeMigrationResul
 
 
 def _ensure_latest_header_comments(source: str) -> str:
-    if "-- version 0.1.12.8" in source:
+    if LATEST_VERSION_LINE in source:
         return source
+
+    version_match = VERSION_LINE_PATTERN.search(source)
+    if version_match is not None:
+        return source[: version_match.start()] + LATEST_VERSION_LINE + source[version_match.end() :]
 
     anchor_index = source.find(HEADER_ANCHOR)
     if anchor_index != -1:
         insert_at = anchor_index + len(HEADER_ANCHOR)
-        return source[:insert_at] + LATEST_VERSION_LINES + source[insert_at:]
+        return source[:insert_at] + LATEST_VERSION_LINE + "\n" + source[insert_at:]
 
     return source
+
+
+def _ensure_managed_assignment(source: str) -> str:
+    if is_d2wc_managed_source(source) and "local D2WC_MANAGED" in source:
+        return source
+
+    anchor_index = source.find("------------------------------------------------------------\n\n")
+    if anchor_index != -1:
+        insert_at = anchor_index + len("------------------------------------------------------------\n\n")
+        return source[:insert_at] + MANAGED_ASSIGNMENT_SETTING + source[insert_at:]
+
+    anchor_index = source.find(HEADER_ANCHOR)
+    if anchor_index != -1:
+        line_end = source.find("\n", anchor_index + len(HEADER_ANCHOR))
+        if line_end != -1:
+            return source[: line_end + 1] + MANAGED_ASSIGNMENT_SETTING + source[line_end + 1 :]
+
+    return MANAGED_ASSIGNMENT_SETTING + source
 
 
 def _ensure_handoff_settings(source: str) -> str:
