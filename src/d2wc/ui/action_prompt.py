@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Literal
 
-from d2wc.event_data import WindowEventData
+from d2wc.event_data import EventWindowGeometry, WindowEventData
 from d2wc.ui.gtk_app import _import_gtk
 
 ACTION_PROMPT_WINDOW_CLASS = "d2wc-action-prompt"
@@ -40,6 +41,7 @@ def run_action_prompt(event_data: WindowEventData) -> ActionPromptDecision:
 
     Gtk, Gdk, GLib = _import_gtk()
     _set_prompt_window_class(Gdk, GLib)
+    event_data = _with_active_window_geometry(Gdk, event_data)
 
     decision: dict[str, ActionPromptDecision] = {"value": "cancel"}
 
@@ -113,6 +115,75 @@ def _install_prompt_css(Gtk, Gdk) -> None:
             provider,
             Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
         )
+
+
+def _with_active_window_geometry(Gdk, event_data: WindowEventData) -> WindowEventData:
+    geometry = event_data.window_geometry
+    if geometry.x is not None and geometry.y is not None and geometry.w is not None and geometry.h is not None:
+        return event_data
+
+    captured = _capture_active_window_geometry(Gdk)
+    if captured is None:
+        return event_data
+    return replace(event_data, window_geometry=captured)
+
+
+def _capture_active_window_geometry(Gdk) -> EventWindowGeometry | None:
+    screen = Gdk.Screen.get_default()
+    if screen is None or not hasattr(screen, "get_active_window"):
+        return None
+
+    active_window = screen.get_active_window()
+    if active_window is None:
+        return None
+
+    try:
+        frame = active_window.get_frame_extents()
+    except Exception:
+        frame = None
+
+    if frame is not None and frame.width > 0 and frame.height > 0:
+        return EventWindowGeometry(
+            x=float(frame.x),
+            y=float(frame.y),
+            w=float(frame.width),
+            h=float(frame.height),
+        )
+
+    try:
+        origin = active_window.get_origin()
+        geometry = active_window.get_geometry()
+    except Exception:
+        return None
+
+    root_x = root_y = None
+    if isinstance(origin, tuple) and len(origin) == 3:
+        ok, root_x, root_y = origin
+        if not ok:
+            return None
+    elif isinstance(origin, tuple) and len(origin) == 2:
+        root_x, root_y = origin
+
+    if root_x is None or root_y is None:
+        return None
+
+    width = height = None
+    if isinstance(geometry, tuple) and len(geometry) >= 4:
+        width = geometry[2]
+        height = geometry[3]
+    elif hasattr(geometry, "width") and hasattr(geometry, "height"):
+        width = geometry.width
+        height = geometry.height
+
+    if width is None or height is None or width <= 0 or height <= 0:
+        return None
+
+    return EventWindowGeometry(
+        x=float(root_x),
+        y=float(root_y),
+        w=float(width),
+        h=float(height),
+    )
 
 
 def _position_prompt(Gtk, Gdk, GLib, window, cancel_button, event_data: WindowEventData) -> None:
