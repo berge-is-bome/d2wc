@@ -51,8 +51,10 @@ The repository currently contains:
 31. XDG-style user paths for source cache, installed source, managed Lua files, and UI settings.
 32. Lua event handoff from managed Lua to the bare `d2wc` command.
 33. Configured-window suppression for automatic handoff.
-34. Configurator `Window events` setting for `D2WC_EVENT_HANDOFF_ENABLED`.
-35. Development status notes in [Development Status](development-status.md).
+34. `Menu -> Configure -> Behavior` settings for automatic handoff and entry-point selection.
+35. `d2wc prompt` as an optional event handoff entry point.
+36. `local D2WC_MANAGED = true` as the required managed Lua marker.
+37. Development status notes in [Development Status](development-status.md).
 
 The Lua script remains the execution layer. User-owned managed Lua files live under `~/.config/d2wc/lua/`, and Devilspie2 reads the active managed file through the integration symlink at `~/.config/devilspie2/d2wc.lua`.
 
@@ -68,7 +70,7 @@ The implementation should follow these decisions:
 6. Keep PySide6/Qt on the roadmap for KDE-oriented users.
 7. Keep parser/writer/validator logic independent from the UI toolkit.
 8. Make the stable entry point a command that can be assigned to a keyboard shortcut or called from the Lua event context.
-9. Treat tray behavior as optional.
+9. Treat tray behavior as optional future work.
 10. Support source-checkout execution because Qubes dom0 is often offline.
 11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
 12. Keep real user configuration writes guarded.
@@ -77,16 +79,19 @@ The implementation should follow these decisions:
 15. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
 16. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
 17. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
-18. Build the GTK UI around representative Devilspie2/Lua event data, not around live target-selection experiments.
-19. Allow automatic configurator launching only for unconfigured normal windows when the user enables the Lua event handoff setting.
-20. Use dedicated test-config paths for isolated GTK UI testing.
-21. Store user-owned managed Lua files under `~/.config/d2wc/lua/`.
-22. Use `~/.config/devilspie2/d2wc.lua` only as the Devilspie2-facing integration symlink for the active managed file.
-23. Do not overwrite unrelated Devilspie2 Lua scripts or unrelated symlinks.
-24. Keep File Open and Save As scoped to `d2wc` managed Lua files, not arbitrary Devilspie2 scripts.
-25. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
-26. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
-27. Keep installer managed-Lua refreshes targeted; do not rewrite whole user-managed Lua files from the bundled template.
+18. Build the GTK UI around real Devilspie2/Lua event data when event data is available, not around live target-selection experiments.
+19. Keep representative event fixtures available for tests and manual experiments, but do not inject them into normal `d2wc` launches.
+20. Allow automatic configurator launching only for unconfigured normal windows when the user enables the Lua event handoff setting.
+21. Let the user choose whether automatic handoff opens the configurator directly or shows the prompt first.
+22. Use dedicated test-config paths for isolated GTK UI testing.
+23. Store user-owned managed Lua files under `~/.config/d2wc/lua/`.
+24. Use `~/.config/devilspie2/d2wc.lua` only as the Devilspie2-facing integration symlink for the active managed file.
+25. Do not overwrite unrelated Devilspie2 Lua scripts or unrelated symlinks.
+26. Keep File Open and Save As scoped to `d2wc` managed Lua files, not arbitrary Devilspie2 scripts.
+27. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
+28. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
+29. Keep installer managed-Lua refreshes targeted; do not rewrite whole user-managed Lua files from the bundled template.
+30. Treat `local D2WC_MANAGED = true` as executable marker state, not as removable documentation.
 
 ## Completed stages
 
@@ -390,25 +395,48 @@ Current behavior:
 
 ### Stage 28: Lua event handoff and configured-window suppression
 
-Complete on the `lua-event-handoff` branch.
+Complete through PR #34.
 
 Current behavior:
 
 1. The managed Lua script can launch bare `d2wc` through `os.execute()` when a normal application window opens.
 2. The launch is controlled by `D2WC_EVENT_HANDOFF_ENABLED` in the active managed Lua file.
-3. The configurator exposes the toggle under `Menu -> Configure -> Window events`.
-4. The configurator publishes the stable GTK/X11 class `d2wc-configurator`.
-5. Lua suppresses configurator recursion by comparing the current window class to `D2WC_CONFIGURATOR_CLASS`.
-6. Lua suppresses automatic launching for windows that already match configured target rules.
-7. Configured-window suppression covers `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION`.
-8. `GEOM` alone does not suppress handoff, because geometry profiles do not target windows by themselves.
-9. Installer updates run targeted managed Lua runtime migrations for marked managed files.
-10. Missing `d2wc managed` marker remains an expected skip/error condition.
-11. Existing user comments, managed rules, spacing, and existing toggle values are preserved.
+3. The configurator publishes the stable GTK/X11 class `d2wc-configurator`.
+4. Lua suppresses configurator recursion by comparing the current window class to `D2WC_CONFIGURATOR_CLASS`.
+5. Lua suppresses automatic launching for windows that already match configured target rules.
+6. Configured-window suppression covers `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, `WORKSPACE_PLACEMENT`, and `LEFT_EDGE_CORRECTION`.
+7. `GEOM` alone does not suppress handoff, because geometry profiles do not target windows by themselves.
+8. Installer updates run targeted managed Lua runtime migrations for marked managed files.
+9. Existing user comments, managed rules, spacing, and existing toggle values are preserved.
+
+### Stage 29: post-handoff GTK polish and prompt entry point
+
+Complete on the `gtk-ui-improvement-post-lua-handoff` branch.
+
+Current behavior:
+
+1. `Menu -> Configure` replaces the editor area with an in-window settings view.
+2. The settings view has `Behavior` and `Notifications` sections.
+3. `Behavior` controls `D2WC_EVENT_HANDOFF_ENABLED`.
+4. `Behavior` controls `D2WC_EVENT_HANDOFF_ENTRY_POINT`.
+5. Supported entry-point values are `configurator` and `prompt`.
+6. The `prompt` entry point launches `d2wc prompt`.
+7. The prompt shows `Cancel` and `Configure` actions.
+8. The pointer is positioned on `Cancel` when the prompt opens.
+9. Prompt mode receives event-window geometry from Lua and places the prompt near the triggering window.
+10. The prompt publishes the stable GTK/X11 class `d2wc-action-prompt`.
+11. Lua suppresses prompt recursion by comparing the current window class to `D2WC_ACTION_PROMPT_CLASS`.
+12. The managed Lua marker is now executable state: `local D2WC_MANAGED = true`.
+13. The old comment marker is no longer accepted as the managed-file test.
+14. The default managed Lua template is version `0.1.13`.
+15. Normal `d2wc` launches no longer inject the example event fixture into Machine/Application dropdowns.
+16. The example fixture remains available only through `--event-fixture`.
+17. Missing managed-marker load errors use the message `could not load config file: missing D2WC_MANAGED marker`.
+18. Missing managed-marker load errors are shown as toasts.
 
 ## Future implementation stages
 
-### Stage 29: applied-write restore and backup recovery
+### Stage 30: applied-write restore and backup recovery
 
 Add a user-facing restore workflow for changes that have already been applied to a managed config.
 
@@ -422,6 +450,6 @@ Required behavior:
 6. Reuse the same staged write, sync, and backup safety rules as normal guarded writes.
 7. Document how restore interacts with backup retention before enabling it broadly.
 
-### Stage 30: generated split profiles
+### Stage 31: generated split profiles
 
 Generated split-profile work remains future work and should be kept separate from the Lua event handoff branch.
