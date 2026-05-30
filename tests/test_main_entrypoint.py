@@ -2,6 +2,7 @@ from d2wc import __main__
 
 
 MANAGED_CONFIG_SOURCE = '''
+local D2WC_MANAGED = true
 local EXCLUDE = {
 }
 local PIN = {
