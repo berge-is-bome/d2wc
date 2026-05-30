@@ -63,7 +63,7 @@ The command is also usable from a terminal for debugging.
 
 ## Entry point 2: Lua event handoff
 
-The active managed Lua file can open the configurator automatically when Devilspie2 sees a new normal application window.
+The active managed Lua file can offer `d2wc` automatically when Devilspie2 sees a new normal application window.
 
 The handoff is controlled by this setting in the active managed Lua file:
 
@@ -92,7 +92,8 @@ The Lua script:
 3. checks whether the current window already matches a managed target rule,
 4. suppresses launch if the current window is already configured,
 5. suppresses launch if the current window is the configurator itself,
-6. launches bare `d2wc` when automatic launch is enabled and the window is unconfigured.
+6. suppresses launch if the current window is the prompt itself,
+7. launches the selected `d2wc` entry point when automatic launch is enabled and the window is unconfigured.
 
 The configurator's own GTK/X11 class is:
 
@@ -100,11 +101,42 @@ The configurator's own GTK/X11 class is:
 d2wc-configurator
 ```
 
-That value is used only to prevent recursive configurator launches.
+The prompt's GTK/X11 class is:
+
+```text
+d2wc-action-prompt
+```
+
+Those values are used only to prevent recursive launches.
 
 For the full implementation details, see [Lua Event Handoff](lua-event-handoff.md).
 
-## Entry point 3: optional tray menu
+## Entry point 3: prompt button
+
+The prompt button is an optional handoff entry point selected by:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "prompt"
+```
+
+When prompt mode is selected, the Lua handoff launches:
+
+```bash
+d2wc prompt
+```
+
+The prompt appears near the bottom-right corner of the window that triggered the event, using geometry passed from Devilspie2's current window event.
+
+The prompt has two actions:
+
+1. `Cancel`
+2. `Configure`
+
+The pointer is centered on `Cancel` when the prompt opens. `Configure` opens the normal configurator for the event window.
+
+Prompt mode is intended to replace the need for a tray icon in the normal workflow if it proves comfortable in daily use.
+
+## Optional future tray menu
 
 A tray icon can still be useful during initial setup or troubleshooting, but it should not be required for normal operation.
 
@@ -142,10 +174,13 @@ It currently includes:
 8. Row-level unsaved-edit detection.
 9. Dirty-row `Undo` / `Apply` split controls.
 10. Compact success toasts.
-11. Blocking dialogs for errors and validation failures.
-12. Per-workflow help through `Menu -> Help` and `F1`.
-13. File Open and Save As for managed Lua files.
-14. Window title showing the active managed file.
+11. Blocking dialogs for most errors and validation failures.
+12. Missing managed-marker load errors shown as a toast.
+13. Per-workflow help through `Menu -> Help` and `F1`.
+14. File Open and Save As for managed Lua files.
+15. Window title showing the active managed file.
+
+Normal `d2wc` and `d2wc configure` launches do not inject the built-in example event fixture into the UI. The fixture is available only when explicitly requested with `--event-fixture`.
 
 ## Configure view
 
@@ -156,13 +191,26 @@ The settings view has a left navigation column with:
 1. `Behavior`
 2. `Notifications`
 
-`Behavior` contains:
+`Behavior` contains the automatic opening controls.
+
+The automatic opening toggle is:
 
 ```text
 Automatically open d2wc for unconfigured windows
 ```
 
 That checkbox updates `D2WC_EVENT_HANDOFF_ENABLED` in the active managed Lua file through the safe-save path.
+
+The entry-point selector controls:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
+```
+
+Visible entry-point choices:
+
+1. `Open configurator directly`
+2. `Show Cancel/Configure button first`
 
 `Notifications` contains:
 
@@ -175,7 +223,7 @@ Toast settings are stored in:
 ~/.config/d2wc/settings.json
 ```
 
-The `Back to rules` button returns to the managed rule editor.
+The `Back` button returns to the managed rule editor.
 
 ## File Open
 
@@ -185,9 +233,16 @@ Behavior:
 
 1. Defaults to `~/.config/d2wc/lua/`.
 2. Loads only valid managed Lua files.
-3. Updates the active managed file in the configurator.
-4. Updates the window title.
-5. Updates `~/.config/devilspie2/d2wc.lua` when it is safe to do so.
+3. Requires the `D2WC_MANAGED` marker.
+4. Updates the active managed file in the configurator.
+5. Updates the window title.
+6. Updates `~/.config/devilspie2/d2wc.lua` when it is safe to do so.
+
+The required managed marker is:
+
+```lua
+local D2WC_MANAGED = true
+```
 
 ## Save As
 
@@ -261,43 +316,3 @@ Save this reusable window size and position.
 ```
 
 The workflow writes to `GEOM`.
-
-`GEOM` profiles do not target windows by themselves, so `GEOM` alone does not suppress Lua event handoff.
-
-## Flow: pin a window
-
-User-facing intent:
-
-```text
-Keep matching windows visible on all workspaces.
-```
-
-The workflow writes to `PIN`.
-
-## Flow: exclude a window
-
-User-facing intent:
-
-```text
-Do not manage matching windows.
-```
-
-The workflow writes to `EXCLUDE`.
-
-Excluded windows skip workspace routing, pinning, geometry, left-edge correction, and automatic configurator launching.
-
-## Flow: left-edge correction
-
-User-facing intent:
-
-```text
-Use this compatibility correction when a window should land at x = 0 but does not.
-```
-
-The workflow writes to `LEFT_EDGE_CORRECTION`.
-
-## Future post-resize flows
-
-Direct post-resize configuration and post-resize choice menus remain future work.
-
-Those future flows must not trigger when `d2wc` itself moves or resizes a window, and they must not apply hidden permanent changes without a visible save action.
