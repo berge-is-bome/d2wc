@@ -53,7 +53,7 @@ def active_managed_config_path() -> Path:
     if entry.is_symlink() and symlink_points_to_managed_dir(entry, managed_dir):
         try:
             return entry.resolve(strict=False)
-        except OSError:
+        except (OSError, RuntimeError):
             pass
     return default_managed_config_path()
 
@@ -166,6 +166,14 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
     managed_dir = default_managed_config_dir()
     entry = devilspie2_entry_path()
 
+    if _same_path_without_resolving(target, entry):
+        return ActivationResult(
+            ok=False,
+            entry_path=entry,
+            target_path=target,
+            message=f"refusing to activate Devilspie2 entry as its own target: {entry}",
+        )
+
     if not _is_within_directory(target, managed_dir):
         return ActivationResult(
             ok=False,
@@ -184,7 +192,9 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
 
     entry.parent.mkdir(parents=True, exist_ok=True)
     if entry.is_symlink():
-        if not symlink_points_to_managed_dir(entry, managed_dir):
+        if _symlink_points_to_path(entry, target):
+            return ActivationResult(ok=True, entry_path=entry, target_path=target, message=f"Managed config already active: {entry} -> {target}")
+        if not symlink_points_to_managed_dir(entry, managed_dir) and not _is_self_referential_symlink(entry):
             return ActivationResult(
                 ok=False,
                 entry_path=entry,
@@ -214,14 +224,14 @@ def activate_managed_config(managed_path: Path) -> ActivationResult:
 def _same_directory(path: Path, directory: Path) -> bool:
     try:
         return path.resolve(strict=False) == directory.resolve(strict=False)
-    except OSError:
+    except (OSError, RuntimeError):
         return False
 
 
 def _is_within_directory(path: Path, directory: Path) -> bool:
     try:
         path.resolve(strict=False).relative_to(directory.resolve(strict=False))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RuntimeError):
         return False
     return True
 
@@ -231,5 +241,24 @@ def _symlink_points_to_path(path: Path, target: Path) -> bool:
         return False
     try:
         return path.resolve(strict=False) == target.resolve(strict=False)
+    except (OSError, RuntimeError):
+        return False
+
+
+def _same_path_without_resolving(left: Path, right: Path) -> bool:
+    try:
+        return left.expanduser().absolute() == right.expanduser().absolute()
     except OSError:
         return False
+
+
+def _is_self_referential_symlink(path: Path) -> bool:
+    if not path.is_symlink():
+        return False
+    try:
+        target = Path(path.readlink())
+    except OSError:
+        return False
+    if not target.is_absolute():
+        target = path.parent / target
+    return _same_path_without_resolving(target, path)
