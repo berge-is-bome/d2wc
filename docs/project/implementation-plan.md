@@ -70,28 +70,27 @@ The implementation should follow these decisions:
 6. Keep PySide6/Qt on the roadmap for KDE-oriented users.
 7. Keep parser/writer/validator logic independent from the UI toolkit.
 8. Make the stable entry point a command that can be assigned to a keyboard shortcut or called from the Lua event context.
-9. Treat tray behavior as optional future work.
-10. Support source-checkout execution because Qubes dom0 is often offline.
-11. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
-12. Keep real user configuration writes guarded.
-13. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
-14. Make CLI save and edit operations safe by default: preview without writing, and require `--write` before modification.
-15. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
-16. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
-17. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
-18. Build the GTK UI around real Devilspie2/Lua event data when event data is available, not around live target-selection experiments.
-19. Keep representative event fixtures available for tests and manual experiments, but do not inject them into normal `d2wc` launches.
-20. Allow automatic configurator launching only for unconfigured normal windows when the user enables the Lua event handoff setting.
-21. Let the user choose whether automatic handoff opens the configurator directly or shows the prompt first.
-22. Use dedicated test-config paths for isolated GTK UI testing.
-23. Store user-owned managed Lua files under `~/.config/d2wc/lua/`.
-24. Use `~/.config/devilspie2/d2wc.lua` only as the Devilspie2-facing integration symlink for the active managed file.
-25. Do not overwrite unrelated Devilspie2 Lua scripts or unrelated symlinks.
-26. Keep File Open and Save As scoped to `d2wc` managed Lua files, not arbitrary Devilspie2 scripts.
-27. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
-28. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
-29. Keep installer managed-Lua refreshes targeted; do not rewrite whole user-managed Lua files from the bundled template.
-30. Treat `local D2WC_MANAGED = true` as executable marker state, not as removable documentation.
+9. Support source-checkout execution because Qubes dom0 is often offline.
+10. Treat generated split-profile settings such as `window_border_width` as configurator/runtime settings, not as ad hoc Lua rule strings.
+11. Keep real user configuration writes guarded.
+12. Treat a save as successful only after the staged file, backup file, backup directory, and target directory have all been synced successfully.
+13. Make CLI save and edit operations safe by default: preview without writing, and require `--write` before modification.
+14. Keep rule parsing token-order-independent, matching the Lua runtime principle that prefixed token order does not matter.
+15. Keep Qubes OS as the real current target while preserving future non-Qubes design space.
+16. Document historical design context and future roadmap items in the repository instead of relying on old conversations.
+17. Build the GTK UI around real Devilspie2/Lua event data when event data is available, not around live target-selection experiments.
+18. Keep representative event fixtures available for tests and manual experiments, but do not inject them into normal `d2wc` launches.
+19. Allow automatic configurator launching only for unconfigured normal windows when the user enables the Lua event handoff setting.
+20. Let the user choose whether automatic handoff opens the configurator directly or shows the prompt first.
+21. Use dedicated test-config paths for isolated GTK UI testing.
+22. Store user-owned managed Lua files under `~/.config/d2wc/lua/`.
+23. Use `~/.config/devilspie2/d2wc.lua` only as the Devilspie2-facing integration symlink for the active managed file.
+24. Do not overwrite unrelated Devilspie2 Lua scripts or unrelated symlinks.
+25. Keep File Open and Save As scoped to `d2wc` managed Lua files, not arbitrary Devilspie2 scripts.
+26. Query the current X11 workspace count for the GTK workspace selector, falling back to workspace 1 when the count cannot be read.
+27. Build the known-window inventory in small testable slices: parser first, row source and suppression second, bounded and continuous capture third, GTK live refresh last.
+28. Keep installer managed-Lua refreshes targeted; do not rewrite whole user-managed Lua files from the bundled template.
+29. Treat `local D2WC_MANAGED = true` as executable marker state, not as removable documentation.
 
 ## Completed stages
 
