@@ -15,8 +15,8 @@ MANAGED_MARKER = "d2wc managed"
 USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
 QUBES_DOMAIN_MARKER = "------------------------------------------------------------\n-- Qubes domain and class extraction"
 
-LATEST_VERSION_LINES = """-- version 0.1.12.7
--- changes: make event handoff entry point selectable
+LATEST_VERSION_LINES = """-- version 0.1.12.8
+-- changes: pass event window geometry to prompt handoff
 """
 HEADER_ANCHOR = "-- devilspie2 workspace configurator\n"
 
@@ -106,7 +106,7 @@ local function launch_d2wc_event_handoff(event_class, is_configured, event_domai
 end
 '''
 
-HANDOFF_HELPER = '''
+SELECTABLE_HANDOFF_HELPER_WITHOUT_GEOMETRY = '''
 local function shell_quote(value)
   if value == nil then return nil end
   local s = tostring(value)
@@ -142,6 +142,54 @@ local function launch_d2wc_event_handoff(event_class, is_configured, event_domai
   append_shell_arg(command_parts, "--window-type", window_type)
   append_shell_arg(command_parts, "--class-instance-name", class_instance)
   append_shell_arg(command_parts, "--window-class", event_class)
+
+  os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
+end
+'''
+
+HANDOFF_HELPER = '''
+local function shell_quote(value)
+  if value == nil then return nil end
+  local s = tostring(value)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function append_shell_arg(parts, name, value)
+  if value == nil then return end
+  table.insert(parts, name)
+  table.insert(parts, shell_quote(value))
+end
+
+local function launch_d2wc_event_handoff(event_class, is_configured, event_domain)
+  if not D2WC_EVENT_HANDOFF_ENABLED then return end
+  if event_class == D2WC_CONFIGURATOR_CLASS then return end
+  if event_class == D2WC_ACTION_PROMPT_CLASS then return end
+  if is_configured then return end
+
+  local mode = D2WC_EVENT_HANDOFF_ENTRY_POINT or "configurator"
+  if mode ~= "configurator" and mode ~= "prompt" then
+    mode = "configurator"
+  end
+
+  if mode == "configurator" then
+    os.execute("d2wc >/dev/null 2>&1 &")
+    return
+  end
+
+  local class_instance = get_class_instance_name()
+  local geometry_ok, x, y, w, h = pcall(get_window_geometry)
+  local command_parts = { "d2wc", "prompt" }
+  append_shell_arg(command_parts, "--domain", event_domain)
+  append_shell_arg(command_parts, "--application-name", event_class)
+  append_shell_arg(command_parts, "--window-type", window_type)
+  append_shell_arg(command_parts, "--class-instance-name", class_instance)
+  append_shell_arg(command_parts, "--window-class", event_class)
+  if geometry_ok then
+    append_shell_arg(command_parts, "--window-x", x)
+    append_shell_arg(command_parts, "--window-y", y)
+    append_shell_arg(command_parts, "--window-width", w)
+    append_shell_arg(command_parts, "--window-height", h)
+  end
 
   os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
@@ -315,7 +363,7 @@ def refresh_lua_runtime_dir(managed_dir: Path) -> tuple[LuaRuntimeMigrationResul
 
 
 def _ensure_latest_header_comments(source: str) -> str:
-    if "-- version 0.1.12.7" in source:
+    if "-- version 0.1.12.8" in source:
         return source
 
     anchor_index = source.find(HEADER_ANCHOR)
@@ -379,6 +427,8 @@ def _ensure_handoff_settings(source: str) -> str:
 def _ensure_handoff_helper(source: str) -> str:
     if HANDOFF_HELPER in source:
         return source
+    if SELECTABLE_HANDOFF_HELPER_WITHOUT_GEOMETRY in source:
+        return source.replace(SELECTABLE_HANDOFF_HELPER_WITHOUT_GEOMETRY, HANDOFF_HELPER, 1)
     if PROMPT_HANDOFF_HELPER_WITH_GEOMETRY in source:
         return source.replace(PROMPT_HANDOFF_HELPER_WITH_GEOMETRY, HANDOFF_HELPER, 1)
     if CONFIGURATOR_HANDOFF_HELPER in source:
