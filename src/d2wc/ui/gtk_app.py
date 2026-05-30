@@ -15,7 +15,7 @@ from d2wc.managed_config_file import (
     managed_config_status_text,
     save_managed_config_as,
 )
-from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
+from d2wc.test_config import MISSING_MANAGED_MARKER_ERROR, TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 from d2wc.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
@@ -119,15 +119,31 @@ def run_configurator(
         for child in content.get_children():
             content.remove(child)
 
+    def is_missing_managed_marker_snapshot(snapshot: TestConfigSnapshot | None) -> bool:
+        return snapshot is not None and snapshot.error == MISSING_MANAGED_MARKER_ERROR
+
+    def show_missing_managed_marker_toast() -> None:
+        timeout_seconds, opacity = current_toast_settings()
+        _show_toast(
+            Gtk,
+            outer,
+            MISSING_MANAGED_MARKER_ERROR,
+            timeout_seconds=timeout_seconds,
+            opacity=opacity,
+        )
+
     def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
         stop_current_editor()
         clear_content()
-        editor = build_managed_section_editor(Gtk, snapshot, _event, GLib=GLib, toast_settings=current_toast_settings)
-        state["snapshot"] = snapshot
+        display_snapshot = None if is_missing_managed_marker_snapshot(snapshot) else snapshot
+        editor = build_managed_section_editor(Gtk, display_snapshot, _event, GLib=GLib, toast_settings=current_toast_settings)
+        state["snapshot"] = display_snapshot
         state["editor"] = editor
         content.pack_start(editor.widget, True, True, 0)
         content.show_all()
         update_window_state()
+        if is_missing_managed_marker_snapshot(snapshot):
+            show_missing_managed_marker_toast()
 
     def open_managed_file(_item=None) -> None:
         managed_dir = default_managed_config_dir()
@@ -153,7 +169,10 @@ def run_configurator(
             return
         snapshot = load_managed_config_snapshot(selected)
         if not snapshot.ok:
-            _show_message(Gtk, window, managed_config_status_text(snapshot))
+            if is_missing_managed_marker_snapshot(snapshot):
+                show_missing_managed_marker_toast()
+            else:
+                _show_message(Gtk, window, managed_config_status_text(snapshot))
             return
         activate_managed_config(selected)
         rebuild_editor(snapshot)
@@ -193,7 +212,10 @@ def run_configurator(
             return
         refreshed = load_managed_config_snapshot(result.path)
         if not refreshed.ok:
-            _show_message(Gtk, window, managed_config_status_text(refreshed))
+            if is_missing_managed_marker_snapshot(refreshed):
+                show_missing_managed_marker_toast()
+            else:
+                _show_message(Gtk, window, managed_config_status_text(refreshed))
             return
         activation = activate_managed_config(result.path)
         rebuild_editor(refreshed)
