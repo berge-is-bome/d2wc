@@ -45,9 +45,10 @@ The stable entry point should be a command that can be assigned to a desktop key
 The configurator should be reachable in these ways:
 
 1. Command or keyboard shortcut. The user focuses or places a window, presses the configured shortcut, and `d2wc` opens the configurator for the active window.
-2. Optional tray menu. During setup or troubleshooting, the user can enable a tray menu and choose `Configure` or `Capture Active Window`.
-3. Direct post-resize flow. The user resizes a window, releases the primary mouse button, and `d2wc` opens the configurator directly for that window.
-4. Post-resize choice menu. The user resizes a window, releases the primary mouse button, and `d2wc` opens a small pointer-anchored menu with `Cancel` and `Configure`.
+2. Automatic window-event handoff. Devilspie2 sees a new unconfigured normal window and opens the selected `d2wc` entry point.
+3. Prompt handoff. Devilspie2 sees a new unconfigured normal window and opens a small prompt with `Cancel` and `Configure`.
+4. Direct post-resize flow. The user resizes a window, releases the primary mouse button, and `d2wc` opens the configurator directly for that window.
+5. Post-resize choice menu. The user resizes a window, releases the primary mouse button, and `d2wc` opens a small pointer-anchored menu with `Cancel` and `Configure`.
 
 The pointer-anchored menu should center the pointer on `Cancel` by default. This protects the user from accidentally configuring a window after every resize. `Configure` should be the second action in the menu.
 
@@ -104,8 +105,6 @@ The user should still be able to override the derived values.
 The current Lua script supports `LEFT_EDGE_CORRECTION` because `set_window_geometry()` may place a window a few pixels away from `x = 0` on some systems.
 
 Manual testing has shown that this incorrect position is visible through `get_window_geometry()`. That means `d2wc` can detect the offset after applying geometry and then test or apply `set_window_position()` or `set_window_position2()` only when needed.
-
-The development task is to test whether the logic can be simplified by using one correction function consistently after setting geometry, or only when the resulting window geometry is wrong.
 
 The safe design is to keep `LEFT_EDGE_CORRECTION` for now. It is a compatibility feature and should remain configurable until testing proves it can be replaced.
 
