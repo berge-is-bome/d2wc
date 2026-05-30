@@ -1,33 +1,19 @@
 ------------------------------------------------------------
--- d2wc managed
 -- devilspie2 workspace configurator
--- version 0.1.12.5
--- changes: suppress Lua event handoff for windows that already match managed rules
--- version 0.1.12.4
--- changes: Lua event handoff proof launches bare d2wc from supported window-open events
--- version 0.1.12.3
--- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
--- version 0.1.12.2
--- Split a dotted class string into tokens, e.g. "org.gnome.meld" -> {"org","gnome","meld"}
--- Class matching improved to recognize class names within dotted segments of class names
+-- version 0.1.13
 ------------------------------------------------------------
 
+local D2WC_MANAGED = true
 
+------------------------------------------------------------
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
-
--- Lua event handoff proof.
--- When enabled, supported window-open events launch the d2wc configurator.
--- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
--- Windows that already match a managed target rule are suppressed.
-local D2WC_EVENT_HANDOFF_ENABLED = true
-local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
 
 -- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION
 -- All rules use space-separated tokens with explicit prefixes:
 --   d:<domain>   c:<class>   g:<geom_profile>   le:<pos1|pos2>
 -- Order of tokens does not matter. Case-insensitive.
---
+
 -- Matching precedence everywhere:  domain.class  ->  domain  ->  class
 -- Duplicates within a single rule (e.g., two g: tokens) are invalid; they are skipped with a debug message.
 -- Unknown geometry profile in g: is invalid; skipped with a debug message.
@@ -36,8 +22,11 @@ local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
 -- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
-  -- "d:work c:okular",    -- this domain.class
   "d:personal-test",       -- domain
+
+  "d:dom0 c:xfce4-notifyd",
+
+  -- "d:work c:okular",    -- this domain.class
   -- "c:<class_name>",     -- class everywhere
   -- add more here
 }
@@ -48,6 +37,7 @@ local EXCLUDE = {
 local PIN = {
   "d:dom0 c:xfce4-terminal",         -- pin dom0 xfce4-terminal windows
   "d:dom0 c:qubes-qube-manager",     -- pin Qube Manager
+
   -- "d:personal",                   -- pin everything from personal
   -- "c:xfce4-terminal",             -- pin xfce4-terminal everywhere
   -- add more here
@@ -62,6 +52,7 @@ local WORKSPACE_ROUTES = {
   [1] = { "d:personal", "d:work c:navigator", "d:work c:krusader", },
 
   [2] = { "d:personal c:navigator", "d:work", },
+
   -- add more here
 }
 
@@ -77,10 +68,12 @@ local GEOM = {
 
   dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
-
   dom0_template_manager = { x = 1129, y = 0  ,  w = 1220, h = 2115 },
   dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
   dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
+  dom0_zenity            = { x = 1500, y = 500 , w = 700 , h = 800  },
+
+  d2wc_configurator      = { x = 900 , y = 600 , w = 1550, h = 900  },
   -- add more here
 }
 
@@ -106,6 +99,7 @@ local WORKSPACE_PLACEMENT = {
   "d:dom0 c:qubes-qube-manager g:half_left",
   "d:dom0 c:xfce4-settings-manager g:dom0_settings_manager",
   "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",    -- domain-specific override for qubes-app-menu in dom0
+
   -- add more here
 }
 
@@ -125,11 +119,12 @@ local WORKSPACE_PLACEMENT = {
 local LEFT_EDGE_CORRECTION = {
   "d:dom0 c:qubes-qube-manager le:pos1",
   "d:personal c:okular le:pos2",
+
   -- add more here
 }
 
 
-
+------------------------------------------------------------
 -- PROGRAM LOGIC
 ------------------------------------------------------------
 
@@ -142,16 +137,66 @@ if (window_type ~= "WINDOW_TYPE_NORMAL") then
 end
 
 ------------------------------------------------------------
+-- Lua event handoff
+------------------------------------------------------------
+
+-- When enabled, supported window-open events launch the selected d2wc entry point.
+-- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
+-- Windows that already match a managed target rule are suppressed.
+local D2WC_EVENT_HANDOFF_ENABLED = true
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
+local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
+local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
+
+------------------------------------------------------------
 -- Helpers
 ------------------------------------------------------------
 local function lc(s) return (s or ""):lower() end
 
-local function launch_d2wc_event_handoff(event_class, is_configured)
+local function shell_quote(value)
+  if value == nil then return nil end
+  local s = tostring(value)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function append_shell_arg(parts, name, value)
+  if value == nil then return end
+  table.insert(parts, name)
+  table.insert(parts, shell_quote(value))
+end
+
+local function launch_d2wc_event_handoff(event_class, is_configured, event_domain)
   if not D2WC_EVENT_HANDOFF_ENABLED then return end
   if event_class == D2WC_CONFIGURATOR_CLASS then return end
+  if event_class == D2WC_ACTION_PROMPT_CLASS then return end
   if is_configured then return end
 
-  os.execute("d2wc >/dev/null 2>&1 &")
+  local mode = D2WC_EVENT_HANDOFF_ENTRY_POINT or "configurator"
+  if mode ~= "configurator" and mode ~= "prompt" then
+    mode = "configurator"
+  end
+
+  if mode == "configurator" then
+    os.execute("d2wc >/dev/null 2>&1 &")
+    return
+  end
+
+  local class_instance = get_class_instance_name()
+  local geometry_ok, x, y, w, h = pcall(get_window_geometry)
+  local command_parts = { "d2wc", "prompt" }
+  append_shell_arg(command_parts, "--domain", event_domain)
+  append_shell_arg(command_parts, "--application-name", event_class)
+  append_shell_arg(command_parts, "--window-type", window_type)
+  append_shell_arg(command_parts, "--class-instance-name", class_instance)
+  append_shell_arg(command_parts, "--window-class", event_class)
+  if geometry_ok then
+    append_shell_arg(command_parts, "--window-x", x)
+    append_shell_arg(command_parts, "--window-y", y)
+    append_shell_arg(command_parts, "--window-width", w)
+    append_shell_arg(command_parts, "--window-height", h)
+  end
+
+  os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
 
 -- Split a rule string into prefixed tokens and validate duplicates.
@@ -407,9 +452,9 @@ end
 local cls = get_lower_class()
 
 ------------------------------------------------------------
--- Lua event handoff proof
+-- Lua event handoff
 ------------------------------------------------------------
-launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls))
+launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls), domain)
 
 ------------------------------------------------------------
 -- Apply exclusions

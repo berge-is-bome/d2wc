@@ -70,32 +70,10 @@ The active managed Lua file can open the configurator automatically when Devilsp
 This behavior is controlled in the configurator:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
-The same dialog also contains notification settings for toast timeout and opacity.
-
-## Installed user config
-
-The installed configurator stores `d2wc` managed Lua files under:
-
-```text
-~/.config/d2wc/lua/
-```
-
-The default managed file is:
-
-```text
-~/.config/d2wc/lua/d2wc.lua
-```
-
-Devilspie2 reads the active managed file through this integration path:
-
-```text
-~/.config/devilspie2/d2wc.lua
-```
-
-That integration path is a symlink to the active managed file. Existing unrelated Devilspie2 scripts in `~/.config/devilspie2/` are not replaced by the installer.
+The same Configure view also contains notification settings for toast timeout and opacity.
 
 ## Launching d2wc
 
@@ -124,7 +102,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The same setting can be changed from the configurator:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
 The checkbox is:

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from d2wc.core.geom_operations import GeometryOperationError, add_geometry_profile_to_source
-from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlockParser
+from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlockParser, is_d2wc_managed_source
 from d2wc.core.managed_config import GeometryProfile, ManagedConfig, extract_managed_config
 from d2wc.core.placement_operations import PlacementOperationError, add_placement_rule_to_source
 from d2wc.core.rendering import RenderValidationError
@@ -18,6 +18,7 @@ from d2wc.event_preview import EventRulePreview, build_event_rule_preview
 
 TEST_CONFIG_RELATIVE_PATH = Path(".config/devilspie2/d2wc-test.lua")
 BUNDLED_CONFIG_PATH = Path(__file__).resolve().parents[1] / "d2wc.lua"
+MISSING_MANAGED_MARKER_ERROR = "could not load config file: missing D2WC_MANAGED marker"
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,12 @@ def load_test_config_snapshot(path: Path | None = None) -> TestConfigSnapshot:
 
     try:
         source = config_path.read_text(encoding="utf-8")
+        if not is_d2wc_managed_source(source):
+            return TestConfigSnapshot(
+                path=config_path,
+                exists=True,
+                error=MISSING_MANAGED_MARKER_ERROR,
+            )
         parse_result = ManagedBlockParser().parse(source)
         validation = validate_managed_blocks(parse_result.blocks)
         config = extract_managed_config(parse_result.blocks) if validation.ok else None

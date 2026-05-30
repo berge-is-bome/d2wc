@@ -2,6 +2,7 @@ from d2wc import __main__
 
 
 MANAGED_CONFIG_SOURCE = '''
+local D2WC_MANAGED = true
 local EXCLUDE = {
 }
 local PIN = {
@@ -34,8 +35,10 @@ def test_main_without_args_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
 
     assert exit_code == 0
     assert len(calls) == 1
-    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
-    assert config_awareness.status == "ok"
+    event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert event_data.domain is None
+    assert event_data.class_instance_name is None
+    assert config_awareness.status == "skipped"
     assert test_config_snapshot.ok
     assert test_config_snapshot.path == config_path
     assert prepare_result is None
@@ -58,8 +61,10 @@ def test_main_configure_runs_gtk_launcher(monkeypatch, tmp_path) -> None:
 
     assert exit_code == 0
     assert len(calls) == 1
-    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
-    assert config_awareness.status == "ok"
+    event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert event_data.domain is None
+    assert event_data.class_instance_name is None
+    assert config_awareness.status == "skipped"
     assert test_config_snapshot.ok
     assert test_config_snapshot.path == config_path
     assert prepare_result is None
@@ -127,6 +132,32 @@ def test_main_configure_passes_event_data_and_config_awareness(monkeypatch, tmp_
     assert prepare_result is None
 
 
+def test_main_configure_loads_event_fixture_when_requested(monkeypatch, tmp_path) -> None:
+    calls = []
+    config_path = tmp_path / "d2wc.lua"
+    config_path.write_text(MANAGED_CONFIG_SOURCE, encoding="utf-8")
+
+    monkeypatch.setattr(__main__, "load_managed_config_snapshot", lambda path=None: __main__.load_test_config_snapshot(config_path if path is None else path))
+
+    def fake_run_configurator(event_data, config_awareness, test_config_snapshot, prepare_result) -> int:
+        calls.append((event_data, config_awareness, test_config_snapshot, prepare_result))
+        return 0
+
+    monkeypatch.setattr(__main__, "run_configurator", fake_run_configurator)
+
+    exit_code = __main__.main(["configure", "--event-fixture", "example"])
+
+    assert exit_code == 0
+    assert len(calls) == 1
+    event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert event_data.domain == "work"
+    assert event_data.class_instance_name == "work:Example"
+    assert config_awareness.status == "ok"
+    assert test_config_snapshot.ok
+    assert test_config_snapshot.path == config_path
+    assert prepare_result is None
+
+
 def test_main_configure_loads_test_config(monkeypatch, tmp_path) -> None:
     calls = []
     test_config_path = tmp_path / "d2wc-test.lua"
@@ -142,8 +173,10 @@ def test_main_configure_loads_test_config(monkeypatch, tmp_path) -> None:
 
     assert exit_code == 0
     assert len(calls) == 1
-    _event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
-    assert config_awareness.status == "ok"
+    event_data, config_awareness, test_config_snapshot, prepare_result = calls[0]
+    assert event_data.domain is None
+    assert event_data.class_instance_name is None
+    assert config_awareness.status == "skipped"
     assert test_config_snapshot.ok
     assert test_config_snapshot.path == test_config_path
     assert prepare_result is None

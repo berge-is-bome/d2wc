@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import argparse
-import sys
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass
+import fcntl
+import os
+import sys
 from pathlib import Path
 
 from d2wc.cli import main as cli_main
-from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
+from d2wc.core.user_paths import d2wc_config_dir
+from d2wc.event_data import EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
 from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
 from d2wc.managed_config_file import load_managed_config_snapshot
 from d2wc.test_config import (
@@ -18,7 +22,11 @@ from d2wc.test_config import (
     load_test_config_snapshot,
     prepare_test_config,
 )
+from d2wc.ui.action_prompt import run_action_prompt
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
+
+CONFIGURATOR_LOCK_FILENAME = "configurator.lock"
+PROMPT_LOCK_FILENAME = "prompt.lock"
 
 
 @dataclass(frozen=True)
@@ -42,32 +50,81 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args[:1] == ["configure"]:
         return _run_configure(args[1:])
 
+    if args[:1] == ["prompt"]:
+        return _run_prompt(args[1:])
+
     return cli_main(args)
 
 
 def _run_configure(argv: Sequence[str]) -> int:
     try:
-        configure_input = _parse_configure_args(argv)
+        configure_input = _parse_configure_args(argv, prog="d2wc configure")
+        return _run_configurator_once(configure_input)
+    except GtkConfiguratorImportError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _run_prompt(argv: Sequence[str]) -> int:
+    try:
+        configure_input = _parse_configure_args(argv, prog="d2wc prompt")
+        with _process_instance_lock(PROMPT_LOCK_FILENAME) as acquired:
+            if not acquired:
+                return 0
+            decision = run_action_prompt(configure_input.event_data)
+        if decision != "configure":
+            return 0
+        return _run_configurator_once(configure_input)
+    except GtkConfiguratorImportError as exc:
+        print(f"ERROR: {exc}")
+        return 2
+
+
+def _run_configurator_once(configure_input: ConfigureInput) -> int:
+    with _process_instance_lock(CONFIGURATOR_LOCK_FILENAME) as acquired:
+        if not acquired:
+            return 0
         return run_configurator(
             configure_input.event_data,
             configure_input.config_awareness,
             configure_input.test_config_snapshot,
             configure_input.prepare_result,
         )
-    except GtkConfiguratorImportError as exc:
-        print(f"ERROR: {exc}")
-        return 2
 
 
-def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
+@contextmanager
+def _process_instance_lock(lock_filename: str) -> Iterator[bool]:
+    """Hold a non-blocking process lock while one UI instance is open."""
+
+    lock_dir = d2wc_config_dir()
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / lock_filename
+    with lock_path.open("w", encoding="utf-8") as lock_file:
+        try:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            yield False
+            return
+
+        try:
+            lock_file.seek(0)
+            lock_file.truncate()
+            lock_file.write(f"{os.getpid()}\n")
+            lock_file.flush()
+            yield True
+        finally:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+
+def _parse_configure_args(argv: Sequence[str], *, prog: str) -> ConfigureInput:
     parser = argparse.ArgumentParser(
-        prog="d2wc configure",
+        prog=prog,
         description="Open the GTK d2wc managed-config editor.",
     )
     parser.add_argument(
         "--event-fixture",
         choices=EVENT_FIXTURE_NAMES,
-        default=DEFAULT_EVENT_FIXTURE,
+        default=None,
         help="Representative Devilspie2 event-data fixture to display.",
     )
     parser.add_argument(
@@ -111,7 +168,7 @@ def _parse_configure_args(argv: Sequence[str]) -> ConfigureInput:
     parser.add_argument("--window-height", type=float, default=None, help="Event window height.")
 
     args = parser.parse_args(list(argv))
-    event_data = get_event_fixture(args.event_fixture).with_overrides(
+    event_data = (get_event_fixture(args.event_fixture) if args.event_fixture else WindowEventData()).with_overrides(
         domain=args.domain,
         application_name=args.application_name,
         window_name=args.window_name,
@@ -161,8 +218,14 @@ def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> Ev
             status="error",
             warnings=(f"Could not read config file read-only: {exc}",),
         )
-
-    return build_event_config_awareness(source, build_event_rule_preview(event_data))
+    try:
+        preview = build_event_rule_preview(event_data)
+        return build_event_config_awareness(source, preview)
+    except Exception as exc:  # pragma: no cover - defensive UI reporting boundary
+        return EventConfigAwareness(
+            status="error",
+            warnings=(f"Could not inspect config read-only: {exc}",),
+        )
 
 
 if __name__ == "__main__":

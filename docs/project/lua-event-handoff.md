@@ -4,24 +4,9 @@
 
 This document describes the current Lua event handoff workflow used by `d2wc`.
 
-The goal is to let the active Devilspie2 `d2wc.lua` script open the GTK configurator automatically when a new normal application window appears and no existing managed rule already covers that window.
+The goal is to let the active Devilspie2 `d2wc.lua` script offer `d2wc` configuration automatically when a new normal application window appears and no existing managed rule already covers that window.
 
-## Current status
-
-Lua event handoff is implemented on the `lua-event-handoff` branch.
-
-Confirmed verification:
-
-```bash
-python3 -m d2wc validate --config src/d2wc.lua
-python3 -m pytest
-```
-
-Result:
-
-```text
-295 passed
-```
+The handoff is optional and user-controlled from the active managed Lua file and from the GTK configurator.
 
 ## Runtime flow
 
@@ -37,7 +22,7 @@ When managed by `d2wc`, that path is a symlink into:
 ~/.config/d2wc/lua/
 ```
 
-Devilspie2 runs the active Lua script for window events. The `d2wc` managed Lua script first filters to normal application windows:
+Devilspie2 runs the active Lua script for window events. The managed Lua script first filters to normal application windows:
 
 ```lua
 local window_type = get_window_type()
@@ -46,15 +31,25 @@ if (window_type ~= "WINDOW_TYPE_NORMAL") then
 end
 ```
 
-After the window type check, the script extracts the current Qubes domain and application class, builds the managed-rule lookup state, and decides whether the configurator should be launched.
+After the window type check, the script extracts the current Qubes domain and application class, builds the managed-rule lookup state, and decides whether the selected `d2wc` entry point should be launched.
 
-The Lua handoff launches the configurator with the bare installed command:
+The handoff call is:
 
 ```lua
-os.execute("d2wc >/dev/null 2>&1 &")
+launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls), domain)
 ```
 
-The handoff does not pass command-line event arguments in the current implementation.
+The handoff does not run when the window is already covered by a managed target rule.
+
+## Managed Lua marker
+
+Managed Lua files identify themselves with executable Lua state, not with a comment marker:
+
+```lua
+local D2WC_MANAGED = true
+```
+
+Files without that marker are not treated as `d2wc` managed Lua files.
 
 ## Handoff toggle
 
@@ -64,7 +59,7 @@ The handoff is controlled in each managed Lua file by:
 local D2WC_EVENT_HANDOFF_ENABLED = true
 ```
 
-Set it to `false` to disable automatic configurator launching:
+Set it to `false` to disable automatic handoff:
 
 ```lua
 local D2WC_EVENT_HANDOFF_ENABLED = false
@@ -73,7 +68,7 @@ local D2WC_EVENT_HANDOFF_ENABLED = false
 The GTK configurator exposes this setting from:
 
 ```text
-Menu -> Configure -> Window events
+Menu -> Configure -> Behavior
 ```
 
 The checkbox label is:
@@ -82,9 +77,95 @@ The checkbox label is:
 Automatically open d2wc for unconfigured windows
 ```
 
-Changing this setting updates the active managed Lua file through the same safe-save path used by other configurator writes. Existing comments and managed rules are preserved.
+## Handoff entry point
 
-## Configurator recursion suppression
+The selected automatic entry point is controlled in each managed Lua file by:
+
+```lua
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
+```
+
+Supported values:
+
+1. `configurator`: open the full GTK configurator directly.
+2. `prompt`: show the small Cancel/Configure prompt first.
+
+The GTK configurator exposes this setting from:
+
+```text
+Menu -> Configure -> Behavior -> Entry point
+```
+
+The visible choices are:
+
+1. `Open configurator directly`
+2. `Show Cancel/Configure button first`
+
+## Direct configurator entry point
+
+When `D2WC_EVENT_HANDOFF_ENTRY_POINT` is `"configurator"`, the Lua handoff launches the installed command:
+
+```lua
+os.execute("d2wc >/dev/null 2>&1 &")
+```
+
+The normal installed command is still:
+
+```bash
+d2wc
+```
+
+The explicit configurator subcommand remains supported:
+
+```bash
+d2wc configure
+```
+
+## Prompt entry point
+
+When `D2WC_EVENT_HANDOFF_ENTRY_POINT` is `"prompt"`, the Lua handoff launches:
+
+```bash
+d2wc prompt
+```
+
+The prompt displays a compact action window with:
+
+1. `Cancel`
+2. `Configure`
+
+The pointer is positioned on `Cancel` automatically..
+
+Choosing `Configure` opens the normal GTK configurator. Choosing `Cancel` closes the prompt without opening the configurator.
+
+The prompt publishes this GTK/X11 class:
+
+```text
+d2wc-action-prompt
+```
+
+The Lua handoff suppresses this class to avoid prompt recursion.
+
+## Event geometry handoff
+
+The Lua runtime captures the current event window geometry with Devilspie2:
+
+```lua
+local geometry_ok, x, y, w, h = pcall(get_window_geometry)
+```
+
+When geometry capture succeeds, prompt mode passes these command-line arguments to `d2wc prompt`:
+
+```text
+--window-x
+--window-y
+--window-width
+--window-height
+```
+
+The prompt uses those values to place itself near the bottom-right corner of the window that triggered the event.
+
+## Recursion suppression
 
 The configurator publishes a stable GTK/X11 window class:
 
@@ -92,19 +173,26 @@ The configurator publishes a stable GTK/X11 window class:
 d2wc-configurator
 ```
 
+The prompt publishes a stable GTK/X11 window class:
+
+```text
+d2wc-action-prompt
+```
+
 The Lua handoff checks the current window class against:
 
 ```lua
 local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
+local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 ```
 
-If the current window is the configurator itself, Lua does not launch another configurator instance. This prevents the configurator window from triggering recursive configurator launches.
+If the current window is the configurator or the action prompt, Lua does not launch another `d2wc` entry point.
 
 In this context, "class" means the X11/WM class value derived from `get_class_instance_name()`, not a Python class.
 
 ## Already-configured window suppression
 
-The handoff suppresses automatic configurator launch when the current window already matches a managed target rule.
+The handoff suppresses automatic launch when the current window already matches a managed target rule.
 
 The suppression check counts these managed sections as configured-window handling rules:
 
@@ -116,11 +204,28 @@ The suppression check counts these managed sections as configured-window handlin
 
 `GEOM` alone is not counted because a geometry profile does not target a window by itself.
 
-This means a new unconfigured normal window can open `d2wc`, while a window that already has a route, placement, pin, exclusion, or left-edge correction does not repeatedly open the configurator.
+This means a new unconfigured normal window can open `d2wc`, while a window that already has a route, placement, pin, exclusion, or left-edge correction does not repeatedly open the configurator or prompt.
+
+## Process instance locks
+
+The Python entry points use process locks under:
+
+```text
+~/.config/d2wc/
+```
+
+Current lock files:
+
+```text
+~/.config/d2wc/configurator.lock
+~/.config/d2wc/prompt.lock
+```
+
+Only one configurator instance and one prompt instance should be active at a time for a given user session.
 
 ## Managed Lua update behavior
 
-Installer updates run a targeted runtime migration over marked managed Lua files under:
+Installer updates run targeted runtime migrations over marked managed Lua files under:
 
 ```text
 ~/.config/d2wc/lua/
@@ -128,21 +233,25 @@ Installer updates run a targeted runtime migration over marked managed Lua files
 
 A file must contain the managed marker:
 
-```text
-d2wc managed
+```lua
+local D2WC_MANAGED = true
 ```
 
-Files without that marker are skipped by the migration helper and rejected by the installer when selected as the active managed file.
+Files without that marker are skipped by the migration helper and rejected when selected as the active managed file.
 
 For marked managed files, the migration inserts only missing runtime snippets needed by the current managed Lua runtime. It does not rewrite the full template, normalize formatting, or replace user-authored comments.
 
 The migration can add missing pieces such as:
 
 1. latest header version comments,
-2. handoff settings,
-3. the handoff helper,
-4. already-configured suppression helpers,
-5. the handoff call.
+2. `D2WC_MANAGED`,
+3. `D2WC_EVENT_HANDOFF_ENABLED`,
+4. `D2WC_EVENT_HANDOFF_ENTRY_POINT`,
+5. `D2WC_CONFIGURATOR_CLASS`,
+6. `D2WC_ACTION_PROMPT_CLASS`,
+7. Lua event handoff helper code,
+8. already-configured suppression helpers,
+9. the handoff call.
 
 Existing user values are preserved. For example, if a user has already set:
 
@@ -154,7 +263,7 @@ an installer update must not flip it back to `true`.
 
 ## Temporary Devilspie2 inventory monitor cleanup
 
-The configurator still starts a temporary Devilspie2 debug process for the known-window inventory monitor.
+The configurator starts a temporary Devilspie2 debug process for the known-window inventory monitor.
 
 Those temporary processes use folders like:
 
@@ -162,7 +271,7 @@ Those temporary processes use folders like:
 /tmp/d2wc-devilspie2-inventory-*
 ```
 
-The inventory stream is now stoppable. When the configurator closes or the editor is rebuilt, the monitor stop event is passed into the stream and the temporary Devilspie2 process is terminated.
+The inventory stream is stoppable. When the configurator closes or the editor is rebuilt, the monitor stop event is passed into the stream and the temporary Devilspie2 process is terminated.
 
 Expected behavior after closing `d2wc`:
 
@@ -172,18 +281,20 @@ ps aux | grep 'devilspie2 --debug --folder /tmp/d2wc-devilspie2-inventory-' | gr
 
 No stale inventory process should remain.
 
-## Configure dialog layout
+## Configure view layout
 
-The GTK `Configure` dialog is grouped into sections:
+`Menu -> Configure` replaces the main editor area with an in-window settings view.
 
-1. `Window events`
+The settings view has a left navigation column with:
+
+1. `Behavior`
 2. `Notifications`
 
-`Window events` contains the automatic handoff toggle.
+`Behavior` contains the automatic handoff toggle and the entry-point selector.
 
 `Notifications` contains:
 
 1. toast timeout seconds,
 2. toast opacity.
 
-This keeps the settings dialog from becoming a flat list of unrelated options.
+The `Back` button returns to the managed rule editor.

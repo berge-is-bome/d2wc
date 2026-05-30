@@ -15,17 +15,22 @@ from d2wc.managed_config_file import (
     managed_config_status_text,
     save_managed_config_as,
 )
-from d2wc.test_config import TestConfigPrepareResult, TestConfigSnapshot
+from d2wc.test_config import MISSING_MANAGED_MARKER_ERROR, TestConfigPrepareResult, TestConfigSnapshot
 from d2wc.ui.managed_actions import build_managed_section_editor
 from d2wc.ui_settings import UiSettings, load_ui_settings, save_ui_settings
 
 CONFIGURATOR_WINDOW_CLASS = "d2wc-configurator"
-UI_FONT_POINT_INCREASE = 2
 D2WC_EVENT_HANDOFF_PATTERN = re.compile(
     r"(?m)^(?P<prefix>\s*local\s+D2WC_EVENT_HANDOFF_ENABLED\s*=\s*)"
     r"(?P<value>true|false)"
     r"(?P<suffix>\s*(?:--.*)?)$"
 )
+D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN = re.compile(
+    r"(?m)^(?P<prefix>\s*local\s+D2WC_EVENT_HANDOFF_ENTRY_POINT\s*=\s*)"
+    r'"(?P<value>configurator|prompt)"'
+    r"(?P<suffix>\s*(?:--.*)?)$"
+)
+D2WC_EVENT_HANDOFF_ENTRY_POINTS = {"configurator", "prompt"}
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -44,14 +49,14 @@ def _import_gtk():
     try:
         gi.require_version("Gtk", "3.0")
         gi.require_version("Gdk", "3.0")
-        from gi.repository import Gdk, GLib, Gtk, Pango
+        from gi.repository import Gdk, GLib, Gtk
     except (ImportError, ValueError) as exc:  # pragma: no cover
         raise GtkConfiguratorImportError(
             "GTK 3 bindings are not available. Install the system GTK 3 PyGObject bindings, "
             "then run `python -m d2wc configure` again."
         ) from exc
 
-    return Gtk, Gdk, GLib, Pango
+    return Gtk, Gdk, GLib
 
 
 def run_configurator(
@@ -64,9 +69,9 @@ def run_configurator(
 
     _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
     ui_settings = load_ui_settings()
-    Gtk, Gdk, GLib, Pango = _import_gtk()
+    Gtk, Gdk, GLib = _import_gtk()
     _set_configurator_window_class(Gdk, GLib)
-    _apply_ui_css(Gtk, Gdk, Pango, UI_FONT_POINT_INCREASE)
+    _apply_ui_css(Gtk, Gdk)
 
     window = Gtk.Window(title="d2wc Configurator")
     window.set_wmclass(CONFIGURATOR_WINDOW_CLASS, CONFIGURATOR_WINDOW_CLASS)
@@ -104,18 +109,41 @@ def run_configurator(
         else:
             window.set_title("d2wc Configurator")
 
-    def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
-        old_editor = state.get("editor")
-        if old_editor is not None and hasattr(old_editor, "stop"):
-            old_editor.stop()
+    def stop_current_editor() -> None:
+        editor = state.get("editor")
+        if editor is not None and hasattr(editor, "stop"):
+            editor.stop()
+        state["editor"] = None
+
+    def clear_content() -> None:
         for child in content.get_children():
             content.remove(child)
-        editor = build_managed_section_editor(Gtk, snapshot, _event, GLib=GLib, toast_settings=current_toast_settings)
-        state["snapshot"] = snapshot
+
+    def is_missing_managed_marker_snapshot(snapshot: TestConfigSnapshot | None) -> bool:
+        return snapshot is not None and snapshot.error == MISSING_MANAGED_MARKER_ERROR
+
+    def show_missing_managed_marker_toast() -> None:
+        timeout_seconds, opacity = current_toast_settings()
+        _show_toast(
+            Gtk,
+            outer,
+            MISSING_MANAGED_MARKER_ERROR,
+            timeout_seconds=timeout_seconds,
+            opacity=opacity,
+        )
+
+    def rebuild_editor(snapshot: TestConfigSnapshot | None) -> None:
+        stop_current_editor()
+        clear_content()
+        display_snapshot = None if is_missing_managed_marker_snapshot(snapshot) else snapshot
+        editor = build_managed_section_editor(Gtk, display_snapshot, _event, GLib=GLib, toast_settings=current_toast_settings)
+        state["snapshot"] = display_snapshot
         state["editor"] = editor
         content.pack_start(editor.widget, True, True, 0)
         content.show_all()
         update_window_state()
+        if is_missing_managed_marker_snapshot(snapshot):
+            show_missing_managed_marker_toast()
 
     def open_managed_file(_item=None) -> None:
         managed_dir = default_managed_config_dir()
@@ -141,12 +169,13 @@ def run_configurator(
             return
         snapshot = load_managed_config_snapshot(selected)
         if not snapshot.ok:
-            _show_message(Gtk, window, managed_config_status_text(snapshot))
+            if is_missing_managed_marker_snapshot(snapshot):
+                show_missing_managed_marker_toast()
+            else:
+                _show_message(Gtk, window, managed_config_status_text(snapshot))
             return
-        activation = activate_managed_config(selected)
+        activate_managed_config(selected)
         rebuild_editor(snapshot)
-        if not activation.ok:
-            _show_message(Gtk, window, activation.message)
 
     def save_managed_file_as(_item=None) -> None:
         snapshot = current_snapshot()
@@ -183,7 +212,10 @@ def run_configurator(
             return
         refreshed = load_managed_config_snapshot(result.path)
         if not refreshed.ok:
-            _show_message(Gtk, window, managed_config_status_text(refreshed))
+            if is_missing_managed_marker_snapshot(refreshed):
+                show_missing_managed_marker_toast()
+            else:
+                _show_message(Gtk, window, managed_config_status_text(refreshed))
             return
         activation = activate_managed_config(result.path)
         rebuild_editor(refreshed)
@@ -193,46 +225,231 @@ def run_configurator(
         else:
             _show_message(Gtk, window, f"{result.message}\n\n{activation.message}")
 
+    def show_settings_page(active_page: str = "behavior") -> None:
+        stop_current_editor()
+        clear_content()
+        content.pack_start(build_settings_view(active_page), True, True, 0)
+        content.show_all()
+        update_window_state()
+
     def configure_preferences(_item=None) -> None:
+        show_settings_page("behavior")
+
+    def build_settings_view(active_page: str):
+        settings_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=18)
+        settings_box.set_hexpand(True)
+        settings_box.set_vexpand(True)
+        settings_box.set_margin_top(8)
+        settings_box.set_margin_bottom(8)
+        settings_box.set_margin_start(8)
+        settings_box.set_margin_end(8)
+
+        sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        sidebar.set_size_request(220, -1)
+        settings_box.pack_start(sidebar, False, False, 0)
+
+        nav_heading = Gtk.Label(label="Configure")
+        nav_heading.set_xalign(0)
+        if hasattr(nav_heading, "set_markup"):
+            nav_heading.set_markup("<b>Configure</b>")
+        sidebar.pack_start(nav_heading, False, False, 0)
+
+        stack = Gtk.Stack()
+        stack.set_hexpand(True)
+        stack.set_vexpand(True)
+        settings_box.pack_start(stack, True, True, 0)
+
+        behavior_button = Gtk.ToggleButton(label="Behavior")
+        notifications_button = Gtk.ToggleButton(label="Notifications")
+        sidebar.pack_start(behavior_button, False, False, 0)
+        sidebar.pack_start(notifications_button, False, False, 0)
+
+        back_button = Gtk.Button(label="Back")
+        back_button.set_halign(Gtk.Align.START)
+        back_button.connect("clicked", lambda _button: rebuild_editor(current_snapshot()))
+        sidebar.pack_end(back_button, False, False, 0)
+
+        stack.add_named(build_behavior_settings_page(), "behavior")
+        stack.add_named(build_notifications_settings_page(), "notifications")
+
+        def activate_page(page_name: str) -> None:
+            stack.set_visible_child_name(page_name)
+            behavior_button.set_active(page_name == "behavior")
+            notifications_button.set_active(page_name == "notifications")
+
+        behavior_button.connect("toggled", lambda button: activate_page("behavior") if button.get_active() else None)
+        notifications_button.connect("toggled", lambda button: activate_page("notifications") if button.get_active() else None)
+        activate_page(active_page if active_page in {"behavior", "notifications"} else "behavior")
+
+        return settings_box
+
+    def build_behavior_settings_page():
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        page.set_hexpand(True)
+        page.set_vexpand(True)
+        page.set_margin_top(8)
+        page.set_margin_bottom(8)
+        page.set_margin_start(8)
+        page.set_margin_end(8)
+
+        heading = Gtk.Label(label="Behavior")
+        heading.set_xalign(0)
+        if hasattr(heading, "set_markup"):
+            heading.set_markup("<b>Behavior</b>")
+        page.pack_start(heading, False, False, 0)
+
+        subheading = Gtk.Label(label="Automatic opening")
+        subheading.set_xalign(0)
+        page.pack_start(subheading, False, False, 0)
+
         snapshot = current_snapshot()
-        timeout_seconds, opacity = current_toast_settings()
         current_handoff_enabled = None
+        current_entry_point = None
         if snapshot is not None and snapshot.exists:
             current_handoff_enabled = _read_event_handoff_enabled(snapshot.path)
+            current_entry_point = _read_event_handoff_entry_point(snapshot.path)
 
-        dialog = Gtk.Dialog(title="Configure", transient_for=window, flags=0)
-        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
-        dialog.set_default_response(Gtk.ResponseType.OK)
+        behavior_settings_available = current_handoff_enabled is not None and current_entry_point is not None
 
-        box = dialog.get_content_area()
+        handoff_check = Gtk.CheckButton(label="Automatically open d2wc for unconfigured windows")
+        handoff_check.set_active(bool(current_handoff_enabled))
+        handoff_check.set_sensitive(current_handoff_enabled is not None)
+        page.pack_start(handoff_check, False, False, 0)
+
+        if current_handoff_enabled is None:
+            hint_text = "No active managed config with D2WC_EVENT_HANDOFF_ENABLED is loaded."
+        else:
+            hint_text = (
+                "Controls whether Devilspie2 opens d2wc automatically on new window events, "
+                "for unconfigured windows."
+            )
+        hint = Gtk.Label(label=hint_text)
+        hint.set_xalign(0)
+        hint.set_line_wrap(True)
+        page.pack_start(hint, False, False, 0)
+
+        entry_heading = Gtk.Label(label="Entry point")
+        entry_heading.set_xalign(0)
+        page.pack_start(entry_heading, False, False, 0)
+
+        configurator_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Open configurator directly")
+        prompt_radio = Gtk.RadioButton.new_with_label_from_widget(configurator_radio, "Show Cancel/Configure button first")
+        configurator_radio.set_sensitive(current_entry_point is not None)
+        prompt_radio.set_sensitive(current_entry_point is not None)
+        if current_entry_point == "prompt":
+            prompt_radio.set_active(True)
+        else:
+            configurator_radio.set_active(True)
+        page.pack_start(configurator_radio, False, False, 0)
+        page.pack_start(prompt_radio, False, False, 0)
+
+        if current_entry_point is None:
+            entry_hint_text = "No active managed config with D2WC_EVENT_HANDOFF_ENTRY_POINT is loaded."
+        else:
+            entry_hint_text = "Choose what appears when automatic opening handles an unconfigured window."
+        entry_hint = Gtk.Label(label=entry_hint_text)
+        entry_hint.set_xalign(0)
+        entry_hint.set_line_wrap(True)
+        page.pack_start(entry_hint, False, False, 0)
+
+        spacer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        page.pack_start(spacer, True, True, 0)
+
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        page.pack_start(action_box, False, False, 0)
+
+        apply_button = Gtk.Button(label="Apply")
+        apply_button.set_sensitive(behavior_settings_available)
+        action_box.pack_end(apply_button, False, False, 0)
+
+        def apply_behavior_settings(_button) -> None:
+            nonlocal current_handoff_enabled, current_entry_point
+            snapshot_value = current_snapshot()
+            if snapshot_value is None or not snapshot_value.exists:
+                _show_message(Gtk, window, "No managed config is loaded.")
+                return
+
+            current_handoff_enabled = _read_event_handoff_enabled(snapshot_value.path)
+            current_entry_point = _read_event_handoff_entry_point(snapshot_value.path)
+            if current_handoff_enabled is None or current_entry_point is None:
+                _show_message(Gtk, window, "The active managed config does not contain the handoff behavior settings.")
+                return
+
+            new_handoff_enabled = bool(handoff_check.get_active())
+            new_entry_point = "prompt" if prompt_radio.get_active() else "configurator"
+            changed = False
+
+            if new_handoff_enabled != current_handoff_enabled:
+                try:
+                    _set_event_handoff_enabled(snapshot_value.path, new_handoff_enabled)
+                except ValueError as exc:
+                    _show_message(Gtk, window, str(exc))
+                    return
+                except SaveValidationError as exc:
+                    _show_message(Gtk, window, "Could not save handoff setting:\n" + "\n".join(exc.validation.errors))
+                    return
+                except (OSError, SaveConfigError) as exc:
+                    _show_message(Gtk, window, f"Could not save handoff setting:\n{exc}")
+                    return
+                current_handoff_enabled = new_handoff_enabled
+                changed = True
+
+            if new_entry_point != current_entry_point:
+                try:
+                    _set_event_handoff_entry_point(snapshot_value.path, new_entry_point)
+                except ValueError as exc:
+                    _show_message(Gtk, window, str(exc))
+                    return
+                except SaveValidationError as exc:
+                    _show_message(Gtk, window, "Could not save handoff entry point:\n" + "\n".join(exc.validation.errors))
+                    return
+                except (OSError, SaveConfigError) as exc:
+                    _show_message(Gtk, window, f"Could not save handoff entry point:\n{exc}")
+                    return
+                current_entry_point = new_entry_point
+                changed = True
+
+            if changed:
+                refreshed = load_managed_config_snapshot(snapshot_value.path)
+                if refreshed.ok:
+                    state["snapshot"] = refreshed
+
+            timeout_seconds, opacity = current_toast_settings()
+            handoff_text = "enabled" if current_handoff_enabled else "disabled"
+            entry_point_text = "button" if current_entry_point == "prompt" else "configurator"
+            _show_toast(
+                Gtk,
+                outer,
+                f"Behavior settings updated: automatic handoff {handoff_text}, entry point {entry_point_text}",
+                timeout_seconds=timeout_seconds,
+                opacity=opacity,
+            )
+
+        apply_button.connect("clicked", apply_behavior_settings)
+        return page
+
+    def build_notifications_settings_page():
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        page.set_hexpand(True)
+        page.set_vexpand(True)
+        page.set_margin_top(8)
+        page.set_margin_bottom(8)
+        page.set_margin_start(8)
+        page.set_margin_end(8)
+
+        heading = Gtk.Label(label="Notifications")
+        heading.set_xalign(0)
+        if hasattr(heading, "set_markup"):
+            heading.set_markup("<b>Notifications</b>")
+        page.pack_start(heading, False, False, 0)
+
         grid = Gtk.Grid()
         grid.set_column_spacing(10)
         grid.set_row_spacing(10)
-        grid.set_margin_top(12)
-        grid.set_margin_bottom(12)
-        grid.set_margin_start(12)
-        grid.set_margin_end(12)
-        box.add(grid)
+        grid.set_hexpand(True)
+        page.pack_start(grid, False, False, 0)
 
-        event_heading = Gtk.Label(label="Window events")
-        event_heading.set_xalign(0)
-        if hasattr(event_heading, "set_markup"):
-            event_heading.set_markup("<b>Window events</b>")
-        event_handoff_check = Gtk.CheckButton(label="Automatically open d2wc for unconfigured windows")
-        event_handoff_check.set_active(bool(current_handoff_enabled))
-        event_handoff_check.set_sensitive(current_handoff_enabled is not None)
-
-        if current_handoff_enabled is None:
-            event_hint = Gtk.Label(label="No active managed config with D2WC_EVENT_HANDOFF_ENABLED is loaded.")
-        else:
-            event_hint = Gtk.Label(label="Updates D2WC_EVENT_HANDOFF_ENABLED in the active managed Lua file.")
-        event_hint.set_xalign(0)
-        event_hint.set_line_wrap(True)
-
-        notifications_heading = Gtk.Label(label="Notifications")
-        notifications_heading.set_xalign(0)
-        if hasattr(notifications_heading, "set_markup"):
-            notifications_heading.set_markup("<b>Notifications</b>")
+        timeout_seconds, opacity = current_toast_settings()
 
         timeout_label = Gtk.Label(label="Toast timeout seconds")
         timeout_label.set_xalign(0)
@@ -246,25 +463,23 @@ def run_configurator(
         opacity_spin = Gtk.SpinButton(adjustment=opacity_adjustment, climb_rate=0.05, digits=2)
         opacity_spin.set_numeric(True)
 
-        grid.attach(event_heading, 0, 0, 2, 1)
-        grid.attach(event_handoff_check, 0, 1, 2, 1)
-        grid.attach(event_hint, 0, 2, 2, 1)
-        grid.attach(notifications_heading, 0, 3, 2, 1)
-        grid.attach(timeout_label, 0, 4, 1, 1)
-        grid.attach(timeout_spin, 1, 4, 1, 1)
-        grid.attach(opacity_label, 0, 5, 1, 1)
-        grid.attach(opacity_spin, 1, 5, 1, 1)
-        dialog.show_all()
+        grid.attach(timeout_label, 0, 0, 1, 1)
+        grid.attach(timeout_spin, 1, 0, 1, 1)
+        grid.attach(opacity_label, 0, 1, 1, 1)
+        grid.attach(opacity_spin, 1, 1, 1, 1)
 
-        handoff_changed = False
-        try:
-            response = dialog.run()
-            if response != Gtk.ResponseType.OK:
-                return
+        spacer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        page.pack_start(spacer, True, True, 0)
 
+        action_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        page.pack_start(action_box, False, False, 0)
+
+        apply_button = Gtk.Button(label="Apply")
+        action_box.pack_end(apply_button, False, False, 0)
+
+        def apply_notification_settings(_button) -> None:
             new_timeout = int(timeout_spin.get_value_as_int())
             new_opacity = float(opacity_spin.get_value())
-            new_handoff_enabled = bool(event_handoff_check.get_active())
 
             state["toast_timeout_seconds"] = new_timeout
             state["toast_opacity"] = new_opacity
@@ -275,48 +490,20 @@ def run_configurator(
                 )
             )
 
-            if (
-                snapshot is not None
-                and snapshot.exists
-                and current_handoff_enabled is not None
-                and new_handoff_enabled != current_handoff_enabled
-            ):
-                try:
-                    _set_event_handoff_enabled(snapshot.path, new_handoff_enabled)
-                except ValueError as exc:
-                    _show_message(Gtk, window, str(exc))
-                    return
-                except SaveValidationError as exc:
-                    _show_message(Gtk, window, "Could not save handoff setting:\n" + "\n".join(exc.validation.errors))
-                    return
-                except (OSError, SaveConfigError) as exc:
-                    _show_message(Gtk, window, f"Could not save handoff setting:\n{exc}")
-                    return
-                refreshed = load_managed_config_snapshot(snapshot.path)
-                if refreshed.ok:
-                    state["snapshot"] = refreshed
-                handoff_changed = True
-        finally:
-            dialog.destroy()
+            timeout_seconds_value, opacity_value = current_toast_settings()
+            _show_toast(
+                Gtk,
+                outer,
+                f"Notification settings updated: {timeout_seconds_value}s, opacity {opacity_value:.2f}",
+                timeout_seconds=timeout_seconds_value,
+                opacity=opacity_value,
+            )
 
-        timeout_seconds, opacity = current_toast_settings()
-        if handoff_changed:
-            handoff_text = "enabled" if _read_event_handoff_enabled(snapshot.path) else "disabled"
-            toast_text = f"Settings updated: event handoff {handoff_text}; toast {timeout_seconds}s, opacity {opacity:.2f}"
-        else:
-            toast_text = f"Toast settings updated: {timeout_seconds}s, opacity {opacity:.2f}"
-        _show_toast(
-            Gtk,
-            outer,
-            toast_text,
-            timeout_seconds=timeout_seconds,
-            opacity=opacity,
-        )
+        apply_button.connect("clicked", apply_notification_settings)
+        return page
 
     def handle_destroy(_window) -> None:
-        editor = state.get("editor")
-        if editor is not None and hasattr(editor, "stop"):
-            editor.stop()
+        stop_current_editor()
         Gtk.main_quit()
 
     window.connect("destroy", handle_destroy)
@@ -368,24 +555,12 @@ def _set_configurator_window_class(Gdk, GLib) -> None:
     Gdk.set_program_class(CONFIGURATOR_WINDOW_CLASS)
 
 
-def _apply_ui_css(Gtk, Gdk, Pango, point_increase: int) -> None:
+def _apply_ui_css(Gtk, Gdk) -> None:
     """Apply application-scoped GTK CSS tweaks."""
 
-    settings = Gtk.Settings.get_default()
-    if settings is None:
-        return
-
-    font_name = settings.get_property("gtk-font-name") or ""
-    font_description = Pango.FontDescription(font_name)
-    theme_font_size = font_description.get_size()
-    if theme_font_size <= 0:
-        return
-
-    font_size_pt = int(round(theme_font_size / Pango.SCALE))
     provider = Gtk.CssProvider()
     provider.load_from_data(
         (
-            f"* {{ font-size: {font_size_pt + point_increase}pt; }}\n"
             "infobar { padding: 2px; }\n"
             "infobar label { padding: 2px 6px; }\n"
         ).encode("utf-8")
@@ -425,6 +600,20 @@ def _read_event_handoff_enabled(config_path: Path) -> bool | None:
     return match.group("value") == "true"
 
 
+def _read_event_handoff_entry_point(config_path: Path) -> str | None:
+    try:
+        source = Path(config_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN.search(source)
+    if match is None:
+        return None
+    value = match.group("value")
+    if value not in D2WC_EVENT_HANDOFF_ENTRY_POINTS:
+        return None
+    return value
+
+
 def _set_event_handoff_enabled(config_path: Path, enabled: bool) -> None:
     path = Path(config_path)
     source = path.read_text(encoding="utf-8")
@@ -436,6 +625,23 @@ def _set_event_handoff_enabled(config_path: Path, enabled: bool) -> None:
     updated, count = D2WC_EVENT_HANDOFF_PATTERN.subn(replace, source, count=1)
     if count != 1:
         raise ValueError("The active managed config does not contain D2WC_EVENT_HANDOFF_ENABLED.")
+
+    save_source_config(path, updated)
+
+
+def _set_event_handoff_entry_point(config_path: Path, entry_point: str) -> None:
+    if entry_point not in D2WC_EVENT_HANDOFF_ENTRY_POINTS:
+        raise ValueError(f"Unsupported handoff entry point: {entry_point}")
+
+    path = Path(config_path)
+    source = path.read_text(encoding="utf-8")
+
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}\"{entry_point}\"{match.group('suffix')}"
+
+    updated, count = D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN.subn(replace, source, count=1)
+    if count != 1:
+        raise ValueError("The active managed config does not contain D2WC_EVENT_HANDOFF_ENTRY_POINT.")
 
     save_source_config(path, updated)
 
