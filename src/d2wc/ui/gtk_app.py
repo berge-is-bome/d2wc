@@ -25,6 +25,12 @@ D2WC_EVENT_HANDOFF_PATTERN = re.compile(
     r"(?P<value>true|false)"
     r"(?P<suffix>\s*(?:--.*)?)$"
 )
+D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN = re.compile(
+    r"(?m)^(?P<prefix>\s*local\s+D2WC_EVENT_HANDOFF_ENTRY_POINT\s*=\s*)"
+    r'"(?P<value>configurator|prompt)"'
+    r"(?P<suffix>\s*(?:--.*)?)$"
+)
+D2WC_EVENT_HANDOFF_ENTRY_POINTS = {"configurator", "prompt"}
 
 
 class GtkConfiguratorImportError(RuntimeError):
@@ -276,8 +282,12 @@ def run_configurator(
 
         snapshot = current_snapshot()
         current_handoff_enabled = None
+        current_entry_point = None
         if snapshot is not None and snapshot.exists:
             current_handoff_enabled = _read_event_handoff_enabled(snapshot.path)
+            current_entry_point = _read_event_handoff_entry_point(snapshot.path)
+
+        behavior_settings_available = current_handoff_enabled is not None and current_entry_point is not None
 
         handoff_check = Gtk.CheckButton(label="Automatically open d2wc for unconfigured windows")
         handoff_check.set_active(bool(current_handoff_enabled))
@@ -296,6 +306,30 @@ def run_configurator(
         hint.set_line_wrap(True)
         page.pack_start(hint, False, False, 0)
 
+        entry_heading = Gtk.Label(label="Entry point")
+        entry_heading.set_xalign(0)
+        page.pack_start(entry_heading, False, False, 0)
+
+        configurator_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Open configurator directly")
+        prompt_radio = Gtk.RadioButton.new_with_label_from_widget(configurator_radio, "Show Cancel/Configure button first")
+        configurator_radio.set_sensitive(current_entry_point is not None)
+        prompt_radio.set_sensitive(current_entry_point is not None)
+        if current_entry_point == "prompt":
+            prompt_radio.set_active(True)
+        else:
+            configurator_radio.set_active(True)
+        page.pack_start(configurator_radio, False, False, 0)
+        page.pack_start(prompt_radio, False, False, 0)
+
+        if current_entry_point is None:
+            entry_hint_text = "No active managed config with D2WC_EVENT_HANDOFF_ENTRY_POINT is loaded."
+        else:
+            entry_hint_text = "Choose what appears when automatic opening handles an unconfigured window."
+        entry_hint = Gtk.Label(label=entry_hint_text)
+        entry_hint.set_xalign(0)
+        entry_hint.set_line_wrap(True)
+        page.pack_start(entry_hint, False, False, 0)
+
         spacer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         page.pack_start(spacer, True, True, 0)
 
@@ -303,22 +337,26 @@ def run_configurator(
         page.pack_start(action_box, False, False, 0)
 
         apply_button = Gtk.Button(label="Apply")
-        apply_button.set_sensitive(current_handoff_enabled is not None)
+        apply_button.set_sensitive(behavior_settings_available)
         action_box.pack_end(apply_button, False, False, 0)
 
         def apply_behavior_settings(_button) -> None:
-            nonlocal current_handoff_enabled
+            nonlocal current_handoff_enabled, current_entry_point
             snapshot_value = current_snapshot()
             if snapshot_value is None or not snapshot_value.exists:
                 _show_message(Gtk, window, "No managed config is loaded.")
                 return
 
             current_handoff_enabled = _read_event_handoff_enabled(snapshot_value.path)
-            if current_handoff_enabled is None:
-                _show_message(Gtk, window, "The active managed config does not contain D2WC_EVENT_HANDOFF_ENABLED.")
+            current_entry_point = _read_event_handoff_entry_point(snapshot_value.path)
+            if current_handoff_enabled is None or current_entry_point is None:
+                _show_message(Gtk, window, "The active managed config does not contain the handoff behavior settings.")
                 return
 
             new_handoff_enabled = bool(handoff_check.get_active())
+            new_entry_point = "prompt" if prompt_radio.get_active() else "configurator"
+            changed = False
+
             if new_handoff_enabled != current_handoff_enabled:
                 try:
                     _set_event_handoff_enabled(snapshot_value.path, new_handoff_enabled)
@@ -331,18 +369,36 @@ def run_configurator(
                 except (OSError, SaveConfigError) as exc:
                     _show_message(Gtk, window, f"Could not save handoff setting:\n{exc}")
                     return
+                current_handoff_enabled = new_handoff_enabled
+                changed = True
 
+            if new_entry_point != current_entry_point:
+                try:
+                    _set_event_handoff_entry_point(snapshot_value.path, new_entry_point)
+                except ValueError as exc:
+                    _show_message(Gtk, window, str(exc))
+                    return
+                except SaveValidationError as exc:
+                    _show_message(Gtk, window, "Could not save handoff entry point:\n" + "\n".join(exc.validation.errors))
+                    return
+                except (OSError, SaveConfigError) as exc:
+                    _show_message(Gtk, window, f"Could not save handoff entry point:\n{exc}")
+                    return
+                current_entry_point = new_entry_point
+                changed = True
+
+            if changed:
                 refreshed = load_managed_config_snapshot(snapshot_value.path)
                 if refreshed.ok:
                     state["snapshot"] = refreshed
-                current_handoff_enabled = new_handoff_enabled
 
             timeout_seconds, opacity = current_toast_settings()
             handoff_text = "enabled" if current_handoff_enabled else "disabled"
+            entry_point_text = "button" if current_entry_point == "prompt" else "configurator"
             _show_toast(
                 Gtk,
                 outer,
-                f"Behavior settings updated: automatic handoff {handoff_text}",
+                f"Behavior settings updated: automatic handoff {handoff_text}, entry point {entry_point_text}",
                 timeout_seconds=timeout_seconds,
                 opacity=opacity,
             )
@@ -522,6 +578,20 @@ def _read_event_handoff_enabled(config_path: Path) -> bool | None:
     return match.group("value") == "true"
 
 
+def _read_event_handoff_entry_point(config_path: Path) -> str | None:
+    try:
+        source = Path(config_path).read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN.search(source)
+    if match is None:
+        return None
+    value = match.group("value")
+    if value not in D2WC_EVENT_HANDOFF_ENTRY_POINTS:
+        return None
+    return value
+
+
 def _set_event_handoff_enabled(config_path: Path, enabled: bool) -> None:
     path = Path(config_path)
     source = path.read_text(encoding="utf-8")
@@ -533,6 +603,23 @@ def _set_event_handoff_enabled(config_path: Path, enabled: bool) -> None:
     updated, count = D2WC_EVENT_HANDOFF_PATTERN.subn(replace, source, count=1)
     if count != 1:
         raise ValueError("The active managed config does not contain D2WC_EVENT_HANDOFF_ENABLED.")
+
+    save_source_config(path, updated)
+
+
+def _set_event_handoff_entry_point(config_path: Path, entry_point: str) -> None:
+    if entry_point not in D2WC_EVENT_HANDOFF_ENTRY_POINTS:
+        raise ValueError(f"Unsupported handoff entry point: {entry_point}")
+
+    path = Path(config_path)
+    source = path.read_text(encoding="utf-8")
+
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group('prefix')}\"{entry_point}\"{match.group('suffix')}"
+
+    updated, count = D2WC_EVENT_HANDOFF_ENTRY_POINT_PATTERN.subn(replace, source, count=1)
+    if count != 1:
+        raise ValueError("The active managed config does not contain D2WC_EVENT_HANDOFF_ENTRY_POINT.")
 
     save_source_config(path, updated)
 
