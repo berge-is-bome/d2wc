@@ -27,8 +27,7 @@ It should not:
 2. Rewrite unrelated Lua program logic.
 3. Apply hidden permanent changes without a visible save action.
 4. Assume that mouse buttons use a right-handed layout.
-5. Require a permanently visible tray icon for normal background operation.
-6. Become a generic editor for arbitrary Devilspie2 scripts.
+5. Become a generic editor for arbitrary Devilspie2 scripts.
 
 ## Main user objects
 
@@ -133,8 +132,6 @@ The prompt has two actions:
 2. `Configure`
 
 The pointer is centered on `Cancel` when the prompt opens. `Configure` opens the normal configurator for the event window.
-
-Prompt mode is intended to replace the need for a tray icon in the normal workflow if it proves comfortable in daily use.
 
 ## Main configurator window
 
