@@ -15,23 +15,25 @@ MANAGED_MARKER = "d2wc managed"
 USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION"
 QUBES_DOMAIN_MARKER = "------------------------------------------------------------\n-- Qubes domain and class extraction"
 
-LATEST_VERSION_LINES = """-- version 0.1.12.6
--- changes: launch action prompt for unconfigured window events
+LATEST_VERSION_LINES = """-- version 0.1.12.7
+-- changes: make event handoff entry point selectable
 """
 HEADER_ANCHOR = "-- devilspie2 workspace configurator\n"
 
 HANDOFF_COMMENT_BLOCK = '''-- Lua event handoff proof.
--- When enabled, supported window-open events launch the d2wc action prompt.
+-- When enabled, supported window-open events launch the selected d2wc entry point.
 -- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
 '''
 HANDOFF_SUPPRESSION_COMMENT = "-- Windows that already match a managed target rule are suppressed.\n"
 HANDOFF_ENABLED_SETTING = "local D2WC_EVENT_HANDOFF_ENABLED = true\n"
+HANDOFF_ENTRY_POINT_SETTING = 'local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"\n'
 HANDOFF_CLASS_SETTING = 'local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"\n'
 ACTION_PROMPT_CLASS_SETTING = 'local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"\n'
 HANDOFF_SETTINGS = (
     HANDOFF_COMMENT_BLOCK
     + HANDOFF_SUPPRESSION_COMMENT
     + HANDOFF_ENABLED_SETTING
+    + HANDOFF_ENTRY_POINT_SETTING
     + HANDOFF_CLASS_SETTING
     + ACTION_PROMPT_CLASS_SETTING
     + "\n"
@@ -67,7 +69,7 @@ local function launch_d2wc_event_handoff(event_class, is_configured)
 end
 '''
 
-HANDOFF_HELPER = '''
+PROMPT_HANDOFF_HELPER_WITH_GEOMETRY = '''
 local function shell_quote(value)
   if value == nil then return nil end
   local s = tostring(value)
@@ -99,6 +101,47 @@ local function launch_d2wc_event_handoff(event_class, is_configured, event_domai
   append_shell_arg(command_parts, "--window-y", y)
   append_shell_arg(command_parts, "--window-width", w)
   append_shell_arg(command_parts, "--window-height", h)
+
+  os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
+end
+'''
+
+HANDOFF_HELPER = '''
+local function shell_quote(value)
+  if value == nil then return nil end
+  local s = tostring(value)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function append_shell_arg(parts, name, value)
+  if value == nil then return end
+  table.insert(parts, name)
+  table.insert(parts, shell_quote(value))
+end
+
+local function launch_d2wc_event_handoff(event_class, is_configured, event_domain)
+  if not D2WC_EVENT_HANDOFF_ENABLED then return end
+  if event_class == D2WC_CONFIGURATOR_CLASS then return end
+  if event_class == D2WC_ACTION_PROMPT_CLASS then return end
+  if is_configured then return end
+
+  local mode = D2WC_EVENT_HANDOFF_ENTRY_POINT or "configurator"
+  if mode ~= "configurator" and mode ~= "prompt" then
+    mode = "configurator"
+  end
+
+  if mode == "configurator" then
+    os.execute("d2wc >/dev/null 2>&1 &")
+    return
+  end
+
+  local class_instance = get_class_instance_name()
+  local command_parts = { "d2wc", "prompt" }
+  append_shell_arg(command_parts, "--domain", event_domain)
+  append_shell_arg(command_parts, "--application-name", event_class)
+  append_shell_arg(command_parts, "--window-type", window_type)
+  append_shell_arg(command_parts, "--class-instance-name", class_instance)
+  append_shell_arg(command_parts, "--window-class", event_class)
 
   os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
@@ -272,7 +315,7 @@ def refresh_lua_runtime_dir(managed_dir: Path) -> tuple[LuaRuntimeMigrationResul
 
 
 def _ensure_latest_header_comments(source: str) -> str:
-    if "-- version 0.1.12.6" in source:
+    if "-- version 0.1.12.7" in source:
         return source
 
     anchor_index = source.find(HEADER_ANCHOR)
@@ -286,6 +329,7 @@ def _ensure_latest_header_comments(source: str) -> str:
 def _ensure_handoff_settings(source: str) -> str:
     migrated = source
     has_enabled = "local D2WC_EVENT_HANDOFF_ENABLED" in migrated
+    has_entry_point = "local D2WC_EVENT_HANDOFF_ENTRY_POINT" in migrated
     has_class = "local D2WC_CONFIGURATOR_CLASS" in migrated
     has_prompt_class = "local D2WC_ACTION_PROMPT_CLASS" in migrated
 
@@ -307,6 +351,14 @@ def _ensure_handoff_settings(source: str) -> str:
         insert_at = len(migrated) if enabled_line_end == -1 else enabled_line_end + 1
         migrated = migrated[:insert_at] + HANDOFF_CLASS_SETTING + migrated[insert_at:]
 
+    if not has_entry_point:
+        enabled_line_start = migrated.find("local D2WC_EVENT_HANDOFF_ENABLED")
+        if enabled_line_start == -1:
+            raise LuaRuntimeMigrationError("could not find handoff enabled setting")
+        enabled_line_end = migrated.find("\n", enabled_line_start)
+        insert_at = len(migrated) if enabled_line_end == -1 else enabled_line_end + 1
+        migrated = migrated[:insert_at] + HANDOFF_ENTRY_POINT_SETTING + migrated[insert_at:]
+
     if not has_prompt_class:
         class_index = migrated.find("local D2WC_CONFIGURATOR_CLASS")
         if class_index == -1:
@@ -325,8 +377,10 @@ def _ensure_handoff_settings(source: str) -> str:
 
 
 def _ensure_handoff_helper(source: str) -> str:
-    if "local function launch_d2wc_event_handoff(event_class, is_configured, event_domain)" in source:
+    if HANDOFF_HELPER in source:
         return source
+    if PROMPT_HANDOFF_HELPER_WITH_GEOMETRY in source:
+        return source.replace(PROMPT_HANDOFF_HELPER_WITH_GEOMETRY, HANDOFF_HELPER, 1)
     if CONFIGURATOR_HANDOFF_HELPER in source:
         return source.replace(CONFIGURATOR_HANDOFF_HELPER, HANDOFF_HELPER, 1)
     if OLD_HANDOFF_HELPER in source:
