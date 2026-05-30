@@ -3,6 +3,7 @@ from d2wc.test_config_actions import ManagedSectionActionRequest, apply_managed_
 
 
 VALID_MINIMAL_CONFIG = '''
+local D2WC_MANAGED = true
 local EXCLUDE = {
 }
 local PIN = {
