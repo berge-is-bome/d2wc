@@ -136,22 +136,6 @@ The pointer is centered on `Cancel` when the prompt opens. `Configure` opens the
 
 Prompt mode is intended to replace the need for a tray icon in the normal workflow if it proves comfortable in daily use.
 
-## Optional future tray menu
-
-A tray icon can still be useful during initial setup or troubleshooting, but it should not be required for normal operation.
-
-The tray mode remains optional future work.
-
-When enabled, the tray menu can include:
-
-1. `Configure`
-2. `Capture Active Window`
-3. `Pause d2wc`
-4. `Reload Rules`
-5. `Open Lua Config`
-6. `About`
-7. `Quit`
-
 ## Main configurator window
 
 The current configurator is organized around workflows rather than a large target-inspection form.
