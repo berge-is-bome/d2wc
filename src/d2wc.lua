@@ -1,6 +1,8 @@
 ------------------------------------------------------------
 -- d2wc managed
 -- devilspie2 workspace configurator
+-- version 0.1.12.6
+-- changes: launch action prompt for unconfigured window events
 -- version 0.1.12.5
 -- changes: suppress Lua event handoff for windows that already match managed rules
 -- version 0.1.12.4
@@ -17,11 +19,12 @@
 ------------------------------------------------------------
 
 -- Lua event handoff proof.
--- When enabled, supported window-open events launch the d2wc configurator.
--- The d2wc configurator window class is suppressed to avoid recursive configurator launches.
+-- When enabled, supported window-open events launch the d2wc action prompt.
+-- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
 -- Windows that already match a managed target rule are suppressed.
 local D2WC_EVENT_HANDOFF_ENABLED = true
 local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
+local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 
 -- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION
 -- All rules use space-separated tokens with explicit prefixes:
@@ -146,12 +149,39 @@ end
 ------------------------------------------------------------
 local function lc(s) return (s or ""):lower() end
 
-local function launch_d2wc_event_handoff(event_class, is_configured)
+local function shell_quote(value)
+  if value == nil then return nil end
+  local s = tostring(value)
+  return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function append_shell_arg(parts, name, value)
+  if value == nil then return end
+  table.insert(parts, name)
+  table.insert(parts, shell_quote(value))
+end
+
+local function launch_d2wc_event_handoff(event_class, is_configured, event_domain)
   if not D2WC_EVENT_HANDOFF_ENABLED then return end
   if event_class == D2WC_CONFIGURATOR_CLASS then return end
+  if event_class == D2WC_ACTION_PROMPT_CLASS then return end
   if is_configured then return end
 
-  os.execute("d2wc >/dev/null 2>&1 &")
+  local x, y, w, h = get_window_geometry()
+  local class_instance = get_class_instance_name()
+
+  local command_parts = { "d2wc", "prompt" }
+  append_shell_arg(command_parts, "--domain", event_domain)
+  append_shell_arg(command_parts, "--application-name", event_class)
+  append_shell_arg(command_parts, "--window-type", window_type)
+  append_shell_arg(command_parts, "--class-instance-name", class_instance)
+  append_shell_arg(command_parts, "--window-class", event_class)
+  append_shell_arg(command_parts, "--window-x", x)
+  append_shell_arg(command_parts, "--window-y", y)
+  append_shell_arg(command_parts, "--window-width", w)
+  append_shell_arg(command_parts, "--window-height", h)
+
+  os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
 
 -- Split a rule string into prefixed tokens and validate duplicates.
@@ -409,7 +439,7 @@ local cls = get_lower_class()
 ------------------------------------------------------------
 -- Lua event handoff proof
 ------------------------------------------------------------
-launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls))
+launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls), domain)
 
 ------------------------------------------------------------
 -- Apply exclusions
