@@ -229,13 +229,13 @@ is_d2wc_managed_lua_file() {
   PYTHONPATH="$source_root/src" python3 - "$path" <<'PY'
 import sys
 from pathlib import Path
-from d2wc.core.lua_blocks import ManagedBlockParser
+from d2wc.core.lua_blocks import ManagedBlockParser, is_d2wc_managed_source
 from d2wc.core.validation import validate_managed_blocks
 
 config = Path(sys.argv[1])
 try:
     source = config.read_text(encoding="utf-8")
-    if "d2wc managed" not in source:
+    if not is_d2wc_managed_source(source):
         raise SystemExit(1)
     parsed = ManagedBlockParser().parse(source)
 except (OSError, ValueError):
