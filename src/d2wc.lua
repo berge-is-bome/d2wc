@@ -1,6 +1,8 @@
 ------------------------------------------------------------
 -- d2wc managed
 -- devilspie2 workspace configurator
+-- version 0.1.12.7
+-- changes: make event handoff entry point selectable
 -- version 0.1.12.6
 -- changes: launch action prompt for unconfigured window events
 -- version 0.1.12.5
@@ -19,10 +21,11 @@
 ------------------------------------------------------------
 
 -- Lua event handoff proof.
--- When enabled, supported window-open events launch the d2wc action prompt.
+-- When enabled, supported window-open events launch the selected d2wc entry point.
 -- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
 -- Windows that already match a managed target rule are suppressed.
 local D2WC_EVENT_HANDOFF_ENABLED = true
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
 local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
 local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 
@@ -167,19 +170,23 @@ local function launch_d2wc_event_handoff(event_class, is_configured, event_domai
   if event_class == D2WC_ACTION_PROMPT_CLASS then return end
   if is_configured then return end
 
-  local x, y, w, h = get_window_geometry()
-  local class_instance = get_class_instance_name()
+  local mode = D2WC_EVENT_HANDOFF_ENTRY_POINT or "configurator"
+  if mode ~= "configurator" and mode ~= "prompt" then
+    mode = "configurator"
+  end
 
+  if mode == "configurator" then
+    os.execute("d2wc >/dev/null 2>&1 &")
+    return
+  end
+
+  local class_instance = get_class_instance_name()
   local command_parts = { "d2wc", "prompt" }
   append_shell_arg(command_parts, "--domain", event_domain)
   append_shell_arg(command_parts, "--application-name", event_class)
   append_shell_arg(command_parts, "--window-type", window_type)
   append_shell_arg(command_parts, "--class-instance-name", class_instance)
   append_shell_arg(command_parts, "--window-class", event_class)
-  append_shell_arg(command_parts, "--window-x", x)
-  append_shell_arg(command_parts, "--window-y", y)
-  append_shell_arg(command_parts, "--window-width", w)
-  append_shell_arg(command_parts, "--window-height", h)
 
   os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
