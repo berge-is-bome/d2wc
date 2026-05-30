@@ -54,7 +54,7 @@ Recent branch work on `gtk-ui-improvement-post-lua-handoff`:
 
 ## Latest confirmed verification
 
-Latest verification before these final documentation updates was reported as:
+Latest verification was reported as:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
@@ -64,7 +64,7 @@ python3 -m pytest
 Result:
 
 ```text
-292 passed
+296 passed
 ```
 
 After the final documentation updates and any local commits, run the normal verification path again:
