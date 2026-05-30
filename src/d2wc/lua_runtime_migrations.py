@@ -16,7 +16,6 @@ USER_CONFIG_MARKER = "-- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LE
 QUBES_DOMAIN_MARKER = "------------------------------------------------------------\n-- Qubes domain and class extraction"
 
 LATEST_VERSION_LINES = """-- version 0.1.12.8
--- changes: pass event window geometry to prompt handoff
 """
 HEADER_ANCHOR = "-- devilspie2 workspace configurator\n"
 
