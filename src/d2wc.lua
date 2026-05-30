@@ -2,20 +2,6 @@
 -- d2wc managed
 -- devilspie2 workspace configurator
 -- version 0.1.12.8
--- changes: pass event window geometry to prompt handoff
--- version 0.1.12.7
--- changes: make event handoff entry point selectable
--- version 0.1.12.6
--- changes: launch action prompt for unconfigured window events
--- version 0.1.12.5
--- changes: suppress Lua event handoff for windows that already match managed rules
--- version 0.1.12.4
--- changes: Lua event handoff proof launches bare d2wc from supported window-open events
--- version 0.1.12.3
--- changes: prefixed grammar (d:, c:, g:, le:) with space-separated tokens
--- version 0.1.12.2
--- Split a dotted class string into tokens, e.g. "org.gnome.meld" -> {"org","gnome","meld"}
--- Class matching improved to recognize class names within dotted segments of class names
 ------------------------------------------------------------
 
 
