@@ -26,6 +26,7 @@ from d2wc.ui.action_prompt import run_action_prompt
 from d2wc.ui.gtk_app import GtkConfiguratorImportError, run_configurator
 
 CONFIGURATOR_LOCK_FILENAME = "configurator.lock"
+PROMPT_LOCK_FILENAME = "prompt.lock"
 
 
 @dataclass(frozen=True)
@@ -67,7 +68,10 @@ def _run_configure(argv: Sequence[str]) -> int:
 def _run_prompt(argv: Sequence[str]) -> int:
     try:
         configure_input = _parse_configure_args(argv, prog="d2wc prompt")
-        decision = run_action_prompt(configure_input.event_data)
+        with _process_instance_lock(PROMPT_LOCK_FILENAME) as acquired:
+            if not acquired:
+                return 0
+            decision = run_action_prompt(configure_input.event_data)
         if decision != "configure":
             return 0
         return _run_configurator_once(configure_input)
@@ -77,7 +81,7 @@ def _run_prompt(argv: Sequence[str]) -> int:
 
 
 def _run_configurator_once(configure_input: ConfigureInput) -> int:
-    with _configurator_instance_lock() as acquired:
+    with _process_instance_lock(CONFIGURATOR_LOCK_FILENAME) as acquired:
         if not acquired:
             return 0
         return run_configurator(
@@ -89,12 +93,12 @@ def _run_configurator_once(configure_input: ConfigureInput) -> int:
 
 
 @contextmanager
-def _configurator_instance_lock() -> Iterator[bool]:
-    """Hold a non-blocking process lock while one configurator window is open."""
+def _process_instance_lock(lock_filename: str) -> Iterator[bool]:
+    """Hold a non-blocking process lock while one UI instance is open."""
 
     lock_dir = d2wc_config_dir()
     lock_dir.mkdir(parents=True, exist_ok=True)
-    lock_path = lock_dir / CONFIGURATOR_LOCK_FILENAME
+    lock_path = lock_dir / lock_filename
     with lock_path.open("w", encoding="utf-8") as lock_file:
         try:
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
