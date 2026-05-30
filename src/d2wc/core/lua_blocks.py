@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
-LEGACY_MANAGED_MARKER = "d2wc managed"
 MANAGED_ASSIGNMENT_PATTERN = re.compile(
     r"(?m)^\s*local\s+D2WC_MANAGED\s*=\s*true\s*(?:--.*)?$"
 )
@@ -45,7 +44,7 @@ class ParseResult:
 def is_d2wc_managed_source(source: str) -> bool:
     """Return whether source is marked as a d2wc managed Lua file."""
 
-    return bool(MANAGED_ASSIGNMENT_PATTERN.search(source)) or LEGACY_MANAGED_MARKER in source
+    return bool(MANAGED_ASSIGNMENT_PATTERN.search(source))
 
 
 class ManagedBlockParser:
