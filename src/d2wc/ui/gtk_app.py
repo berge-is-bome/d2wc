@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 
 from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
-from d2wc.core.user_paths import default_managed_config_dir, devilspie2_entry_path
+from d2wc.core.user_paths import default_managed_config_dir
 from d2wc.desktop.active_window import ActiveWindowInfo
 from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
 from d2wc.managed_config_file import (
@@ -125,16 +125,14 @@ def run_configurator(
 
     def open_managed_file(_item=None) -> None:
         managed_dir = default_managed_config_dir()
-        devilspie2_dir = devilspie2_entry_path().parent
         managed_dir.mkdir(parents=True, exist_ok=True)
-        devilspie2_dir.mkdir(parents=True, exist_ok=True)
         chooser = Gtk.FileChooserDialog(
             title="Open d2wc managed Lua file",
             parent=window,
             action=Gtk.FileChooserAction.OPEN,
         )
         chooser.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OPEN, Gtk.ResponseType.OK)
-        chooser.set_current_folder(str(devilspie2_dir))
+        chooser.set_current_folder(str(managed_dir))
         _add_lua_filter(Gtk, chooser)
         try:
             response = chooser.run()
@@ -144,23 +142,15 @@ def run_configurator(
         finally:
             chooser.destroy()
 
-        managed_path = _resolve_open_managed_path(selected, managed_dir)
-        if managed_path is None:
-            _show_message(
-                Gtk,
-                window,
-                "Open ~/.config/devilspie2/d2wc.lua or a managed Lua file under "
-                f"{managed_dir}.",
-            )
+        if not _is_under_managed_dir(selected, managed_dir):
+            _show_message(Gtk, window, f"Managed files must be opened from {managed_dir}")
             return
-        snapshot = load_managed_config_snapshot(managed_path)
+        snapshot = load_managed_config_snapshot(selected)
         if not snapshot.ok:
             _show_message(Gtk, window, managed_config_status_text(snapshot))
             return
-        activation = activate_managed_config(managed_path)
+        activate_managed_config(selected)
         rebuild_editor(snapshot)
-        if not activation.ok:
-            _show_message(Gtk, window, activation.message)
 
     def save_managed_file_as(_item=None) -> None:
         snapshot = current_snapshot()
@@ -511,16 +501,6 @@ def _add_lua_filter(Gtk, chooser) -> None:
     lua_filter.set_name("Lua files")
     lua_filter.add_pattern("*.lua")
     chooser.add_filter(lua_filter)
-
-
-def _resolve_open_managed_path(path: Path, managed_dir: Path) -> Path | None:
-    try:
-        resolved = path.resolve(strict=False)
-    except OSError:
-        return None
-    if _is_under_managed_dir(resolved, managed_dir):
-        return resolved
-    return None
 
 
 def _is_under_managed_dir(path: Path, managed_dir: Path) -> bool:
