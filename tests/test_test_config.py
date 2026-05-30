@@ -16,6 +16,7 @@ from d2wc.test_config import (
 
 
 VALID_MINIMAL_CONFIG = '''
+local D2WC_MANAGED = true
 local EXCLUDE = {
   "d:personal-test",
 }
