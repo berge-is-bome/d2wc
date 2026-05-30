@@ -1,6 +1,8 @@
 ------------------------------------------------------------
 -- d2wc managed
 -- devilspie2 workspace configurator
+-- version 0.1.12.8
+-- changes: pass event window geometry to prompt handoff
 -- version 0.1.12.7
 -- changes: make event handoff entry point selectable
 -- version 0.1.12.6
@@ -181,12 +183,19 @@ local function launch_d2wc_event_handoff(event_class, is_configured, event_domai
   end
 
   local class_instance = get_class_instance_name()
+  local geometry_ok, x, y, w, h = pcall(get_window_geometry)
   local command_parts = { "d2wc", "prompt" }
   append_shell_arg(command_parts, "--domain", event_domain)
   append_shell_arg(command_parts, "--application-name", event_class)
   append_shell_arg(command_parts, "--window-type", window_type)
   append_shell_arg(command_parts, "--class-instance-name", class_instance)
   append_shell_arg(command_parts, "--window-class", event_class)
+  if geometry_ok then
+    append_shell_arg(command_parts, "--window-x", x)
+    append_shell_arg(command_parts, "--window-y", y)
+    append_shell_arg(command_parts, "--window-width", w)
+    append_shell_arg(command_parts, "--window-height", h)
+  end
 
   os.execute(table.concat(command_parts, " ") .. " >/dev/null 2>&1 &")
 end
