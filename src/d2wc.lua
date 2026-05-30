@@ -1,27 +1,19 @@
 ------------------------------------------------------------
--- d2wc managed
 -- devilspie2 workspace configurator
--- version 0.1.12.8
+-- version 0.1.13
 ------------------------------------------------------------
 
+local D2WC_MANAGED = true
 
+------------------------------------------------------------
 -- USER CUSTOMIZATION
 ------------------------------------------------------------
-
--- Lua event handoff proof.
--- When enabled, supported window-open events launch the selected d2wc entry point.
--- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
--- Windows that already match a managed target rule are suppressed.
-local D2WC_EVENT_HANDOFF_ENABLED = true
-local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
-local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
-local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 
 -- EXCLUDE, PIN, WORKSPACE_ROUTES, WORKSPACE_PLACEMENT, LEFT_EDGE_CORRECTION
 -- All rules use space-separated tokens with explicit prefixes:
 --   d:<domain>   c:<class>   g:<geom_profile>   le:<pos1|pos2>
 -- Order of tokens does not matter. Case-insensitive.
---
+
 -- Matching precedence everywhere:  domain.class  ->  domain  ->  class
 -- Duplicates within a single rule (e.g., two g: tokens) are invalid; they are skipped with a debug message.
 -- Unknown geometry profile in g: is invalid; skipped with a debug message.
@@ -30,8 +22,11 @@ local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 -- Exclusions: anything listed here is ignored
 ------------------------------------------------------------
 local EXCLUDE = {
-  -- "d:work c:okular",    -- this domain.class
   "d:personal-test",       -- domain
+
+  "d:dom0 c:xfce4-notifyd",
+
+  -- "d:work c:okular",    -- this domain.class
   -- "c:<class_name>",     -- class everywhere
   -- add more here
 }
@@ -42,6 +37,7 @@ local EXCLUDE = {
 local PIN = {
   "d:dom0 c:xfce4-terminal",         -- pin dom0 xfce4-terminal windows
   "d:dom0 c:qubes-qube-manager",     -- pin Qube Manager
+
   -- "d:personal",                   -- pin everything from personal
   -- "c:xfce4-terminal",             -- pin xfce4-terminal everywhere
   -- add more here
@@ -56,6 +52,7 @@ local WORKSPACE_ROUTES = {
   [1] = { "d:personal", "d:work c:navigator", "d:work c:krusader", },
 
   [2] = { "d:personal c:navigator", "d:work", },
+
   -- add more here
 }
 
@@ -71,10 +68,12 @@ local GEOM = {
 
   dom0_qubes_app_menu   = { x = 0,    y = 0,    w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830,  y = 517,  w = 1818, h = 1029 },
-
   dom0_template_manager = { x = 1129, y = 0  ,  w = 1220, h = 2115 },
   dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
   dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
+  dom0_zenity            = { x = 1500, y = 500 , w = 700 , h = 800  },
+
+  d2wc_configurator      = { x = 900 , y = 600 , w = 1550, h = 900  },
   -- add more here
 }
 
@@ -100,6 +99,7 @@ local WORKSPACE_PLACEMENT = {
   "d:dom0 c:qubes-qube-manager g:half_left",
   "d:dom0 c:xfce4-settings-manager g:dom0_settings_manager",
   "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",    -- domain-specific override for qubes-app-menu in dom0
+
   -- add more here
 }
 
@@ -119,11 +119,12 @@ local WORKSPACE_PLACEMENT = {
 local LEFT_EDGE_CORRECTION = {
   "d:dom0 c:qubes-qube-manager le:pos1",
   "d:personal c:okular le:pos2",
+
   -- add more here
 }
 
 
-
+------------------------------------------------------------
 -- PROGRAM LOGIC
 ------------------------------------------------------------
 
@@ -134,6 +135,18 @@ local window_type = get_window_type()
 if (window_type ~= "WINDOW_TYPE_NORMAL") then
   return
 end
+
+------------------------------------------------------------
+-- Lua event handoff
+------------------------------------------------------------
+
+-- When enabled, supported window-open events launch the selected d2wc entry point.
+-- The d2wc configurator and action-prompt window classes are suppressed to avoid recursive launches.
+-- Windows that already match a managed target rule are suppressed.
+local D2WC_EVENT_HANDOFF_ENABLED = true
+local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
+local D2WC_CONFIGURATOR_CLASS = "d2wc-configurator"
+local D2WC_ACTION_PROMPT_CLASS = "d2wc-action-prompt"
 
 ------------------------------------------------------------
 -- Helpers
@@ -439,7 +452,7 @@ end
 local cls = get_lower_class()
 
 ------------------------------------------------------------
--- Lua event handoff proof
+-- Lua event handoff
 ------------------------------------------------------------
 launch_d2wc_event_handoff(cls, window_has_managed_rule(domain, cls), domain)
 
