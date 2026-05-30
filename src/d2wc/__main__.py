@@ -13,7 +13,7 @@ from pathlib import Path
 
 from d2wc.cli import main as cli_main
 from d2wc.core.user_paths import d2wc_config_dir
-from d2wc.event_data import DEFAULT_EVENT_FIXTURE, EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
+from d2wc.event_data import EVENT_FIXTURE_NAMES, WindowEventData, get_event_fixture
 from d2wc.event_preview import EventConfigAwareness, build_event_config_awareness, build_event_rule_preview
 from d2wc.managed_config_file import load_managed_config_snapshot
 from d2wc.test_config import (
@@ -124,7 +124,7 @@ def _parse_configure_args(argv: Sequence[str], *, prog: str) -> ConfigureInput:
     parser.add_argument(
         "--event-fixture",
         choices=EVENT_FIXTURE_NAMES,
-        default=DEFAULT_EVENT_FIXTURE,
+        default=None,
         help="Representative Devilspie2 event-data fixture to display.",
     )
     parser.add_argument(
@@ -168,7 +168,7 @@ def _parse_configure_args(argv: Sequence[str], *, prog: str) -> ConfigureInput:
     parser.add_argument("--window-height", type=float, default=None, help="Event window height.")
 
     args = parser.parse_args(list(argv))
-    event_data = get_event_fixture(args.event_fixture).with_overrides(
+    event_data = (get_event_fixture(args.event_fixture) if args.event_fixture else WindowEventData()).with_overrides(
         domain=args.domain,
         application_name=args.application_name,
         window_name=args.window_name,
@@ -218,8 +218,14 @@ def _read_config_awareness(config_path: Path, event_data: WindowEventData) -> Ev
             status="error",
             warnings=(f"Could not read config file read-only: {exc}",),
         )
-
-    return build_event_config_awareness(source, build_event_rule_preview(event_data))
+    try:
+        preview = build_event_rule_preview(event_data)
+        return build_event_config_awareness(source, preview)
+    except Exception as exc:  # pragma: no cover - defensive UI reporting boundary
+        return EventConfigAwareness(
+            status="error",
+            warnings=(f"Could not inspect config read-only: {exc}",),
+        )
 
 
 if __name__ == "__main__":
