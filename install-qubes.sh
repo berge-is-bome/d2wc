@@ -256,155 +256,327 @@ refresh_managed_lua_runtime_files() {
 choose_available_managed_filename() {
   local preferred="$1"
   local name="$preferred"
-  local stem
-  local suffix
-
   if [ ! -e "$MANAGED_DIR/$name" ]; then
-    printf '%s\n' "$name"
+    printf "%s\n" "$name"
     return 0
   fi
 
-  stem="${preferred%.lua}"
-  suffix=1
-  while [ -e "$MANAGED_DIR/${stem}-${suffix}.lua" ]; do
-    suffix=$((suffix + 1))
+  while true; do
+    read -rp "Managed config $name exists. Enter alternate .lua filename: " name
+    if ! is_safe_managed_filename "$name"; then
+      echo "ERROR: filename must be non-empty, end with .lua, and not contain / or .." >&2
+      continue
+    fi
+    if [ -e "$MANAGED_DIR/$name" ]; then
+      echo "ERROR: $MANAGED_DIR/$name already exists" >&2
+      continue
+    fi
+    printf "%s\n" "$name"
+    return 0
   done
-  printf '%s\n' "${stem}-${suffix}.lua"
 }
 
-install_managed_lua_file() {
+migrate_devilspie2_regular_managed_file() {
   local source_root="$1"
-  local source_file="$source_root/src/d2wc.lua"
-  local active_target="$MANAGED_DIR/$DEFAULT_MANAGED_FILENAME"
-  local target
-  local chosen_name
 
-  mkdir -p -- "$MANAGED_DIR" "$DEVILSPIE2_DIR"
-
-  if [ -e "$active_target" ] && is_d2wc_managed_lua_file "$active_target" "$source_root"; then
-    echo "Managed config already exists: $active_target"
-    activate_managed_lua_file "$active_target"
+  if [ -L "$DEVILSPIE2_ENTRY" ]; then
     return 0
   fi
 
-  chosen_name="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
-  target="$MANAGED_DIR/$chosen_name"
-  cp -- "$source_file" "$target"
-  echo "Installed managed config: $target"
-  activate_managed_lua_file "$target"
+  if [ ! -f "$DEVILSPIE2_ENTRY" ]; then
+    return 0
+  fi
+
+  if ! is_d2wc_managed_lua_file "$DEVILSPIE2_ENTRY" "$source_root"; then
+    return 0
+  fi
+
+  local filename target
+  filename="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
+  target="$MANAGED_DIR/$filename"
+  cp -- "$DEVILSPIE2_ENTRY" "$target"
+  echo "Migrated managed Devilspie2 file to: $target"
+  MIGRATED_MANAGED_PATH="$target"
 }
 
-activate_managed_lua_file() {
-  local target="$1"
+current_safe_devilspie2_managed_path() {
+  local resolved managed_root
 
+  [ -L "$DEVILSPIE2_ENTRY" ] || return 1
+
+  resolved="$(readlink -f -- "$DEVILSPIE2_ENTRY" || true)"
+  managed_root="$(readlink -f -- "$MANAGED_DIR" || true)"
+
+  [ -n "$resolved" ] || return 1
+  [ -n "$managed_root" ] || return 1
+
+  case "$resolved" in
+    "$managed_root"/*)
+      [ -f "$resolved" ] || return 1
+      printf "%s\n" "$resolved"
+      return 0
+      ;;
+  esac
+
+  return 1
+}
+
+link_devilspie2_entry_safely() {
+  local managed_path="$1"
   mkdir -p -- "$DEVILSPIE2_DIR"
 
-  if [ -e "$DEVILSPIE2_ENTRY" ] || [ -L "$DEVILSPIE2_ENTRY" ]; then
-    if [ -L "$DEVILSPIE2_ENTRY" ] && [ "$(readlink -- "$DEVILSPIE2_ENTRY")" = "$target" ]; then
-      echo "Active devilspie2 entry already points to: $target"
+  if [ -L "$DEVILSPIE2_ENTRY" ]; then
+    local resolved managed_root
+    resolved="$(readlink -f -- "$DEVILSPIE2_ENTRY" || true)"
+    managed_root="$(readlink -f -- "$MANAGED_DIR" || true)"
+    case "$resolved" in
+      "$managed_root"/*) rm -f -- "$DEVILSPIE2_ENTRY" ;;
+      *)
+        echo "WARNING: leaving unrelated Devilspie2 symlink unchanged: $DEVILSPIE2_ENTRY -> $resolved" >&2
+        return 0
+        ;;
+    esac
+  elif [ -e "$DEVILSPIE2_ENTRY" ]; then
+    echo "WARNING: leaving existing unmanaged Devilspie2 file unchanged: $DEVILSPIE2_ENTRY" >&2
+    return 0
+  fi
+
+  ln -s -- "$managed_path" "$DEVILSPIE2_ENTRY"
+  echo "Configured Devilspie2 symlink: $DEVILSPIE2_ENTRY -> $managed_path"
+}
+
+running_d2wc_processes() {
+  local user_id pattern
+  user_id="$(id -u)"
+  pattern='(^|[ /])d2wc($|[[:space:]])|python[0-9.]*([[:space:]].*)?-m[[:space:]]+d2wc'
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -u "$user_id" -fa "$pattern" || true
+    return 0
+  fi
+
+  ps -u "$user_id" -o pid=,args= |
+    awk '
+      /(^|[ \/])d2wc($|[[:space:]])|python[0-9.]*([[:space:]].*)?-m[[:space:]]+d2wc/ {
+        print
+      }
+    '
+}
+
+wait_until_d2wc_closed_for_update() {
+  local running
+
+  while true; do
+    running="$(running_d2wc_processes)"
+
+    if [ -z "$running" ]; then
       return 0
     fi
 
-    local timestamp
-    timestamp="$(date +%Y%m%d-%H%M%S)"
-    local backup="$DEVILSPIE2_ENTRY.backup-$timestamp"
-    mv -- "$DEVILSPIE2_ENTRY" "$backup"
-    echo "Backed up existing devilspie2 entry: $backup"
+    echo "WARNING: d2wc appears to be running." >&2
+    echo "Close all d2wc configurator windows before updating." >&2
+    echo >&2
+    echo "Running d2wc process candidates:" >&2
+    echo "$running" >&2
+    echo >&2
+
+    if [ ! -t 0 ]; then
+      echo "ERROR: cannot wait for d2wc to close because stdin is not interactive." >&2
+      exit 1
+    fi
+
+    read -rp "After closing d2wc, press Enter to continue, or press Ctrl+C to abort. "
+  done
+}
+
+add_local_bin_to_current_path() {
+  case ":$PATH:" in
+    *":$LOCAL_BIN:"*) ;;
+    *) export PATH="$LOCAL_BIN:$PATH" ;;
+  esac
+}
+
+detect_user_shell() {
+  local shell_path="${SHELL:-}"
+
+  if [ -z "$shell_path" ] && command -v getent >/dev/null 2>&1; then
+    shell_path="$(getent passwd "$(id -un)" | cut -d: -f7 || true)"
   fi
 
-  ln -s -- "$target" "$DEVILSPIE2_ENTRY"
-  echo "Activated devilspie2 entry symlink: $DEVILSPIE2_ENTRY -> $target"
+  basename -- "$shell_path"
 }
 
-install_python_entrypoint() {
-  local source_root="$1"
-  mkdir -p -- "$LOCAL_BIN"
+remove_managed_path_block() {
+  local config_file="$1"
+  local tmp_file
 
-  cat > "$D2WC_BIN" <<EOF
-#!/usr/bin/env bash
-PYTHONPATH="$source_root/src" exec python3 -m d2wc "\$@"
-EOF
-  chmod 755 "$D2WC_BIN"
-  echo "Installed launcher: $D2WC_BIN"
+  tmp_file="$(mktemp)"
+  awk \
+    -v start="$PATH_BLOCK_START" \
+    -v end="$PATH_BLOCK_END" \
+    '$0 == start { skip = 1; next } $0 == end { skip = 0; next } !skip { print }' \
+    "$config_file" > "$tmp_file"
+  cat "$tmp_file" > "$config_file"
+  rm -f -- "$tmp_file"
 }
 
-ensure_local_bin_on_path() {
-  local shell_name
-  shell_name="$(basename -- "${SHELL:-}")"
+ensure_bash_local_bin_path() {
+  local bashrc="$HOME/.bashrc"
 
-  case "$shell_name" in
-    fish)
-      ensure_fish_path
+  touch "$bashrc"
+  remove_managed_path_block "$bashrc"
+
+  cat >> "$bashrc" <<'EOF_BASHRC'
+
+# >>> d2wc local bin >>>
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) export PATH="$HOME/.local/bin:$PATH" ;;
+esac
+# <<< d2wc local bin <<<
+EOF_BASHRC
+
+  echo "Configured $HOME/.local/bin in: $bashrc"
+}
+
+ensure_fish_local_bin_path() {
+  local fish_config_dir="$HOME/.config/fish"
+  local fish_config="$fish_config_dir/config.fish"
+
+  mkdir -p -- "$fish_config_dir"
+  touch "$fish_config"
+  remove_managed_path_block "$fish_config"
+
+  cat >> "$fish_config" <<'EOF_FISH'
+
+# >>> d2wc local bin >>>
+if type -q fish_add_path
+    fish_add_path $HOME/.local/bin
+else if not contains $HOME/.local/bin $PATH
+    set -gx PATH $HOME/.local/bin $PATH
+end
+# <<< d2wc local bin <<<
+EOF_FISH
+
+  echo "Configured $HOME/.local/bin in: $fish_config"
+}
+
+ensure_local_bin_path_for_user_shell() {
+  local user_shell
+  user_shell="$(detect_user_shell)"
+
+  add_local_bin_to_current_path
+
+  case "$user_shell" in
+    bash)
+      ensure_bash_local_bin_path
       ;;
-    bash|zsh)
-      ensure_posix_shell_path "$HOME/.profile"
+    fish)
+      ensure_fish_local_bin_path
       ;;
     *)
-      ensure_posix_shell_path "$HOME/.profile"
+      echo "WARNING: shell '$user_shell' is not handled automatically." >&2
+      echo "WARNING: add $HOME/.local/bin to PATH manually, or launch d2wc by full path:" >&2
+      echo "WARNING: $D2WC_BIN" >&2
       ;;
   esac
 }
 
-ensure_fish_path() {
-  local config_dir="$HOME/.config/fish"
-  local config_file="$config_dir/config.fish"
-  mkdir -p -- "$config_dir"
+parse_args "$@"
+mkdir -p -- "$CACHEDIR"
 
-  if [ -f "$config_file" ] && grep -Fqx 'fish_add_path --path "$HOME/.local/bin"' "$config_file"; then
-    echo "PATH already configured in: $config_file"
-    return 0
+VM="$(choose_source_vm "$SOURCE_VM")"
+copy_archive_from_vm "$VM" "$ARCHIVE"
+
+SOURCE_PARENT="$HOME/.local/share/d2wc"
+mkdir -p -- "$SOURCE_PARENT"
+TMP_SOURCE="$(mktemp -d --tmpdir="$SOURCE_PARENT" d2wc-source.XXXXXX)"
+trap 'rm -rf -- "$TMP_SOURCE"' EXIT
+
+tar xzf "$ARCHIVE" -C "$TMP_SOURCE"
+EXTRACTED="$TMP_SOURCE/d2wc"
+
+if [ ! -f "$EXTRACTED/pyproject.toml" ]; then
+  echo "ERROR: expected $EXTRACTED/pyproject.toml after extracting archive" >&2
+  exit 1
+fi
+
+if [ ! -f "$EXTRACTED/src/d2wc.lua" ]; then
+  echo "ERROR: expected $EXTRACTED/src/d2wc.lua after extracting archive" >&2
+  exit 1
+fi
+
+if python3 -m pip show d2wc >/dev/null 2>&1 || [ -x "$D2WC_BIN" ]; then
+  FIRST_INSTALL=0
+else
+  FIRST_INSTALL=1
+fi
+
+if [ "$FIRST_INSTALL" -eq 0 ]; then
+  wait_until_d2wc_closed_for_update
+fi
+
+mkdir -p -- "$(dirname "$SOURCE_ROOT")"
+rm -rf -- "$SOURCE_ROOT"
+mkdir -p -- "$(dirname "$SOURCE_ROOT")"
+mv -- "$EXTRACTED" "$SOURCE_ROOT"
+
+MIGRATED_MANAGED_PATH=""
+mkdir -p -- "$MANAGED_DIR"
+if [ "$FIRST_INSTALL" -eq 1 ]; then
+  migrate_devilspie2_regular_managed_file "$SOURCE_ROOT"
+  if [ -n "$MIGRATED_MANAGED_PATH" ] && [ -f "$DEVILSPIE2_ENTRY" ] && [ ! -L "$DEVILSPIE2_ENTRY" ]; then
+    rm -f -- "$DEVILSPIE2_ENTRY"
   fi
+fi
 
-  cat >> "$config_file" <<'EOF'
-
-# >>> d2wc local bin >>>
-fish_add_path --path "$HOME/.local/bin"
-# <<< d2wc local bin <<<
-EOF
-  echo "Added ~/.local/bin to PATH in: $config_file"
-}
-
-ensure_posix_shell_path() {
-  local profile_file="$1"
-  touch "$profile_file"
-
-  if grep -Fqx "$PATH_BLOCK_START" "$profile_file"; then
-    echo "PATH block already present in: $profile_file"
-    return 0
+if [ -n "$MIGRATED_MANAGED_PATH" ]; then
+  MANAGED_PATH="$MIGRATED_MANAGED_PATH"
+elif [ "$FIRST_INSTALL" -eq 0 ] && MANAGED_PATH="$(current_safe_devilspie2_managed_path)"; then
+  echo "Keeping active managed config: $MANAGED_PATH"
+else
+  MANAGED_PATH="$MANAGED_DIR/$DEFAULT_MANAGED_FILENAME"
+  if [ ! -e "$MANAGED_PATH" ]; then
+    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    echo "Created managed config: $MANAGED_PATH"
+  elif [ "$FIRST_INSTALL" -eq 1 ] && ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
+    alt_name="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
+    MANAGED_PATH="$MANAGED_DIR/$alt_name"
+    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    echo "Created managed config: $MANAGED_PATH"
   fi
+fi
 
-  cat >> "$profile_file" <<'EOF'
+refresh_managed_lua_runtime_files "$SOURCE_ROOT"
 
-# >>> d2wc local bin >>>
-case ":$PATH:" in
-  *:"$HOME/.local/bin":*) ;;
-  *) PATH="$HOME/.local/bin:$PATH" ;;
-esac
-export PATH
-# <<< d2wc local bin <<<
-EOF
-  echo "Added ~/.local/bin to PATH in: $profile_file"
-}
+if ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
+  echo "ERROR: managed config is not a valid d2wc-managed Lua file: $MANAGED_PATH" >&2
+  exit 1
+fi
 
-main() {
-  parse_args "$@"
-  mkdir -p -- "$CACHEDIR"
+link_devilspie2_entry_safely "$MANAGED_PATH"
 
-  SOURCE_VM="$(choose_source_vm "$SOURCE_VM")"
-  copy_archive_from_vm "$SOURCE_VM" "$ARCHIVE"
+if python3 -m pip show d2wc >/dev/null 2>&1; then
+  python3 -m pip uninstall -y d2wc
+fi
 
-  rm -rf -- "$SOURCE_ROOT"
-  mkdir -p -- "$SOURCE_ROOT"
-  tar xzf "$ARCHIVE" -C "$SOURCE_ROOT" --strip-components=1
-  echo "Installed source snapshot: $SOURCE_ROOT"
+rm -f -- "$D2WC_BIN"
 
-  install_python_entrypoint "$SOURCE_ROOT"
-  install_managed_lua_file "$SOURCE_ROOT"
-  refresh_managed_lua_runtime_files "$SOURCE_ROOT"
-  ensure_local_bin_on_path
+cd "$SOURCE_ROOT"
+python3 -m pip install --user --no-index --no-build-isolation --no-deps --force-reinstall --no-warn-script-location .
 
-  echo "d2wc install/update complete."
-  echo "Open a new terminal or refresh your shell PATH, then run: d2wc"
-}
+if [ ! -x "$D2WC_BIN" ]; then
+  echo "ERROR: expected executable $D2WC_BIN after install" >&2
+  exit 1
+fi
 
-main "$@"
+ensure_local_bin_path_for_user_shell
+python3 -c 'import d2wc; print("Using d2wc from:", d2wc.__file__)'
+
+if [ "$FIRST_INSTALL" -eq 1 ]; then
+  echo "First install complete. Launching d2wc."
+  "$D2WC_BIN"
+else
+  echo "Updated d2wc."
+  echo "Launch it with: d2wc"
+fi
