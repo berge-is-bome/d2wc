@@ -8,7 +8,7 @@ import re
 from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
 from d2wc.core.user_paths import default_managed_config_dir
 from d2wc.desktop.active_window import ActiveWindowInfo
-from d2wc.event_data import DEFAULT_EVENT_FIXTURE, WindowEventData, get_event_fixture
+from d2wc.event_data import WindowEventData
 from d2wc.managed_config_file import (
     activate_managed_config,
     load_managed_config_snapshot,
@@ -67,7 +67,7 @@ def run_configurator(
 ) -> int:
     """Open the GTK configurator proof window."""
 
-    _event = event_data or get_event_fixture(DEFAULT_EVENT_FIXTURE)
+    _event = event_data if event_data is not None else WindowEventData()
     ui_settings = load_ui_settings()
     Gtk, Gdk, GLib = _import_gtk()
     _set_configurator_window_class(Gdk, GLib)
