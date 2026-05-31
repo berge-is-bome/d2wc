@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document records design context recovered from the archived pre-repository `d2wc.lua` history and the current `src/d2wc.lua` script.
+Design context recovered from the archived pre-repository `d2wc.lua` history and the current `src/d2wc.lua` script is recorded here.
 
 The purpose is not to preserve every intermediate implementation detail. The purpose is to keep the reasoning behind the current Lua configuration model available in the repository, so future work does not depend on finding an old ChatGPT conversation or reconstructing intent from memory.
 
