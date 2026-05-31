@@ -196,4 +196,4 @@ Required behavior:
 6. Back up the previous Lua file before saving.
 7. Provide a preview before applying rule changes.
 
-For historical context behind these sections and the current grammar, see [Lua Design History Notes](lua-design-history.md).
+For historical context behind these sections and the current grammar, see [d2wc Design History Notes](d2wc-design-history.md).
