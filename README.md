@@ -18,7 +18,7 @@ Send matching windows to the workspace where they belong.
 
 A route can be broad, such as every window from a Qubes domain, or narrow, such as one application from one domain.
 
-![Workspace routes workflow](images/d2wc-configurator-workspace-routes.png)
+![Workspace routes workflow](docs/user/images/d2wc-configurator-workspace-routes.png)
 
 ### Place windows with saved geometry profiles
 
@@ -26,7 +26,7 @@ Save reusable window size and position profiles, then apply those profiles to ma
 
 This is useful for layouts such as a file manager on the left, a browser on the right, a document viewer on a second workspace, or any other repeated desktop arrangement.
 
-![Window geometry workflow](images/d2wc-configurator-window-geometry.png)
+![Window geometry workflow](docs/user/images/d2wc-configurator-window-geometry.png)
 
 ### Pin selected windows
 
@@ -34,13 +34,13 @@ Keep selected windows visible on all workspaces.
 
 This is useful to keep utility windows, notes, or other windows that should stay available while moving between workspaces.
 
-![Pin workflow](images/d2wc-configurator-pin.png)
+![Pin workflow](docs/user/images/d2wc-configurator-pin.png)
 
 ### Exclude windows from automation
 
 Tell `d2wc` to leave selected windows, or all windows from a specific domain (VM/Machine) alone.
 
-![Exclude workflow](images/d2wc-configurator-exclude.png)
+![Exclude workflow](docs/user/images/d2wc-configurator-exclude.png)
 
 ### Correct left-edge placement problems
 
@@ -48,7 +48,7 @@ Some desktop environments or window-manager combinations may not place a window 
 
 `d2wc` includes a left-edge correction workflow for those cases.
 
-![Left edge correction workflow](images/d2wc-configurator-left-edge-correction.png)
+![Left edge correction workflow](docs/user/images/d2wc-configurator-left-edge-correction.png)
 
 ## The configurator
 
