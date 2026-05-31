@@ -1,10 +1,6 @@
 # Backup Archives
 
-## Purpose
-
-`d2wc` creates backups before guarded writes replace a managed Lua config file.
-
-The active Lua file is not compressed and is not moved into an archive. Only backup snapshots are stored in the backup archive.
+`d2wc` creates backups automatically on every `configurator` change, for the current active managed file, and stores them in a `*.tgz` archive inside the same folder as the managed archive.
 
 ## Archive location
 
