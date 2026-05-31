@@ -1,416 +1,178 @@
 # d2wc Runtime Architecture
 
-## Purpose
+Runtime architecture records how the active pieces of `d2wc` fit together and where future runtime responsibilities should land.
 
-This document describes how the runtime pieces of `d2wc` should fit together.
+Detailed implemented behavior belongs in the focused references below:
 
-The UI flow describes what the user sees. This document describes what must exist behind that UI so `d2wc` can observe windows, capture geometry, update the Lua configuration safely, and keep `devilspie2` running with the intended rules.
+1. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, recursion suppression, configured-window suppression, and managed Lua runtime migrations.
+2. [Lua Configurables](lua-configurables.md) documents the internal managed Lua rule grammar and rule-section behavior.
+3. [Managed Config Workflow](managed-config-workflow.md) documents active managed-file ownership, path selection, File Open, Save As, and Devilspie2 symlink safety.
+4. [Installation Workflow](installation-workflow.md) documents installer behavior and managed Lua runtime refreshes.
+5. [Backup Archives](backup-archives.md) documents backup archive creation and safe-save ordering.
+6. [UI Flow](ui-flow.md) documents the user-facing configurator behavior.
+7. [Event Monitoring](event-monitoring.md) documents later post-resize/event-monitoring work.
+8. [Implementation Plan](implementation-plan.md) tracks completed stages and future roadmap work.
 
-## Architecture summary
+## Current runtime shape
 
-`d2wc` should be designed as three cooperating parts:
+The current runtime uses three main pieces:
 
-1. The `devilspie2` Lua rules script.
-2. The configurator UI.
-3. A daemon/helper process, when event monitoring, process ownership, or optional tray behavior requires logic outside the Lua script.
+1. Devilspie2 runs the active managed Lua file for window events.
+2. The managed Lua runtime applies window rules and can optionally launch `d2wc` for unconfigured normal windows.
+3. The Python `d2wc` command opens the configurator or prompt and performs managed-file operations.
 
-The current repository starts with the Lua script as the only execution layer. The first implementation goal is to add a safe manual configurator that can be opened by command or keyboard shortcut. Post-resize automation and pointer-anchored menus should build on top of that foundation.
+There is no separate long-running `d2wc` daemon yet.
 
-## Responsibilities
+## Runtime responsibilities
 
-### `devilspie2`
+### Devilspie2
 
-`devilspie2` remains the window-rule engine.
+Devilspie2 remains the active window-rule engine.
 
-It should continue to:
+It receives window events from the desktop/window-manager environment, runs the active managed Lua file, exposes window information to Lua, and applies workspace, pinning, and geometry operations through Devilspie2 functions.
 
-1. Receive window events from the desktop/window-manager environment.
-2. Run the Lua script for matching windows.
-3. Provide window information through built-in functions such as `get_window_type()`, `get_window_geometry()`, `get_screen_geometry()`, `get_class_instance_name()`, and `get_window_property()`.
-4. Apply workspace routing, pinning, and geometry changes using `devilspie2` functions.
+Devilspie2 does not present the user-facing configurator.
 
-`devilspie2` should not be responsible for presenting a user-facing configuration UI.
+### Managed Lua runtime
 
-### Lua rules script
+The managed Lua runtime is the active window-rule execution layer.
 
-The Lua script remains the active rules file.
+It currently handles:
 
-It should continue to:
+1. filtering to normal application windows,
+2. reading the Qubes domain when `_QUBES_VMNAME` is available,
+3. treating an empty `_QUBES_VMNAME` value as `dom0`,
+4. reading and normalizing the application class,
+5. applying managed rules,
+6. applying left-edge correction when configured,
+7. optionally launching `d2wc` for unconfigured normal windows.
 
-1. Filter out non-normal windows.
-2. Read the window domain where `_QUBES_VMNAME` is available.
-3. Treat an empty `_QUBES_VMNAME` value as `dom0`.
-4. Read and normalize the application class.
-5. Apply `EXCLUDE` before later automation.
-6. Apply `WORKSPACE_ROUTES`.
-7. Apply `PIN` after workspace assignment.
-8. Resolve `WORKSPACE_PLACEMENT` into a named `GEOM` profile.
-9. Apply geometry.
-10. Apply `LEFT_EDGE_CORRECTION` when needed.
+The managed Lua runtime is documented in [Lua Configurables](lua-configurables.md) and [Lua Event Handoff](lua-event-handoff.md).
 
-The configurator should edit the Lua script's managed configuration sections, not its program logic.
+### Python `d2wc` command
 
-Managed sections:
+The Python command is the user-facing and file-management layer.
 
-1. `EXCLUDE`
-2. `PIN`
-3. `WORKSPACE_ROUTES`
-4. `GEOM`
-5. `WORKSPACE_PLACEMENT`
-6. `LEFT_EDGE_CORRECTION`
+It currently provides:
 
-### Configurator UI
+1. `d2wc` as the normal configurator launch command,
+2. `d2wc configure` as the explicit configurator subcommand,
+3. `d2wc prompt` as the optional event-handoff prompt,
+4. parser, validator, renderer, backup, and safe-save logic,
+5. GTK configurator workflows for managed rules,
+6. File Open and Save As for managed Lua files,
+7. settings persistence under `~/.config/d2wc/settings.json`.
 
-The configurator UI is the normal user-facing editing tool.
+User-facing UI behavior is documented in [UI Flow](ui-flow.md). Managed-file behavior is documented in [Managed Config Workflow](managed-config-workflow.md).
 
-It should:
+### Future daemon/helper process
 
-1. Open from a command suitable for assigning to a desktop keyboard shortcut.
-2. Load the current managed Lua configuration.
-3. Read the selected or active window identity.
-4. Show current domain, class, workspace, screen, and geometry.
-5. Let the user create or update rules without writing Lua manually.
-6. Preview generated rules before saving.
-7. Validate generated rules before saving.
-8. Back up the previous Lua file before saving.
-9. Write deterministic Lua for the managed sections.
-10. Request a clean reload or restart after saving.
+A future daemon or helper process may be needed for behavior that should not live inside Devilspie2 Lua or the transient configurator process.
 
-The configurator should not silently rewrite unrelated parts of the Lua script.
+Potential responsibilities:
 
-### Daemon/helper process
+1. starting, verifying, or restarting the managed Devilspie2 process,
+2. owning only the `d2wc`-managed Devilspie2 instance,
+3. post-resize detection,
+4. suppression of resize events caused by `d2wc` itself,
+5. optional tray or status entry points,
+6. pointer-anchored prompt/menu behavior if prompt mode is expanded,
+7. debug logging for runtime behavior.
 
-A daemon/helper may be required for behavior that is awkward or impossible inside `devilspie2` Lua alone.
+This future process should not require a permanently visible tray icon. The stable user entry point should remain command-based so users can launch it directly or bind it to a keyboard shortcut.
 
-The daemon/helper may own:
+## Managed file boundary
 
-1. Starting, verifying, or restarting the managed `devilspie2` process.
-2. Active-window capture.
-3. Optional system tray icon and tray menu actions.
-4. Post-resize detection.
-5. Pointer-anchored `Cancel` / `Configure` menu.
-6. Suppression of resize events caused by `d2wc` itself.
-7. Relaunching or reloading `devilspie2` after configuration changes.
-8. Debug logging.
-
-The exact daemon implementation depends on the technology choice. The architecture should allow the daemon/helper and configurator to be the same process at first, then split later if needed.
-
-The daemon/helper should not require a permanently visible tray icon. After initial setup, `d2wc` should be able to run quietly in the background, with the configurator opened by command or keyboard shortcut when the user wants to make a change.
-
-## Phase 1 runtime
-
-Phase 1 should avoid unnecessary event-monitoring complexity.
-
-Required runtime pieces:
-
-1. Current `devilspie2` Lua script.
-2. Manual configurator UI.
-3. Command-line/manual launch path suitable for desktop keyboard shortcuts.
-4. Config file reader/writer for the managed Lua sections.
-5. Validation before save.
-6. Backup before save.
-7. Reload or restart path after save.
-
-Optional Phase 1 runtime pieces:
-
-1. Tray entry point, if the chosen toolkit supports it cleanly and it does not drive the architecture.
-2. Setup/troubleshooting mode where the tray is visible while the user is actively configuring their workspace.
-
-Phase 1 does not need to detect post-resize events yet. A user can manually place a window, open the configurator, capture the active window, and save the desired rule.
-
-## Phase 2 runtime
-
-Phase 2 adds desktop automation around the manual configurator.
-
-Required runtime pieces:
-
-1. Window resize start detection.
-2. Window resize completion detection.
-3. Pre-resize and post-resize geometry capture.
-4. Resize threshold handling.
-5. Suppression of resize events caused by automatic `d2wc` placement.
-6. Post-resize setting:
-   1. Disabled.
-   2. Open configurator directly.
-   3. Show pointer-anchored `Cancel` / `Configure` menu.
-7. Configurator launch with the resized window preloaded.
-
-Phase 2 should not change the underlying Lua grammar unless Phase 1 shows that the current managed sections are insufficient.
-
-## Configuration file model
-
-The initial storage model is the managed Lua script itself.
-
-The configurator should treat the Lua file as a structured document with managed blocks rather than as arbitrary text.
-
-The first implementation can parse the known block names:
-
-1. `local EXCLUDE = { ... }`
-2. `local PIN = { ... }`
-3. `local WORKSPACE_ROUTES = { ... }`
-4. `local GEOM = { ... }`
-5. `local WORKSPACE_PLACEMENT = { ... }`
-6. `local LEFT_EDGE_CORRECTION = { ... }`
-
-The configurator should preserve program logic outside those blocks.
-
-## Runtime settings model
-
-Some configurator behavior is not naturally stored as a window-matching rule. These values should live in a small `d2wc` settings file rather than being mixed into `WORKSPACE_PLACEMENT` rules.
-
-Early settings should include:
-
-1. Lua config path.
-2. Backup location.
-3. Manual configurator command.
-4. `window_border_width` for generated split profiles.
-5. Optional tray behavior.
-6. Post-resize behavior.
-7. Resize threshold.
-8. Suppression delay after automated placement.
-9. Debug logging.
-
-The `window_border_width` setting should be used by the configurator when generating `half_left` and `half_right` geometry profiles. It does not need to be consumed by the Lua runtime after the generated `GEOM` values have been written.
-
-## Managed block writing
-
-Managed blocks should be written in a deterministic style.
-
-Required behavior:
-
-1. Stable ordering where practical.
-2. Valid Lua syntax.
-3. Consistent indentation.
-4. Clear comments where helpful.
-5. No duplicate workspace keys.
-6. No duplicate prefixes in generated rule strings.
-7. No placement rule that references a missing geometry profile.
-8. No left-edge correction rule with an invalid correction mode.
-
-The configurator may preserve existing user comments where practical, but correctness and predictable output are more important than perfect comment preservation in the first implementation.
-
-## Validation model
-
-Validation should run before any file is written.
-
-Validation should check:
-
-1. Rule token grammar.
-2. Required prefixes for each managed section.
-3. Duplicate rules.
-4. Duplicate workspace keys.
-5. Unknown geometry profile references.
-6. Invalid geometry values.
-7. Invalid left-edge correction modes.
-8. Workspace numbers outside the available workspace range, when that range is known.
-9. Valid numeric settings such as `window_border_width`, when generated profile settings are saved.
-
-The configurator should explain validation failures in user language.
-
-Example:
+`d2wc` manages Lua files under:
 
 ```text
-This placement rule uses geometry profile `wide_right`, but no `wide_right` profile exists in GEOM.
+~/.config/d2wc/lua/
 ```
 
-## Backup model
-
-Before writing a modified Lua file, the configurator must create a backup.
-
-The backup should include:
-
-1. Original file name.
-2. Timestamp.
-3. A clear suffix such as `.bak`.
-
-Example backup name:
+Devilspie2 reads the active managed file through:
 
 ```text
-d2wc.lua.2026-05-20-011530.bak
+~/.config/devilspie2/d2wc.lua
 ```
 
-The backup directory can initially be the same directory as the Lua file. A later settings option can allow a dedicated backup directory.
+When managed by `d2wc`, that path is a symlink into `~/.config/d2wc/lua/`.
 
-## Save model
+`d2wc` must not become a generic Devilspie2 Lua editor. It edits managed files that pass the managed-marker and managed-block validation rules.
 
-A safe save should use this order:
+The active managed-file model is documented in [Managed Config Workflow](managed-config-workflow.md).
 
-1. Parse current Lua file.
-2. Apply pending user changes in memory.
-3. Validate the resulting managed blocks and runtime settings.
-4. Render updated Lua content.
-5. Create a backup of the current file.
-6. Write the new Lua file to a temporary file in the same directory.
-7. Replace the old Lua file with the new file.
-8. Reload or restart `devilspie2`.
-9. Report success or failure to the user.
+## Write safety boundary
 
-Writing to a temporary file first reduces the chance of leaving a truncated config if the process fails during save.
+All real writes should go through the guarded managed-file path.
 
-## Reload and restart model
+The runtime safety model is:
 
-The exact reload mechanism still needs testing.
+1. parse the managed file,
+2. apply the requested change in memory,
+3. validate the result,
+4. render deterministic Lua,
+5. create or update the backup archive,
+6. replace the target file only after staging succeeds,
+7. report success or failure clearly.
 
-Possible approaches:
+Backup archive behavior and safe-save ordering are documented in [Backup Archives](backup-archives.md).
 
-1. Ask the user to run `devilspie2` through a `d2wc` launcher wrapper.
-2. Have the helper process manage the `devilspie2` process lifecycle.
-3. Send a signal if `devilspie2` supports an appropriate reload behavior in the target environment.
-4. Stop and restart `devilspie2` after a successful save.
+## Current non-goals
 
-The first reliable implementation may use a conservative restart if it can identify only the `d2wc`-managed `devilspie2` process.
+The current public beta baseline does not require:
 
-The implementation must avoid killing unrelated `devilspie2` processes that the user may be running for other rules.
+1. a separate long-running daemon,
+2. post-resize automation,
+3. ownership of arbitrary user Devilspie2 scripts,
+4. a permanently visible tray icon,
+5. Wayland-first behavior,
+6. a Qt/KDE-specific front end.
 
-## Process ownership
+Those remain future design areas or compatibility work.
 
-The cleanest long-term model is that `d2wc` owns the `devilspie2` instance that runs the managed script.
+## Future runtime work
 
-That means:
+Future runtime work should focus on the areas that are not solved by the current command-driven configurator and Lua event handoff.
 
-1. The user starts `d2wc`.
-2. `d2wc` starts or verifies its managed `devilspie2` instance.
-3. The managed `devilspie2` instance runs the `d2wc` Lua script.
-4. The configurator writes the managed Lua script.
-5. `d2wc` reloads or restarts only its own managed `devilspie2` instance.
+### Managed Devilspie2 process ownership
 
-This avoids guessing which random `devilspie2` process belongs to `d2wc`.
+The cleanest long-term model is that `d2wc` owns the Devilspie2 instance that runs the managed `d2wc` Lua file.
 
-## Window identity model
+That would allow `d2wc` to reload or restart only its own managed runtime instead of guessing which arbitrary Devilspie2 process belongs to the user.
 
-The configurator needs enough information to build safe rules.
+Packaging direction for this is documented in [Packaging](packaging.md).
 
-For each selected window, it should try to collect:
+### Post-resize event monitoring
 
-1. Window title.
-2. Window type.
-3. Application class.
-4. Class instance, if available.
-5. Qubes domain from `_QUBES_VMNAME`, if available.
-6. Workspace number.
-7. Screen or monitor.
-8. Current geometry.
-9. Screen geometry.
+Post-resize behavior remains future work.
 
-On Qubes, `_QUBES_VMNAME` is the domain source.
+A future implementation needs to detect user-initiated resize completion, capture final geometry, apply thresholds, and avoid treating `d2wc`-initiated geometry changes as user edits.
 
-On non-Qubes systems, this value may be unavailable. In that case, class-based rules and geometry capture should still work.
+That work is documented in [Event Monitoring](event-monitoring.md).
 
-## Geometry model
+### Generated split profiles
 
-The runtime should treat geometry as four integer values:
+Generated split profiles remain future work.
 
-1. `x`
-2. `y`
-3. `w`
-4. `h`
+A future implementation should generate profiles such as `half_left` and `half_right` from current screen or monitor geometry, preview generated values before writing, and keep generated profiles editable as normal `GEOM` profiles.
 
-The configurator should show these values to the user, but it should not force ordinary users to type them manually.
+The roadmap entry is documented in [Implementation Plan](implementation-plan.md).
 
-The common path should be:
+### Managed grammar expansion
 
-1. User places a window.
-2. `d2wc` captures the geometry.
-3. User names or confirms a geometry profile.
-4. `d2wc` writes the `GEOM` profile.
-5. User links the profile to a placement rule.
+Current managed rule strings are whitespace-separated prefixed tokens.
 
-Generated split profiles should additionally use screen or monitor geometry plus the configured `window_border_width` setting. The generated `half_left` and `half_right` profiles should be previewed together so the user can see how border width changes the resulting `x` and `w` values.
+Values containing whitespace need a future grammar decision before they can be safely edited or rendered.
 
-## Left-edge correction model
+The roadmap entry is documented in [Implementation Plan](implementation-plan.md).
 
-`LEFT_EDGE_CORRECTION` remains part of the runtime design for now.
+## Open architecture questions
 
-The configurator should only expose it when relevant:
+Open questions that still need testing or design decisions:
 
-1. The target geometry has `x = 0`.
-2. A test shows the actual window does not land at `x = 0`.
-3. The user opens troubleshooting or advanced placement options.
-
-The correction test should try:
-
-1. Normal geometry placement.
-2. `set_window_position(x, y)` after geometry.
-3. `set_window_position2(x, y)` after geometry.
-
-The working result can be saved as either `le:pos1` or `le:pos2`.
-
-## Event suppression model
-
-When `d2wc` applies a geometry rule, the window manager may emit movement or resize events.
-
-The daemon/helper must not interpret those as user-initiated resizes.
-
-The runtime should maintain a short suppression window after automated placement.
-
-The exact duration needs testing. It should be configurable later.
-
-## Failure handling
-
-The UI should report failures clearly.
-
-Important failure cases:
-
-1. Lua file cannot be read.
-2. Lua file cannot be parsed into managed blocks.
-3. Validation fails.
-4. Backup cannot be created.
-5. New Lua file cannot be written.
-6. Reload or restart fails.
-7. Window identity cannot be captured.
-8. The selected window is not a normal application window.
-
-A save failure should leave the previous Lua file intact whenever possible.
-
-## Logging
-
-The runtime should support debug logging.
-
-Logs should help diagnose:
-
-1. Window identity capture.
-2. Rule matching.
-3. Geometry capture.
-4. Resize detection.
-5. Suppression behavior.
-6. File write operations.
-7. Reload or restart operations.
-
-The log location should be configurable later. The initial implementation can log to standard output when run from a terminal.
-
-## Open design questions
-
-The following decisions still need testing or technology evaluation:
-
-1. Best implementation language and GUI toolkit.
-2. Best way to observe resize completion.
-3. Best way to anchor a menu at the pointer.
-4. Best way to reload or restart only the managed `devilspie2` instance.
-5. Whether the Lua script should eventually be generated from a separate data file instead of edited directly.
-6. Whether `LEFT_EDGE_CORRECTION` can be simplified by always applying one position function after geometry.
-7. Whether optional tray behavior is worth implementing after the command/shortcut entry point works.
-8. How `window_border_width` should interact with panels, usable work area, and monitor-specific split profiles.
-
-## Related documents
-
-1. [UI Flow](ui-flow.md)
-2. [Lua Configurables](lua-configurables.md)
-3. [Event Monitoring](event-monitoring.md)
-4. [Implementation Plan](implementation-plan.md)
-5. [Testing](testing.md)
-
-## Initial development sequence
-
-The recommended implementation sequence is:
-
-1. Keep the current Lua script working.
-2. Build a parser/writer for the managed Lua blocks.
-3. Build validation for generated rules.
-4. Build a manual configurator window that can be opened by command or keyboard shortcut.
-5. Add backup and save behavior.
-6. Add a reload or restart path.
-7. Add optional tray entry if useful.
-8. Add generated split profile support with `window_border_width` preview.
-9. Add post-resize detection.
-10. Add the pointer-anchored `Cancel` / `Configure` menu.
-11. Add live geometry display while resizing.
+1. How should `d2wc` own and restart only its managed Devilspie2 instance?
+2. Which event source best identifies user-initiated resize completion?
+3. How should resize-event suppression distinguish user changes from `d2wc` placement changes?
+4. Whether optional tray behavior is useful after the command/shortcut entry point is established.
+5. How generated split profiles should account for panels, usable work area, and monitor-specific geometry.
+6. Whether a later Qt/KDE front end is worth implementing once the core behavior is stable.

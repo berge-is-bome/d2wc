@@ -26,16 +26,13 @@ git -C d2wc archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
 Replace `<source-vm>` with the running VM that contains `/tmp/d2wc.tgz`.
 
 ```bash
+cd /tmp
 qvm-run --pass-io <source-vm> 'cat /tmp/d2wc/install-qubes.sh' > /tmp/install-qubes.sh
 chmod 700 /tmp/install-qubes.sh
-/tmp/install-qubes.sh <source-vm>
+./install-qubes.sh
 ```
 
-The VM argument is optional. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
-
-```bash
-/tmp/install-qubes.sh
-```
+The script can also be called with a sourceVM paramete, `./install-qubes.sh <source-vm>`. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
 
 ## Installer update behavior
 
@@ -47,8 +44,8 @@ The installer also refreshes marked managed Lua files under `~/.config/d2wc/lua/
 
 Only files that contain the managed marker are migrated:
 
-```text
--- d2wc managed
+```lua
+local D2WC_MANAGED = true
 ```
 
 Files without that marker are skipped by the migration helper and are not considered valid active `d2wc` managed files by the installer.

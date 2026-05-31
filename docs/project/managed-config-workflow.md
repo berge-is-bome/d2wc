@@ -1,14 +1,17 @@
 # Managed Config Workflow
 
-## Purpose
+The managed-config model keeps `d2wc` managed Lua files separate from arbitrary user Devilspie2 scripts while still letting Devilspie2 load the active managed file normally.
 
-This document captures the current managed-config model for `d2wc`.
+Related implementation details live elsewhere:
 
-The goal is to keep `d2wc` managed Lua files separate from arbitrary user Devilspie2 scripts while still letting Devilspie2 load the active managed file normally.
+1. [Installation Workflow](installation-workflow.md) documents installer behavior and managed Lua runtime refreshes.
+2. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, and handoff runtime settings.
+3. [Backup Archives](backup-archives.md) documents backup archive creation and safe-save ordering.
+4. [UI Flow](ui-flow.md) documents the configurator from the user's point of view.
 
 ## Current path model
 
-The Qubes/dom0 installer uses these user paths:
+The current Qubes/dom0 installer uses these user paths:
 
 ```text
 ~/.cache/d2wc/
@@ -84,86 +87,7 @@ could not load config file: missing D2WC_MANAGED marker
 
 The GTK configurator shows this case as a toast.
 
-## Default managed Lua header
-
-The bundled managed Lua template now uses a compact top header:
-
-```lua
-------------------------------------------------------------
--- devilspie2 workspace configurator
--- version 0.1.13
-------------------------------------------------------------
-
-local D2WC_MANAGED = true
-```
-
-Only the version line should change when the managed Lua runtime version changes.
-
-Historical per-version change notes belong in Git history and project documentation, not in the top of the user-managed Lua file.
-
-## Installer behavior
-
-Before replacing the extracted source tree in `~/.local/share/d2wc/source`, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
-
-The installer then:
-
-1. Extracts the local source tree under `~/.local/share/d2wc/source/`.
-2. Installs the Python package with the user-site pip flow.
-3. Creates `~/.config/d2wc/lua/` if needed.
-4. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled template if a managed file is needed.
-5. Runs targeted runtime migrations for marked managed Lua files under `~/.config/d2wc/lua/`.
-6. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
-7. Leaves unrelated `~/.config/devilspie2/` files and symlinks unchanged.
-8. Leaves existing `~/.config/d2wc/settings.json` user settings unchanged.
-
-On update, the installer preserves the active managed file selection when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
-
-On update, if one or more `d2wc` configurator instances are running, the installer warns the user to close them and waits before continuing. The update continues only after no running `d2wc` process candidates remain.
-
-The installer validates active managed Lua files through the shared managed-marker and managed-block validation code. It does not insert the managed marker into old files automatically.
-
-## Managed Lua runtime migrations
-
-Installer runtime migrations are targeted insertions into marked managed Lua files.
-
-The migration helper requires this managed marker:
-
-```lua
-local D2WC_MANAGED = true
-```
-
-Files without that marker are skipped.
-
-For marked managed files, the migration may add missing runtime pieces such as:
-
-1. latest header version comments,
-2. `D2WC_EVENT_HANDOFF_ENABLED`,
-3. `D2WC_EVENT_HANDOFF_ENTRY_POINT`,
-4. `D2WC_CONFIGURATOR_CLASS`,
-5. `D2WC_ACTION_PROMPT_CLASS`,
-6. Lua event handoff helper code,
-7. already-configured window suppression helper code,
-8. the Lua event handoff call.
-
-The migration must not rewrite the full bundled template. It must preserve user rules, user comments, spacing, and existing toggle values.
-
-For example, if a user has already set:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = false
-```
-
-an installer update must not change it back to `true`.
-
-If a user has already set:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENTRY_POINT = "prompt"
-```
-
-an installer update must not change it back to `"configurator"`.
-
-## Configurator behavior
+## Active managed file selection
 
 The configurator tracks the currently open managed Lua file.
 
@@ -234,7 +158,7 @@ Unsafe cases include:
 
 Unsafe cases produce a clear warning and leave the existing Devilspie2 file or symlink unchanged.
 
-## UI settings
+## UI settings file
 
 The configurator stores UI settings in:
 
@@ -242,81 +166,11 @@ The configurator stores UI settings in:
 ~/.config/d2wc/settings.json
 ```
 
-Current settings file values:
-
-1. Toast timeout seconds.
-2. Toast opacity.
-
-`Menu -> Configure` replaces the main editor area with an in-window settings view.
-
-The settings view has a left navigation column with:
-
-1. `Behavior`
-2. `Notifications`
-
-`Behavior` controls these active managed Lua settings:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = true
-local D2WC_EVENT_HANDOFF_ENTRY_POINT = "configurator" -- values: "configurator", "prompt"
-```
-
-`D2WC_EVENT_HANDOFF_ENABLED` controls whether Devilspie2 opens `d2wc` automatically on new window events, for unconfigured windows.
-
-`D2WC_EVENT_HANDOFF_ENTRY_POINT` selects whether automatic opening opens the configurator directly or shows the Cancel/Configure prompt button first.
-
-Supported entry-point values:
-
-1. `configurator`
-2. `prompt`
-
-Visible choices:
-
-1. `Open configurator directly`
-2. `Show Cancel/Configure button first`
-
-`Notifications` controls the persisted toast timeout and toast opacity values.
-
-The `Back` button returns to the managed rule editor.
-
 The settings file is user-owned runtime configuration and must not be overwritten by installer updates.
 
-## Prompt entry point
+The current settings view and user-facing settings behavior are documented in [UI Flow](ui-flow.md).
 
-The prompt entry point is launched with:
-
-```bash
-d2wc prompt
-```
-
-The prompt appears near the bottom-right corner of the window that triggered the event when event geometry is available.
-
-The prompt has two actions:
-
-1. `Cancel`
-2. `Configure`
-
-The pointer is centered on `Cancel` when the prompt opens.
-
-Choosing `Configure` opens the normal configurator for that event context.
-
-The prompt publishes this GTK/X11 class:
-
-```text
-d2wc-action-prompt
-```
-
-The managed Lua runtime suppresses that class to avoid recursive prompt launches.
-
-## Dropdown display rules
-
-Machine, Application, and similar target dropdowns use `All` to display an empty match component.
-
-For example, if Machine is `All`, the generated rule has no `d:` component. This keeps the Lua rule format unchanged while making the UI clearer.
-
-Normal command launches do not add the built-in example fixture values to Machine/Application dropdowns. Example fixture values appear only when `--event-fixture` is explicitly requested or when real event data is supplied through Lua handoff arguments.
-
-## Backup behavior
+## Backup relationship
 
 Backups follow the currently open managed file.
 
@@ -329,8 +183,4 @@ For example:
 ~/.config/d2wc/lua/work.lua.bak.tgz
 ```
 
-## Current implementation notes
-
-The installer and configurator now use the new path model.
-
-The active managed Lua file may optionally open `d2wc` automatically for unconfigured normal windows through the Lua event handoff flow documented in [Lua Event Handoff](lua-event-handoff.md).
+Detailed backup behavior is documented in [Backup Archives](backup-archives.md).

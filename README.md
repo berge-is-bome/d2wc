@@ -73,7 +73,7 @@ This behavior is controlled in the configurator:
 Menu -> Configure -> Behavior
 ```
 
-The same Configure view also contains notification settings for toast timeout and opacity.
+For implementation details, see [Lua Event Handoff](docs/project/lua-event-handoff.md).
 
 ## Launching d2wc
 
@@ -81,34 +81,6 @@ After installation, launch the configurator with:
 
 ```bash
 d2wc
-```
-
-## Automatic window-event launching
-
-The active managed Lua file can open `d2wc` automatically when Devilspie2 sees a new normal application window that does not already match a managed rule.
-
-The setting lives in the active managed Lua file:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = true
-```
-
-Set it to `false` to disable automatic launching:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = false
-```
-
-The same setting can be changed from the configurator:
-
-```text
-Menu -> Configure -> Behavior
-```
-
-The checkbox is:
-
-```text
-Automatically open d2wc for unconfigured windows
 ```
 
 ## Qubes dom0 installation
@@ -119,14 +91,14 @@ Use [Install/Update for Qubes](docs/user/install-qubes.md) for the full install/
 
 ## Documentation
 
+Start with [User Documentation](docs/user/README.md) for install, configuration, and backup information.
+
 Useful project documents:
 
-1. [Install/Update for Qubes](docs/user/install-qubes.md) for the Qubes dom0 install and update flow.
-2. [Lua Configurables](docs/project/lua-configurables.md) for the supported rule types and user-editable sections.
-3. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
-4. [Lua Event Handoff](docs/project/lua-event-handoff.md) for automatic window-event launching and suppression behavior.
-5. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
-6. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
+1. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
+2. [Lua Event Handoff](docs/project/lua-event-handoff.md) for automatic window-event launching and suppression behavior.
+3. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
+4. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
 
 ## Project status
 
