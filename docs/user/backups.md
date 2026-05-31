@@ -1,32 +1,33 @@
-# Backup Archives
+# Backups
 
-`d2wc` creates backups automatically on every `configurator` change, for the current active managed file, and stores them in a `*.tgz` archive inside the same folder as the managed archive.
+`d2wc` creates a backup automatically before it saves a change to the active managed Lua file. Backups are stored in a `*.bak.tgz` archive beside that managed Lua file.
 
-## Archive location
+## Backup location
 
-For the installed managed config:
+For the default managed Lua file:
 
 ```text
 ~/.config/d2wc/lua/d2wc.lua
 ```
 
-`d2wc` stores backup snapshots in:
+The backup archive is:
 
 ```text
 ~/.config/d2wc/lua/d2wc.lua.bak.tgz
 ```
 
-If `--backup-dir` is supplied, the archive is created in that directory and keeps the same filename pattern:
+If you save or open another managed Lua file, its backup archive follows that file. For example:
 
 ```text
-<backup-dir>/<config-filename>.bak.tgz
+~/.config/d2wc/lua/work.lua
+~/.config/d2wc/lua/work.lua.bak.tgz
 ```
 
-## Archive members
+## Backup entries
 
-Each successful write adds a timestamped backup member to the archive.
+Each saved change adds a timestamped entry to the archive.
 
-Example members:
+Example entries:
 
 ```text
 d2wc.lua.2026-05-20-153000.bak
@@ -34,9 +35,13 @@ d2wc.lua.2026-05-20-153001.bak
 d2wc.lua.2026-05-20-153002.bak
 ```
 
-If more than one backup is created during the same second, `d2wc` keeps member names unique by adding a suffix:
+If more than one backup is created during the same second, `d2wc` adds a suffix so the entries stay unique:
 
 ```text
 d2wc.lua.2026-05-20-153000.bak
 d2wc.lua.2026-05-20-153000.bak.1
 ```
+
+## Current restore status
+
+`d2wc` creates backup archives automatically, but it does not yet provide a restore command or restore screen in the configurator.
