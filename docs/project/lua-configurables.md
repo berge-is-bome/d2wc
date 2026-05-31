@@ -15,8 +15,6 @@ The event handoff settings are documented in [Lua Event Handoff](lua-event-hando
 3. `D2WC_CONFIGURATOR_CLASS`
 4. `D2WC_ACTION_PROMPT_CLASS`
 
-This document focuses on the managed Lua rule grammar and rule sections. Runtime settings should be documented here only when they affect how managed rules are parsed, matched, or written.
-
 ## Rule grammar
 
 Rules use space-separated prefixed tokens.
