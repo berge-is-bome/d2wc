@@ -73,7 +73,7 @@ This behavior is controlled in the configurator:
 Menu -> Configure -> Behavior
 ```
 
-The same Configure view also contains notification settings for toast timeout and opacity.
+For implementation details, see [Lua Event Handoff](docs/project/lua-event-handoff.md)
 
 ## Launching d2wc
 
@@ -81,34 +81,6 @@ After installation, launch the configurator with:
 
 ```bash
 d2wc
-```
-
-## Automatic window-event launching
-
-The active managed Lua file can open `d2wc` automatically when Devilspie2 sees a new normal application window that does not already match a managed rule.
-
-The setting lives in the active managed Lua file:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = true
-```
-
-Set it to `false` to disable automatic launching:
-
-```lua
-local D2WC_EVENT_HANDOFF_ENABLED = false
-```
-
-The same setting can be changed from the configurator:
-
-```text
-Menu -> Configure -> Behavior
-```
-
-The checkbox is:
-
-```text
-Automatically open d2wc for unconfigured windows
 ```
 
 ## Qubes dom0 installation
