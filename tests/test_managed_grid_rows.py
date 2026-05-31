@@ -8,6 +8,7 @@ from d2wc.ui.grid_rows import (
     build_available_known_window_grid_rows,
     build_configured_grid_rows,
     build_known_window_grid_rows,
+    class_values,
 )
 
 
@@ -39,6 +40,16 @@ def test_build_configured_grid_rows_flattens_all_sections() -> None:
     assert rows[3].existing_profile == "nav_wide"
     assert rows[3].geometry == "x=10 y=20 w=300 h=400"
     assert rows[4].existing_profile == "nav_wide"
+
+
+def test_default_event_fixture_is_empty_for_normal_configurator_launch() -> None:
+    event_data = get_event_fixture()
+
+    assert event_data.domain is None
+    assert event_data.class_instance_name is None
+    assert event_data.window_class is None
+    assert build_known_window_grid_rows(event_data) == ()
+    assert class_values(None, event_data) == ()
 
 
 def test_build_known_window_grid_rows_creates_event_proposals() -> None:
@@ -149,4 +160,3 @@ def test_build_available_known_window_grid_rows_returns_empty_for_geom() -> None
         "GEOM",
         (KnownWindowTarget(machine="personal", application="navigator"),),
     ) == ()
-
