@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document evaluates practical implementation choices for the future `d2wc` configurator and daemon/helper.
+Practical implementation choices for the `d2wc` configurator and future daemon/helper are evaluated here.
 
 The decision must serve the actual product shape described in the current design documents:
 
@@ -288,9 +288,9 @@ The core logic should be testable without starting the GUI.
 
 The `ui/qt/` path should not be implemented until there is a real need, but leaving room for it helps avoid a GTK-only architecture.
 
-## Phase 1 proof tasks
+## Original Phase 1 proof tasks
 
-Before committing fully to GTK/PyGObject, build tiny proof tasks:
+Before committing fully to GTK/PyGObject, the planned tiny proof tasks were:
 
 1. Open a main window from a command.
 2. Confirm the command can be assigned to a desktop keyboard shortcut.
@@ -341,20 +341,4 @@ Do not use a webview for the first implementation.
 1. [Runtime Architecture](runtime-architecture.md)
 2. [Event Monitoring](event-monitoring.md)
 3. [Implementation Plan](implementation-plan.md)
-4. [Testing](testing.md)
-5. [Packaging](packaging.md)
-
-## Review checkpoint
-
-Before writing real application code, confirm these points:
-
-1. Python is acceptable as the first implementation language.
-2. GTK/PyGObject should be tested first for the UI toolkit.
-3. PySide6 remains the fallback toolkit if GTK exposes a blocker.
-4. Qt remains on the roadmap for KDE-oriented users.
-5. The first implementation may target X11/Qubes/XFCE behavior first.
-6. Wayland support can be treated as later compatibility work.
-7. Phase 1 uses a command/keyboard-shortcut entry point.
-8. Tray behavior is optional and should not drive the architecture.
-9. Post-resize automation remains Phase 2.
-10. The parser/writer core must be separated from the UI.
+4. [Packaging](packaging.md)
