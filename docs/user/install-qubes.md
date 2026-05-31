@@ -8,12 +8,26 @@ The install flow uses a source VM to clone and archive the repository, then runs
 
 1. Clone repository.
 2. Create archive.
-3. Leave the source VM running until the dom0 installation is finished.
+3. Copy install script to /tmp.
+4. Leave the source VM running until the dom0 installation is finished.
+
+```bash
+cd /tmp
+rm -rf -- d2wc
+
+git clone --depth 1 git@github.com:berge-is-bome/d2wc.git
+git -C d2wc fetch --depth 1 origin tag v0.1.0
+git -C d2wc archive --format=tar --prefix=d2wc/ v0.1.0 | gzip > /tmp/d2wc.tgz
+cp d2wc/install-qubes.sh .
+```
+
+If you want to stay on the main branch instead of the specific release tag, use:
 
 ```bash
 cd /tmp
 git clone git@github.com:berge-is-bome/d2wc.git
 git -C d2wc archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
+cp d2wc/install-qubes.sh .
 ```
 
 ## In dom0:
