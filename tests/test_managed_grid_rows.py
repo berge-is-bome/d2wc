@@ -52,6 +52,31 @@ def test_default_event_fixture_is_empty_for_normal_configurator_launch() -> None
     assert class_values(None, event_data) == ()
 
 
+def test_real_example_class_remains_available_from_configured_rules() -> None:
+    snapshot = ConfigSnapshot(
+        path=Path("d2wc-test.lua"),
+        exists=True,
+        config=ManagedConfig(
+            exclude=("d:work c:example",),
+            pin=(),
+            workspace_routes=(),
+            geom=(),
+            workspace_placement=(),
+            left_edge_correction=(),
+        ),
+    )
+
+    assert class_values(snapshot, get_event_fixture()) == ("example",)
+
+
+def test_real_example_class_remains_available_from_inventory() -> None:
+    assert class_values(
+        None,
+        get_event_fixture(),
+        (KnownWindowTarget(machine="work", application="example"),),
+    ) == ("example",)
+
+
 def test_build_known_window_grid_rows_creates_event_proposals() -> None:
     rows = build_known_window_grid_rows(get_event_fixture("example"))
 
