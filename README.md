@@ -73,7 +73,7 @@ This behavior is controlled in the configurator:
 Menu -> Configure -> Behavior
 ```
 
-For implementation details, see [Lua Event Handoff](docs/project/lua-event-handoff.md)
+For implementation details, see [Lua Event Handoff](docs/project/lua-event-handoff.md).
 
 ## Launching d2wc
 
