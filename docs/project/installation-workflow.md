@@ -2,8 +2,6 @@
 
 `d2wc` currently ships one implemented installer path: the Qubes/dom0 source-archive installer.
 
-Future Fedora, Debian, or distribution-package installers should be documented here as they are added, so installer behavior stays in one project reference instead of being repeated in status notes.
-
 For user-facing Qubes install and update steps, see [Install/Update for Qubes](../user/install-qubes.md).
 
 ## Current installer paths
