@@ -38,16 +38,7 @@ Before replacing the extracted source tree, the installer copies `/tmp/d2wc.tgz`
 ~/.cache/d2wc/d2wc.tgz
 ```
 
-The copied archive is validated before use.
-
-Required archive members include:
-
-```text
-d2wc/pyproject.toml
-d2wc/src/d2wc.lua
-```
-
-If the archive cannot be read or does not contain the required files, the installer exits before replacing the local source tree.
+The copied archive is validated before use. If the archive cannot be read, the installer exits before replacing the local source tree.
 
 ## Local source installation
 
