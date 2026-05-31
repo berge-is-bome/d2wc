@@ -11,25 +11,13 @@ The active Lua file is not compressed and is not moved into an archive. Only bac
 For the installed managed config:
 
 ```text
-~/.config/devilspie2/d2wc.lua
+~/.config/d2wc/lua/d2wc.lua
 ```
 
 `d2wc` stores backup snapshots in:
 
 ```text
-~/.config/devilspie2/d2wc.lua.bak.tgz
-```
-
-For the GTK development test config:
-
-```text
-~/.config/devilspie2/d2wc-test.lua
-```
-
-`d2wc` stores backup snapshots in:
-
-```text
-~/.config/devilspie2/d2wc-test.lua.bak.tgz
+~/.config/d2wc/lua/d2wc.lua.bak.tgz
 ```
 
 If `--backup-dir` is supplied, the archive is created in that directory and keeps the same filename pattern:
