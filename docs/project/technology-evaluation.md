@@ -282,30 +282,6 @@ The recommended Phase 1 direction is:
 
 This gives the project a practical path to a working manual configurator without prematurely solving every daemon, tray, and post-resize problem.
 
-## Proposed Phase 1 internal structure
-
-When implementation starts, the source tree can evolve toward:
-
-```text
-src/
-  d2wc.lua
-  d2wc/
-    __init__.py
-    app.py
-    config_model.py
-    lua_blocks.py
-    validation.py
-    backup.py
-    window_info.py
-    ui/
-      gtk/
-        main_window.py
-      qt/
-        README.md
-      shortcut_entry.md
-      tray.py
-```
-
 The important design point is that Lua parsing and rule validation must not be buried inside UI widgets.
 
 The core logic should be testable without starting the GUI.
