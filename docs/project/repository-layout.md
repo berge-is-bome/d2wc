@@ -1,6 +1,6 @@
 # Repository Layout
 
-This repository holds the current `devilspie2` Lua rules script, the Python configurator core, the GTK configurator, Qubes/dom0 installation helper, tests, and project documentation.
+This repository holds the managed Devilspie2 Lua runtime template, the Python configurator core, the GTK configurator and prompt UI, the Qubes/dom0 installation helper, tests, user documentation, and project documentation.
 
 The README is intended to describe what `d2wc` is from a public user point of view. User-facing documentation belongs in `docs/user/`. Technical status, development workflow, implementation notes, and repository structure belong in `docs/project/`.
 
@@ -13,24 +13,28 @@ pyproject.toml
 install-qubes.sh
 docs/
   user/
+    README.md
+    backups.md
     install-qubes.md
+    lua-configurables.md
   project/
     backup-archives.md
     configurator-notification-settings.md
+    d2wc-design-history.md
     development-status.md
-    event-data-ui-direction.md
     event-monitoring.md
     implementation-plan.md
+    installation-workflow.md
     left-edge-correction-testing.md
     lua-configurables.md
-    lua-design-history.md
+    lua-event-handoff.md
+    managed-config-workflow.md
     mvp-scope.md
     packaging.md
     product-development-brief.md
     repository-layout.md
     runtime-architecture.md
     technology-evaluation.md
-    testing.md
     ui-flow.md
 src/
   d2wc.lua
@@ -42,6 +46,8 @@ src/
     event_inventory.py
     event_inventory_capture.py
     event_preview.py
+    managed_config_file.py
+    prompt.py
     test_config.py
     test_config_actions.py
     core/
@@ -58,6 +64,7 @@ src/
       settings.py
       shadow_validation.py
       split_profiles.py
+      user_paths.py
       validation.py
     desktop/
       active_window.py
@@ -72,39 +79,49 @@ tests/
 
 ### User documentation
 
-1. [Install/Update for Qubes](../user/install-qubes.md) describes the current Qubes dom0 source-archive install/update flow.
+1. [User Documentation](../user/README.md) is the user-facing documentation landing page.
+2. [Install/Update for Qubes](../user/install-qubes.md) describes the Qubes dom0 source-archive install/update flow.
+3. [Lua Configurables](../user/lua-configurables.md) explains the window behavior users can configure through `d2wc`.
+4. [Backups](../user/backups.md) explains where automatic backup archives are stored and what restore support exists now.
 
 ### Project documentation
 
 1. [Backup Archives](backup-archives.md) describes backup archive behavior for guarded writes.
-2. [Configurator Notification Settings](configurator-notification-settings.md) records future Configure menu notification settings.
-3. [Development Status](development-status.md) records the active branch, latest verified baseline, current GTK behavior, Qubes/dom0 install behavior, known-window inventory behavior, current safe capability, and next work.
-4. [Event-Data GTK UI Direction](event-data-ui-direction.md) records the direction for using Devilspie2 event data in the GTK UI.
-5. [Event Monitoring](event-monitoring.md) describes resize detection, pointer menus, suppression, and desktop event behavior.
-6. [Implementation Plan](implementation-plan.md) turns the design into ordered development stages.
-7. [Left-Edge Correction Testing](left-edge-correction-testing.md) defines repeatable tests for `set_window_geometry()`, `set_window_position()`, and `set_window_position2()`.
-8. [Lua Configurables](lua-configurables.md) explains the managed Lua sections and rule grammar.
-9. [Lua Design History Notes](lua-design-history.md) records design context recovered from the archived pre-repository Lua script history.
-10. [MVP Scope](mvp-scope.md) separates the safe manual configurator from post-resize automation.
-11. [Packaging](packaging.md) describes Fedora-first RPM direction, later Debian packaging, Qubes/dom0 offline installation routes, and current source-archive installation behavior.
-12. [Product Development Brief](product-development-brief.md) describes the product direction and intended user outcomes.
-13. [Repository Layout](repository-layout.md) describes this repository structure.
-14. [Runtime Architecture](runtime-architecture.md) describes the Lua script, configurator, helper process direction, runtime settings, save model, and reload model.
-15. [Technology Evaluation](technology-evaluation.md) explains the Python, GTK-first, Qt-roadmap direction.
-16. [Testing](testing.md) defines parser, renderer, settings, generated split-profile, UI proof, and packaging tests.
-17. [UI Flow](ui-flow.md) describes the configurator screens, entry points, generated split profiles, and user-facing workflows.
+2. [Configurator Notification Settings](configurator-notification-settings.md) records notification settings behavior and related UI notes.
+3. [d2wc Design History Notes](d2wc-design-history.md) records design context recovered from the archived pre-repository Lua script history.
+4. [Development Status](development-status.md) tracks the current implementation baseline, recent milestones, latest verification, public beta scope, and active working notes.
+5. [Event Monitoring](event-monitoring.md) describes resize detection, pointer menus, suppression, and future desktop event behavior.
+6. [Implementation Plan](implementation-plan.md) tracks completed stages and future roadmap work.
+7. [Installation Workflow](installation-workflow.md) documents current installer behavior and future installer principles.
+8. [Left-Edge Correction Testing](left-edge-correction-testing.md) defines repeatable tests for `set_window_geometry()`, `set_window_position()`, and `set_window_position2()`.
+9. [Lua Configurables](lua-configurables.md) explains the internal managed Lua rule grammar and rule-section behavior.
+10. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, recursion suppression, process locks, and managed Lua runtime migrations.
+11. [Managed Config Workflow](managed-config-workflow.md) documents active managed-file ownership, path selection, File Open, Save As, settings file, and Devilspie2 symlink safety.
+12. [MVP Scope](mvp-scope.md) separates the safe manual configurator from future automation work.
+13. [Packaging](packaging.md) describes packaging direction and current packaging roadmap.
+14. [Product Development Brief](product-development-brief.md) describes the product direction and intended user outcomes.
+15. [Repository Layout](repository-layout.md) describes this repository structure.
+16. [Runtime Architecture](runtime-architecture.md) describes runtime boundaries between Devilspie2, the managed Lua runtime, the Python command, and future helper responsibilities.
+17. [Technology Evaluation](technology-evaluation.md) records implementation technology choices and tradeoffs.
+18. [UI Flow](ui-flow.md) describes the configurator screens, entry points, prompt behavior, settings views, and user-facing workflows.
+
+### Removed or superseded project documents
+
+1. `docs/project/event-data-ui-direction.md` was removed after its useful content was folded into focused project documents.
+2. `docs/project/testing.md` was removed after verification and testing notes were folded into the current status and implementation documents.
+3. `docs/project/lua-design-history.md` was renamed to [d2wc Design History Notes](d2wc-design-history.md).
 
 ## Directory purposes
 
 ### `docs/user/`
 
-User-facing documentation for installing, launching, and using `d2wc`.
+User-facing documentation for installing, launching, configuring, and understanding `d2wc`.
 
 These documents should be practical and task-oriented.
 
 ### `docs/project/`
 
-Project planning, product design, UI behavior, architecture, packaging, development status, and development notes.
+Project planning, product design, UI behavior, architecture, packaging, development status, implementation workflow, and development notes.
 
 These documents may describe implementation details, development history, and technical direction.
 
@@ -112,7 +129,7 @@ These documents may describe implementation details, development history, and te
 
 Source code.
 
-The current structure keeps the active Lua script and the Python package together under `src/`:
+The current structure keeps the bundled Devilspie2 Lua runtime template and the Python package together under `src/`:
 
 ```text
 src/
@@ -126,13 +143,13 @@ src/
       ...
 ```
 
-The Lua script remains the active Devilspie2 rules layer while the Python package provides the configurator, parser, validator, renderer, guarded edit commands, safe-save behavior, known-window inventory helpers, and GTK UI.
+The Lua runtime remains the active Devilspie2 rules layer. The Python package provides the configurator, prompt entry point, parser, validator, renderer, guarded edit commands, safe-save behavior, known-window inventory helpers, installer/runtime path helpers, and GTK UI.
 
-Core logic should stay separate from GTK-specific UI code so later front ends can reuse the same parser, validator, renderer, settings, split-profile, backup, save, and edit-operation logic.
+Core logic should stay separate from GTK-specific UI code so later front ends can reuse the same parser, validator, renderer, settings, split-profile, backup, save, user-path, and edit-operation logic.
 
 ### `tests/`
 
-Python tests for the configurator core, CLI behavior, safe-save behavior, known-window inventory behavior, and UI helper logic.
+Python tests for the configurator core, CLI behavior, safe-save behavior, known-window inventory behavior, managed user paths, prompt/configurator behavior, and UI helper logic.
 
 Tests must continue to avoid modifying a user's real configuration files.
 
@@ -140,12 +157,12 @@ Tests must continue to avoid modifying a user's real configuration files.
 
 Use short topic branches for repo changes. Examples:
 
-1. `documentation-update-public-release`
-2. `configurator-core-proof`
-3. `configurator-save-proof`
-4. `configurator-gtk-proof`
-5. `left-edge-correction-tests`
-6. `configurator-known-window-inventory`
+1. `documentation-update`
+2. `installer-managed-config-workflow`
+3. `lua-event-handoff`
+4. `gtk-ui-improvement-post-lua-handoff`
+5. `configurator-known-window-inventory`
+6. `left-edge-correction-tests`
 
 ## Documentation style
 
