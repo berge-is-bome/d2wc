@@ -1,14 +1,12 @@
 # Managed Config Workflow
 
-## Purpose
+The managed-config model keeps `d2wc` managed Lua files separate from arbitrary user Devilspie2 scripts while still letting Devilspie2 load the active managed file normally.
 
-This document captures the current managed-config model for `d2wc`.
-
-The goal is to keep `d2wc` managed Lua files separate from arbitrary user Devilspie2 scripts while still letting Devilspie2 load the active managed file normally.
+Installer behavior is documented separately in [Installation Workflow](installation-workflow.md).
 
 ## Current path model
 
-The Qubes/dom0 installer uses these user paths:
+The current Qubes/dom0 installer uses these user paths:
 
 ```text
 ~/.cache/d2wc/
@@ -100,27 +98,6 @@ local D2WC_MANAGED = true
 Only the version line should change when the managed Lua runtime version changes.
 
 Historical per-version change notes belong in Git history and project documentation, not in the top of the user-managed Lua file.
-
-## Installer behavior
-
-Before replacing the extracted source tree in `~/.local/share/d2wc/source`, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
-
-The installer then:
-
-1. Extracts the local source tree under `~/.local/share/d2wc/source/`.
-2. Installs the Python package with the user-site pip flow.
-3. Creates `~/.config/d2wc/lua/` if needed.
-4. Creates `~/.config/d2wc/lua/d2wc.lua` from the bundled template if a managed file is needed.
-5. Runs targeted runtime migrations for marked managed Lua files under `~/.config/d2wc/lua/`.
-6. Creates or updates `~/.config/devilspie2/d2wc.lua` as a symlink only when safe.
-7. Leaves unrelated `~/.config/devilspie2/` files and symlinks unchanged.
-8. Leaves existing `~/.config/d2wc/settings.json` user settings unchanged.
-
-On update, the installer preserves the active managed file selection when `~/.config/devilspie2/d2wc.lua` is already a safe symlink into `~/.config/d2wc/lua/`.
-
-On update, if one or more `d2wc` configurator instances are running, the installer warns the user to close them and waits before continuing. The update continues only after no running `d2wc` process candidates remain.
-
-The installer validates active managed Lua files through the shared managed-marker and managed-block validation code. It does not insert the managed marker into old files automatically.
 
 ## Managed Lua runtime migrations
 
@@ -329,8 +306,10 @@ For example:
 ~/.config/d2wc/lua/work.lua.bak.tgz
 ```
 
+Detailed backup behavior is documented in [Backup Archives](backup-archives.md).
+
 ## Current implementation notes
 
-The installer and configurator now use the new path model.
+The installer and configurator now use the current path model.
 
 The active managed Lua file may optionally open `d2wc` automatically for unconfigured normal windows through the Lua event handoff flow documented in [Lua Event Handoff](lua-event-handoff.md).
