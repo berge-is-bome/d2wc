@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRoute
-from d2wc.event_data import get_event_fixture
+from d2wc.event_data import WindowEventData, get_event_fixture
 from d2wc.event_inventory import KnownWindowTarget
 from d2wc.test_config import TestConfigSnapshot as ConfigSnapshot
 from d2wc.ui.grid_rows import (
@@ -50,6 +50,18 @@ def test_default_event_fixture_is_empty_for_normal_configurator_launch() -> None
     assert event_data.window_class is None
     assert build_known_window_grid_rows(event_data) == ()
     assert class_values(None, event_data) == ()
+
+
+def test_empty_event_data_does_not_contribute_example_application_value() -> None:
+    assert class_values(None, WindowEventData()) == ()
+    assert build_known_window_grid_rows(WindowEventData()) == ()
+
+
+def test_explicit_example_event_fixture_remains_available_for_development() -> None:
+    event_data = get_event_fixture("example")
+
+    assert class_values(None, event_data) == ("example",)
+    assert build_known_window_grid_rows(event_data)[0].target_entry == "d:work c:example"
 
 
 def test_real_example_class_remains_available_from_configured_rules() -> None:
