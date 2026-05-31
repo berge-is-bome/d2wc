@@ -91,15 +91,14 @@ Use [Install/Update for Qubes](docs/user/install-qubes.md) for the full install/
 
 ## Documentation
 
-Useful documents:
+Start with [User Documentation](docs/user/README.md) for install, configuration, and backup information.
 
-1. [Install/Update for Qubes](docs/user/install-qubes.md) for the Qubes dom0 install and update flow.
-2. [Lua Configurables](docs/user/lua-configurables.md) for user-configurable window behavior.
-3. [Backups](docs/user/backups.md) for the user-facing backup overview.
-4. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
-5. [Lua Event Handoff](docs/project/lua-event-handoff.md) for automatic window-event launching and suppression behavior.
-6. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
-7. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
+Useful project documents:
+
+1. [Managed Config Workflow](docs/project/managed-config-workflow.md) for the installed config layout and configurator file-management direction.
+2. [Lua Event Handoff](docs/project/lua-event-handoff.md) for automatic window-event launching and suppression behavior.
+3. [Backup Archives](docs/project/backup-archives.md) for backup behavior during guarded writes.
+4. [Product Development Brief](docs/project/product-development-brief.md) for the product direction and intended user outcomes.
 
 ## Project status
 
