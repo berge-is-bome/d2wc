@@ -317,7 +317,10 @@ def _known_window_target_grid_rows(targets: tuple[KnownWindowTarget, ...]) -> tu
 
 
 def _geometry_text(x: object, y: object, w: object, h: object) -> str:
-    return f"x={x} y={y} w={w} h={h}"
+    values = tuple(str(value).strip() for value in (x, y, w, h))
+    if not any(values):
+        return ""
+    return f"x={values[0]} y={values[1]} w={values[2]} h={values[3]}"
 
 
 def _event_number_to_text(value: float | None) -> str:

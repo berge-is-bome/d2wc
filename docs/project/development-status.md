@@ -32,7 +32,7 @@ python3 -m pytest
 Result:
 
 ```text
-296 passed
+302 passed
 ```
 
 After documentation restructuring and any local commits, run the normal verification path again:

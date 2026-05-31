@@ -122,7 +122,7 @@ choose_source_vm_zenity() {
 
   printf '%s\n' "$list" | zenity --list --height=420 \
     --title 'd2wc installer' \
-    --text "Select the running VM that contains $SOURCE_ARCHIVE" \
+    --hide-header \
     --column 'Running AppVM/DispVM' 2>/dev/null || return 3
 }
 
