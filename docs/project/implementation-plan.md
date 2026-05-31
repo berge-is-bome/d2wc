@@ -19,7 +19,6 @@ Detailed implemented behavior is documented in focused reference documents:
 5. [Lua Configurables](lua-configurables.md) documents the internal managed Lua rule grammar and rule-section behavior.
 6. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, recursion suppression, process locks, and managed Lua runtime migrations.
 7. [Backup Archives](backup-archives.md) documents backup archive creation and safe-save ordering.
-8. [Testing](testing.md) documents verification strategy.
 
 ### Baseline implementation capabilities
 
@@ -230,4 +229,56 @@ Relevant current documents:
 
 1. [Lua Configurables](lua-configurables.md)
 2. [UI Flow](ui-flow.md)
-3. [Testing](testing.md)
+
+### Stage 33: consistent ranked class matching
+
+Target precedence and ranked class matching are separate concepts.
+
+Target precedence is already the intended rule-scope order for all managed rule sections:
+
+```text
+domain.class -> domain -> class
+```
+
+Ranked class matching is about how a `c:` value matches the actual application class inside a chosen target scope.
+
+The current Lua runtime has a ranked matcher with this order:
+
+1. exact full-string class match,
+2. exact match on a dotted class segment,
+3. wildcard prefix on the full class string,
+4. wildcard prefix on a dotted class segment.
+
+Current implementation state:
+
+1. `WORKSPACE_PLACEMENT` uses ranked class matching for actual geometry placement.
+2. `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, and actual `LEFT_EDGE_CORRECTION` use exact class lookup during rule execution.
+3. Automatic handoff suppression uses exact lookup for `EXCLUDE`, `PIN`, and `WORKSPACE_ROUTES`.
+4. Automatic handoff suppression uses ranked rule matching for `WORKSPACE_PLACEMENT` and `LEFT_EDGE_CORRECTION`.
+5. That means actual rule execution and handoff suppression are not fully aligned for all class-bearing rules.
+
+Desired behavior needs a deliberate implementation decision.
+
+Open design questions:
+
+1. Should ranked class matching apply to every class-bearing rule section, not only `WORKSPACE_PLACEMENT`?
+2. If ranked class matching applies everywhere, should `EXCLUDE`, `PIN`, `WORKSPACE_ROUTES`, and `LEFT_EDGE_CORRECTION` all share one resolver style?
+3. Should handoff suppression call the same matching helpers used by actual rule execution so suppression cannot diverge from runtime behavior?
+4. For `WORKSPACE_ROUTES`, how should conflicts be handled when more than one class pattern matches different workspaces inside the same target-precedence scope?
+5. For `EXCLUDE` and `PIN`, should exact full-class matches outrank dotted-segment and wildcard matches when both exist?
+6. How should duplicate validation and conflict warnings be represented in the parser, validator, CLI edit operations, and GTK editor?
+
+Initial requirements:
+
+1. Keep existing target precedence unchanged: `domain.class -> domain -> class`.
+2. Decide the intended ranked class matching scope before changing documentation that describes current behavior.
+3. Refactor matching helpers so actual execution and automatic handoff suppression use consistent semantics.
+4. Add tests for each managed section with full class, dotted-segment class, full-string wildcard, dotted-segment wildcard, and no-match cases.
+5. Add conflict tests where two class patterns match the same actual class with different ranks.
+6. Keep backward compatibility for existing exact class rules.
+
+Relevant current documents:
+
+1. [Lua Configurables](lua-configurables.md)
+2. [Lua Event Handoff](lua-event-handoff.md)
+3. [d2wc Design History Notes](d2wc-design-history.md)
