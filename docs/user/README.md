@@ -1,7 +1,5 @@
 # User Documentation
 
-User documentation explains how to install, configure, and recover `d2wc` without needing to understand the internal implementation.
-
 Start here:
 
 1. [Install/Update for Qubes](install-qubes.md) explains how to install or update `d2wc` in Qubes dom0.
