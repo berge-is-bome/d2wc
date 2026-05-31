@@ -6,9 +6,13 @@
 
 The active Lua file is not compressed and is not moved into an archive. Only backup snapshots are stored in the backup archive.
 
+For the user-facing backup overview, see [Backups](../user/backups.md).
+
 ## Archive location
 
-For the installed managed config:
+Backup archives follow the managed Lua file being written.
+
+For the default installed managed config:
 
 ```text
 ~/.config/d2wc/lua/d2wc.lua
@@ -18,6 +22,18 @@ For the installed managed config:
 
 ```text
 ~/.config/d2wc/lua/d2wc.lua.bak.tgz
+```
+
+For another managed file such as:
+
+```text
+~/.config/d2wc/lua/work.lua
+```
+
+`d2wc` stores backup snapshots in:
+
+```text
+~/.config/d2wc/lua/work.lua.bak.tgz
 ```
 
 If `--backup-dir` is supplied, the archive is created in that directory and keeps the same filename pattern:
@@ -71,8 +87,9 @@ This keeps the archive transportable while preserving the safe-save model.
 Current behavior is intentionally limited:
 
 1. Backup archives are created only as part of guarded writes.
-2. The GTK configurator can load and edit the installed managed config at `~/.config/devilspie2/d2wc.lua`.
-3. The development test-config workflow remains available for isolated UI testing at `~/.config/devilspie2/d2wc-test.lua`.
-4. Backup retention is not implemented yet.
-5. Diff-based backups are not implemented.
-6. User-facing restore commands and GTK restore UI are not implemented yet.
+2. The GTK configurator can load and edit active managed Lua files under `~/.config/d2wc/lua/`.
+3. `~/.config/devilspie2/d2wc.lua` is the Devilspie2-facing integration symlink, not the primary managed config store.
+4. The development test-config workflow remains available for isolated UI testing at `~/.config/devilspie2/d2wc-test.lua`.
+5. Backup retention is not implemented yet.
+6. Diff-based backups are not implemented.
+7. User-facing restore commands and GTK restore UI are not implemented yet.
