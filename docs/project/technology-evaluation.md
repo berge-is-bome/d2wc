@@ -48,13 +48,11 @@ The chosen stack should be judged against these criteria.
 
 ### Not required for Phase 1
 
-1. Cross-platform Windows or macOS support.
-2. Wayland-first behavior.
-3. Highly themed or flamboyant UI.
-4. Live geometry updates while resizing.
-5. Full daemon/window-event monitoring.
-6. Permanently visible tray icon.
-7. A Qt/KDE-specific UI.
+1. Wayland-first behavior.
+2. Highly themed or flamboyant UI.
+3. Live geometry updates while resizing.
+4. Full daemon/window-event monitoring.
+5. A Qt/KDE-specific UI.
 
 ## Initial platform assumption
 
