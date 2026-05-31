@@ -98,7 +98,7 @@ class WindowEventData:
         )
 
 
-DEFAULT_EVENT_FIXTURE = "example"
+DEFAULT_EVENT_FIXTURE: str | None = None
 
 _EVENT_FIXTURES: dict[str, WindowEventData] = {
     "example": WindowEventData(
@@ -116,9 +116,11 @@ _EVENT_FIXTURES: dict[str, WindowEventData] = {
 EVENT_FIXTURE_NAMES = tuple(_EVENT_FIXTURES)
 
 
-def get_event_fixture(name: str = DEFAULT_EVENT_FIXTURE) -> WindowEventData:
-    """Return a representative event-data fixture by name."""
+def get_event_fixture(name: str | None = DEFAULT_EVENT_FIXTURE) -> WindowEventData:
+    """Return representative event data, using an empty event unless a fixture name is explicit."""
 
+    if name is None:
+        return WindowEventData()
     try:
         return _EVENT_FIXTURES[name]
     except KeyError as exc:
