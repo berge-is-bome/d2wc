@@ -10,6 +10,8 @@ from d2wc.event_inventory import KnownWindowTarget, filter_known_window_targets_
 from d2wc.event_preview import build_event_rule_preview
 from d2wc.test_config import TestConfigSnapshot
 
+DEVELOPMENT_SELECTOR_VALUES = {"example"}
+
 
 @dataclass(frozen=True)
 class ManagedGridRow:
@@ -247,6 +249,7 @@ def class_values(
     if event_class:
         values.add(event_class)
     values.discard("")
+    values.difference_update(DEVELOPMENT_SELECTOR_VALUES)
     return tuple(sorted(values))
 
 
