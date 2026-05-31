@@ -2,8 +2,6 @@
 
 The managed-config model keeps `d2wc` managed Lua files separate from arbitrary user Devilspie2 scripts while still letting Devilspie2 load the active managed file normally.
 
-Use this file for active managed-file ownership, path selection, File Open, Save As, and Devilspie2 symlink safety.
-
 Related implementation details live elsewhere:
 
 1. [Installation Workflow](installation-workflow.md) documents installer behavior and managed Lua runtime refreshes.
