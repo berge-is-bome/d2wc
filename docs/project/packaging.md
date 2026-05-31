@@ -1,81 +1,21 @@
 # d2wc Packaging
 
-## Purpose
+Packaging direction for `d2wc` should stay conservative until the first public release path is proven.
 
-This document describes the packaging and installation direction for `d2wc`.
+The first packaging priorities are:
 
-The first priority is to support the environments where `d2wc` is most likely to be used first:
-
-1. Qubes OS dom0.
+1. Qubes OS dom0 source-archive install/update flow.
 2. Fedora-family systems.
 3. Debian-family systems later.
 4. Other Linux distributions after the architecture is stable.
 
-The packaging plan should remain conservative until the first public release path is proven.
+Current install and managed-config behavior is documented elsewhere:
 
-## Current project state
-
-The repository currently contains:
-
-1. The active Devilspie2 Lua rules template.
-2. A Python package with the `d2wc` command entry point.
-3. Parser, validator, renderer, safe-save, backup, and guarded edit logic for the managed Lua sections.
-4. A GTK configurator for the managed config.
-5. Known-window inventory parsing, capture, stream, and GTK dropdown integration.
-6. Qubes/dom0 source-archive install and update support.
-7. User-facing documentation under `docs/user/` and project documentation under `docs/project/`.
-
-The current public-release installation path is documented in [Install/Update for Qubes](../user/install-qubes.md).
+1. [Install/Update for Qubes](../user/install-qubes.md) documents the user-facing Qubes install/update flow.
+2. [Installation Workflow](installation-workflow.md) documents current installer behavior and future installer principles.
+3. [Managed Config Workflow](managed-config-workflow.md) documents managed-file ownership, active-file selection, File Open, Save As, and Devilspie2 symlink safety.
 
 Distribution packages are still future work.
-
-## Current Qubes/dom0 source-archive installation model
-
-The current source-archive workflow is documented in [Install/Update for Qubes](../user/install-qubes.md).
-
-The workflow uses:
-
-1. A networked source VM to clone the repository and create `/tmp/d2wc.tgz`.
-2. dom0 to copy the installer from the source VM.
-3. The dom0 installer to copy and validate `/tmp/d2wc.tgz` from the selected source VM.
-4. The dom0 installer to extract, install, create or preserve the managed config, and configure the user command path.
-
-Before replacing the extracted source tree in `~/.local/share/d2wc/source`, the installer copies and validates `/tmp/d2wc.tgz` from the selected source VM.
-
-Current user-path layout:
-
-```text
-~/.cache/d2wc/
-~/.local/share/d2wc/source/
-~/.config/d2wc/lua/
-~/.config/d2wc/settings.json
-~/.config/devilspie2/d2wc.lua
-```
-
-`~/.cache/d2wc/` stores the copied source archive cache.
-
-`~/.local/share/d2wc/source/` stores the extracted local installation source used by the dom0 installer.
-
-`~/.config/d2wc/lua/` stores user-owned `d2wc` managed Lua files.
-
-`~/.config/d2wc/settings.json` stores user UI preferences such as toast timeout and opacity.
-
-`~/.config/devilspie2/d2wc.lua` is the Devilspie2-facing symlink only and points to the active file under `~/.config/d2wc/lua/`. Unrelated Devilspie2 scripts and symlinks are not overwritten.
-
-## Managed config workflow
-
-The managed config workflow is documented in [Managed Config Workflow](managed-config-workflow.md).
-
-In summary:
-
-1. `d2wc` owns managed Lua files under `~/.config/d2wc/lua/`.
-2. Devilspie2 continues to load the active managed file through `~/.config/devilspie2/d2wc.lua`.
-3. The Devilspie2-facing path is an integration symlink, not the primary config store.
-4. The configurator opens and saves only `d2wc` managed Lua files.
-5. The configurator opens the active symlink target on startup when the symlink is safe.
-6. The configurator stores UI preferences under `~/.config/d2wc/settings.json`.
-7. The configurator displays empty match components as `All` while preserving the underlying managed Lua rule format.
-8. The configurator should not become a generic Devilspie2 Lua editor.
 
 ## Packaging phases
 
@@ -100,20 +40,7 @@ Supported behavior:
 
 Complete for the current public-release target.
 
-Supported behavior:
-
-1. Prepare a source archive in a networked source VM.
-2. Copy and run the installer in dom0.
-3. Install or update the user-site Python package without dom0 network access.
-4. Store the copied archive under `~/.cache/d2wc/`.
-5. Store extracted source under `~/.local/share/d2wc/source/`.
-6. Store managed Lua files under `~/.config/d2wc/lua/`.
-7. Preserve existing `~/.config/d2wc/settings.json` user settings.
-8. Preserve the active managed file selection during updates when the Devilspie2 integration symlink already points safely into `~/.config/d2wc/lua/`.
-9. Warn and wait during updates when one or more `d2wc` configurator instances are running.
-10. Activate Devilspie2 through `~/.config/devilspie2/d2wc.lua` when safe.
-11. Keep unrelated Devilspie2 scripts untouched.
-12. Launch the installed `d2wc` command.
+The current Qubes/dom0 source-archive installer supports user-site installation without dom0 network access. Current behavior is documented in [Installation Workflow](installation-workflow.md).
 
 ### Phase 3: local package
 
