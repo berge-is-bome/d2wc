@@ -96,8 +96,6 @@ Stage 14 established the current event-data direction:
 7. Perfect target selection should not block UI work.
 8. Duplicate configurator launches were acceptable only for intermediary proof stages and have since been reduced through suppression of already-configured windows.
 
-The repository-local record for that design turn is [Event-Data GTK UI Direction](event-data-ui-direction.md). Some of that document is now historical and may be reduced during the documentation cleanup.
-
 Stage 15 proved representative event data could be passed through fixtures or command arguments and displayed by GTK without live target-selection experiments or config writes.
 
 Stage 16 proved read-only event-derived `GEOM` and `WORKSPACE_PLACEMENT` proposal previews with optional read-only config inspection and copy-proposal support.
@@ -203,3 +201,33 @@ Relevant current documents:
 1. [UI Flow](ui-flow.md)
 2. [Lua Configurables](lua-configurables.md)
 3. [Left-Edge Correction Testing](left-edge-correction-testing.md)
+
+### Stage 32: managed grammar support for whitespace values
+
+Some useful Devilspie2 values may contain spaces.
+
+Example:
+
+```text
+Window class: personal:Example App
+```
+
+The current managed Lua prefixed grammar splits rules on whitespace. A token such as this cannot be represented safely yet:
+
+```text
+c:Example App
+```
+
+Initial requirements:
+
+1. Decide whether the grammar should support quoted values, escaped values, or another safe representation.
+2. Update the parser, validator, renderer, CLI edit operations, and GTK editor together.
+3. Keep existing whitespace-free rules backward compatible.
+4. Reject or skip unsafe whitespace-containing values until the new grammar is implemented.
+5. Add tests for parsing, rendering, validation, and UI round-tripping before enabling user edits for these values.
+
+Relevant current documents:
+
+1. [Lua Configurables](lua-configurables.md)
+2. [UI Flow](ui-flow.md)
+3. [Testing](testing.md)
