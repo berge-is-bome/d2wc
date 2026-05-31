@@ -186,7 +186,7 @@ For unsupported shells, the installer prints a warning and shows the full comman
 
 ## First install and update completion
 
-On first install, the installer launches the installed `d2wc` command after setup completes.
+On first install, the installer launches `d2wc` after setup completes.
 
 On update, the installer reports success and tells the user to launch `d2wc` manually.
 
