@@ -99,6 +99,8 @@ local WORKSPACE_PLACEMENT = {
   "d:dom0 c:qubes-qube-manager g:half_left",
   "d:dom0 c:xfce4-settings-manager g:dom0_settings_manager",
   "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",    -- domain-specific override for qubes-app-menu in dom0
+  "d:dom0 c:zenity g:dom0_zenity",
+  "d:dom0 c:d2wc-configurator g:d2wc_configurator",
 
   -- add more here
 }
