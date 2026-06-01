@@ -61,19 +61,19 @@ local WORKSPACE_ROUTES = {
 -- Geometry profiles determine where a window will be placed and what size it will be.
 ------------------------------------------------------------
 local GEOM = {
-  wide                  = { x = 100 , y = 456 , w = 3624, h = 1389 },
-  centered_mid          = { x = 960 , y = 540 , w = 1200, h = 900  },
-  half_left             = { x = 0   , y = 0   , w = 1920, h = 2115 },
-  half_right            = { x = 1914, y = 0   , w = 1920, h = 2115 },
+  wide                  = { x = 50  , y = 228 , w = 1812, h = 695  },
+  centered_mid          = { x = 480 , y = 270 , w = 600 , h = 450  },
+  half_left             = { x = 0   , y = 0   , w = 960 , h = 1035 },
+  half_right            = { x = 957 , y = 0   , w = 960 , h = 1035 },
 
-  dom0_qubes_app_menu   = { x = 0   , y = 0   , w = 1000, h = 1200 },
-  dom0_settings_manager = { x = 830 , y = 517 , w = 1818, h = 1029 },
-  dom0_template_manager = { x = 1129, y = 0   , w = 1220, h = 2115 },
-  dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
-  dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
-  dom0_zenity           = { x = 1500, y = 500 , w = 700 , h = 800  },
+  dom0_qubes_app_menu   = { x = 0   , y = 0   , w = 500 , h = 600  },
+  dom0_settings_manager = { x = 415 , y = 259 , w = 909 , h = 515  },
+  dom0_template_manager = { x = 565 , y = 0   , w = 610 , h = 1035 },
+  dom0_new_qube         = { x = 0   , y = 194 , w = 960 , h = 600  },
+  dom0_global_config    = { x = 0   , y = 0   , w = 960 , h = 900  },
+  dom0_zenity           = { x = 750 , y = 250 , w = 350 , h = 400  },
 
-  d2wc_configurator     = { x = 900 , y = 600 , w = 1550, h = 900  },
+  d2wc_configurator     = { x = 450,  y = 300 , w = 775 , h = 450  },
   -- add more here
 }
 
