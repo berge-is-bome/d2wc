@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-Created by André, with code developed in collaboration with ChatGPT and Codex.
+Created by André, code developed in collaboration with ChatGPT and Codex.
 
 `d2wc` is a desktop workspace and window placement configurator for Linux systems that use Devilspie2.
 
