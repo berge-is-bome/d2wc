@@ -20,9 +20,15 @@ import tempfile
 from typing import Callable, Protocol
 
 from d2wc.core.lua_blocks import MANAGED_BLOCK_NAMES, ManagedBlockParser
-from d2wc.core.managed_config import GeometryProfile, ManagedConfig, WorkspaceRoute, extract_managed_config, render_managed_config
+from d2wc.core.managed_config import (
+    GeometryProfile,
+    ManagedConfig,
+    WorkspaceRoute,
+    extract_managed_config,
+    render_managed_config,
+)
 from d2wc.core.rendering import RenderValidationError
-from d2wc.core.rule_grammar import RuleParseError, parse_prefixed_rule
+from d2wc.core.rule_grammar import PrefixedRule, RuleParseError, parse_prefixed_rule
 from d2wc.core.validation import validate_managed_blocks
 
 TRANSIENT_APPLY_SETTLE_SECONDS = 1.0
@@ -216,7 +222,8 @@ def _minimal_config_for_request(
         profile = _referenced_geometry_profile(saved_config, rule)
         return ManagedConfig(empty.exclude, empty.pin, empty.workspace_routes, profile, (rule,), empty.left_edge_correction)
     if section == "LEFT_EDGE_CORRECTION":
-        return ManagedConfig(empty.exclude, empty.pin, empty.workspace_routes, empty.geom, empty.workspace_placement, (rule,))
+        placement_rule, profile = _left_edge_geometry_context(saved_config, rule)
+        return ManagedConfig(empty.exclude, empty.pin, empty.workspace_routes, (profile,), (placement_rule,), (rule,))
 
     raise NoTransientApplyNeeded()
 
@@ -225,11 +232,47 @@ def _referenced_geometry_profile(saved_config: ManagedConfig, rule: str) -> tupl
     parsed_rule = parse_prefixed_rule(rule)
     if parsed_rule.geometry_profile is None:
         return ()
-    profile_name = parsed_rule.geometry_profile
+    return (_geometry_profile_by_name(saved_config, parsed_rule.geometry_profile),)
+
+
+def _left_edge_geometry_context(saved_config: ManagedConfig, rule: str) -> tuple[str, GeometryProfile]:
+    left_edge_rule = parse_prefixed_rule(rule)
+    matches: list[tuple[str, GeometryProfile]] = []
+
+    for placement_rule in saved_config.workspace_placement:
+        parsed_placement = parse_prefixed_rule(placement_rule)
+        if not _same_rule_target(left_edge_rule, parsed_placement):
+            continue
+        if parsed_placement.geometry_profile is None:
+            continue
+        profile = _geometry_profile_by_name(saved_config, parsed_placement.geometry_profile)
+        if profile.x != 0:
+            raise ValueError(
+                "transient LEFT_EDGE_CORRECTION apply requires matching WORKSPACE_PLACEMENT "
+                f"profile '{profile.name}' to have x = 0"
+            )
+        matches.append((placement_rule, profile))
+
+    if not matches:
+        raise ValueError(
+            "transient LEFT_EDGE_CORRECTION apply could not find matching WORKSPACE_PLACEMENT rule "
+            "with an x = 0 GEOM profile"
+        )
+    if len(matches) > 1:
+        raise ValueError("transient LEFT_EDGE_CORRECTION apply found multiple matching WORKSPACE_PLACEMENT rules")
+
+    return matches[0]
+
+
+def _same_rule_target(left: PrefixedRule, placement: PrefixedRule) -> bool:
+    return left.domain == placement.domain and left.class_name == placement.class_name
+
+
+def _geometry_profile_by_name(saved_config: ManagedConfig, profile_name: str) -> GeometryProfile:
     for profile in saved_config.geom:
         if profile.name == profile_name:
-            return (profile,)
-    raise ValueError(f"transient WORKSPACE_PLACEMENT apply could not find GEOM profile: {profile_name}")
+            return profile
+    raise ValueError(f"transient apply could not find GEOM profile: {profile_name}")
 
 
 def _replace_managed_blocks(source: str, blocks: dict[str, object], replacements: dict[str, str]) -> str:
