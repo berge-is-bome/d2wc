@@ -34,7 +34,16 @@ chmod 700 /tmp/install-qubes.sh
 ./install-qubes.sh
 ```
 
-The script can also be called with a sourceVM parameter, `./install-qubes.sh <source-vm>`. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
+The script can also be called with a source VM parameter, `./install-qubes.sh <source-vm>`. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
+
+## First-install display template
+
+On first install, the installer asks which bundled display template to use:
+
+1. `1080`
+2. `2160`
+
+The [bundled templates](bundled-templates.md) page explains why `d2wc` ships separate defaults for 1080 and 2160 displays.
 
 ## Installer update behavior
 
