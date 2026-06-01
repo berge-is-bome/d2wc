@@ -333,7 +333,7 @@ def run_configurator(
         page.pack_start(entry_heading, False, False, 0)
 
         configurator_radio = Gtk.RadioButton.new_with_label_from_widget(None, "Open configurator directly")
-        prompt_radio = Gtk.RadioButton.new_with_label_from_widget(configurator_radio, "Show Cancel/Configure button first")
+        prompt_radio = Gtk.RadioButton.new_with_label_from_widget(configurator_radio, "Show Cancel/Configure overlay button")
         configurator_radio.set_sensitive(current_entry_point is not None)
         prompt_radio.set_sensitive(current_entry_point is not None)
         if current_entry_point == "prompt":
