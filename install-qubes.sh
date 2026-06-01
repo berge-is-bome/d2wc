@@ -172,7 +172,7 @@ choose_template_target_zenity() {
   [ -n "${DISPLAY-}" ] || return 1
 
   printf '%s\n%s\n' "$TEMPLATE_TARGET_1080" "$TEMPLATE_TARGET_2160" |
-    zenity --list --width --height=400 \
+    zenity --list --height=400 \
       --title 'd2wc installer' \
       --text 'Choose the display/template target for the managed config.' \
       --hide-header \
