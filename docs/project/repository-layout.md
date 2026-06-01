@@ -1,6 +1,6 @@
 # Repository Layout
 
-This repository holds the managed Devilspie2 Lua runtime template, the Python configurator core, the GTK configurator and prompt UI, the Qubes/dom0 installation helper, tests, user documentation, and project documentation.
+This repository holds the managed Devilspie2 Lua runtime templates, the Python configurator core, the GTK configurator and prompt UI, the Qubes/dom0 installation helper, tests, user documentation, and project documentation.
 
 The README is intended to describe what `d2wc` is from a public user point of view. User-facing documentation belongs in `docs/user/`. Technical status, development workflow, implementation notes, and repository structure belong in `docs/project/`.
 
@@ -15,6 +15,8 @@ docs/
   user/
     README.md
     backups.md
+    bundled-templates.md
+    configurator-options.md
     install-qubes.md
     lua-configurables.md
   project/
@@ -38,6 +40,7 @@ docs/
     ui-flow.md
 src/
   d2wc.lua
+  d2wc-1080.lua
   d2wc/
     __init__.py
     __main__.py
@@ -64,6 +67,7 @@ src/
       settings.py
       shadow_validation.py
       split_profiles.py
+      transient_apply.py
       user_paths.py
       validation.py
     desktop/
@@ -73,6 +77,7 @@ src/
       gtk_app.py
       managed_actions.py
 tests/
+  test_transient_apply.py
 ```
 
 ## Document index
@@ -81,8 +86,10 @@ tests/
 
 1. [User Documentation](../user/README.md) is the user-facing documentation landing page.
 2. [Install/Update for Qubes](../user/install-qubes.md) describes the Qubes dom0 source-archive install/update flow.
-3. [Lua Configurables](../user/lua-configurables.md) explains the window behavior users can configure through `d2wc`.
-4. [Backups](../user/backups.md) explains where automatic backup archives are stored and what restore support exists now.
+3. [Bundled Templates](../user/bundled-templates.md) explains why the installer offers 1080 and 2160 default templates.
+4. [Lua Configurables](../user/lua-configurables.md) explains the window behavior users can configure through `d2wc`.
+5. [Configurator Options](../user/configurator-options.md) explains Behavior and Notifications settings in the configurator.
+6. [Backups](../user/backups.md) explains where automatic backup archives are stored and what restore support exists now.
 
 ### Project documentation
 
@@ -96,7 +103,7 @@ tests/
 8. [Left-Edge Correction Testing](left-edge-correction-testing.md) defines repeatable tests for `set_window_geometry()`, `set_window_position()`, and `set_window_position2()`.
 9. [Lua Configurables](lua-configurables.md) explains the internal managed Lua rule grammar and rule-section behavior.
 10. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, recursion suppression, process locks, and managed Lua runtime migrations.
-11. [Managed Config Workflow](managed-config-workflow.md) documents active managed-file ownership, path selection, File Open, Save As, settings file, and Devilspie2 symlink safety.
+11. [Managed Config Workflow](managed-config-workflow.md) documents active managed-file ownership, path selection, File Open, Save As, settings file, Devilspie2 symlink safety, and transient apply behavior.
 12. [MVP Scope](mvp-scope.md) separates the safe manual configurator from future automation work.
 13. [Packaging](packaging.md) describes packaging direction and current packaging roadmap.
 14. [Product Development Brief](product-development-brief.md) describes the product direction and intended user outcomes.
@@ -129,11 +136,12 @@ These documents may describe implementation details, development history, and te
 
 Source code.
 
-The current structure keeps the bundled Devilspie2 Lua runtime template and the Python package together under `src/`:
+The current structure keeps the bundled Devilspie2 Lua runtime templates and the Python package together under `src/`:
 
 ```text
 src/
   d2wc.lua
+  d2wc-1080.lua
   d2wc/
     core/
       ...
@@ -143,13 +151,13 @@ src/
       ...
 ```
 
-The Lua runtime remains the active Devilspie2 rules layer. The Python package provides the configurator, prompt entry point, parser, validator, renderer, guarded edit commands, safe-save behavior, known-window inventory helpers, installer/runtime path helpers, and GTK UI.
+The Lua runtime remains the active Devilspie2 rules layer. The Python package provides the configurator, prompt entry point, parser, validator, renderer, guarded edit commands, safe-save behavior, known-window inventory helpers, installer/runtime path helpers, transient apply helper, and GTK UI.
 
-Core logic should stay separate from GTK-specific UI code so later front ends can reuse the same parser, validator, renderer, settings, split-profile, backup, save, user-path, and edit-operation logic.
+Core logic should stay separate from GTK-specific UI code so later front ends can reuse the same parser, validator, renderer, settings, split-profile, backup, save, user-path, transient-apply, and edit-operation logic.
 
 ### `tests/`
 
-Python tests for the configurator core, CLI behavior, safe-save behavior, known-window inventory behavior, managed user paths, prompt/configurator behavior, and UI helper logic.
+Python tests for the configurator core, CLI behavior, safe-save behavior, known-window inventory behavior, managed user paths, prompt/configurator behavior, transient apply behavior, and UI helper logic.
 
 Tests must continue to avoid modifying a user's real configuration files.
 
