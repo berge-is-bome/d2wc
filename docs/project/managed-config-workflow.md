@@ -158,6 +158,32 @@ Unsafe cases include:
 
 Unsafe cases produce a clear warning and leave the existing Devilspie2 file or symlink unchanged.
 
+## Apply-after-save runtime behavior
+
+After a successful row-level `Apply`, the configurator may run a transient Devilspie2 helper so the saved rule affects currently open windows immediately.
+
+This helper is deliberately not a long-running Devilspie2 process manager.
+
+The transient helper:
+
+1. Builds a minimal managed `d2wc.lua` from the saved active file.
+2. Includes only the saved Add/Modify rule and the minimum supporting context it needs.
+3. Writes the temporary `d2wc.lua` into a temporary folder.
+4. Runs `devilspie2 --folder <temporary-folder>`.
+5. Gives Devilspie2 a short time to read and execute the temporary script.
+6. Terminates and reaps only the process group it started.
+7. Removes the temporary folder.
+
+The helper does not run the user's full managed config. This prevents unrelated windows from being moved back to saved positions when the user only wanted to apply one changed row.
+
+The helper is skipped for `Delete` actions and pure `GEOM` actions.
+
+`WORKSPACE_PLACEMENT` transient apply includes the selected placement rule and the referenced geometry profile.
+
+`LEFT_EDGE_CORRECTION` transient apply includes the selected correction rule, the matching placement rule, and the geometry profile referenced by that placement rule. The Lua runtime checks left-edge correction only after geometry has been resolved, so this supporting context is required for the transient correction to have an effect.
+
+Transient apply warnings are reported separately from save success. A transient runtime warning must not turn an already successful managed-file save into a failed save.
+
 ## UI settings file
 
 The configurator stores UI settings in:
