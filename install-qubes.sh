@@ -171,13 +171,12 @@ choose_template_target_zenity() {
   command -v zenity >/dev/null 2>&1 || return 1
   [ -n "${DISPLAY-}" ] || return 1
 
-  zenity --list --radiolist --height=240 --width=360 \
-    --title 'd2wc installer' \
-    --text 'Choose the display/template target for the managed config.' \
-    --column '' \
-    --column 'Display/template target' \
-    FALSE "$TEMPLATE_TARGET_1080" \
-    TRUE "$TEMPLATE_TARGET_2160" 2>/dev/null || return 3
+  printf '%s\n%s\n' "$TEMPLATE_TARGET_1080" "$TEMPLATE_TARGET_2160" |
+    zenity --list --height=240 --width=360 \
+      --title 'd2wc installer' \
+      --text 'Choose the display/template target for the managed config.' \
+      --hide-header \
+      --column 'Display/template target' 2>/dev/null || return 3
 }
 
 choose_template_target_cli() {
