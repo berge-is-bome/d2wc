@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
+import shutil
+import signal
+import subprocess
 
 from d2wc.core.geom_operations import (
     GeometryOperationError,
@@ -53,6 +57,8 @@ MANAGED_ACTION_SECTIONS = (
     "LEFT_EDGE_CORRECTION",
 )
 MANAGED_ACTION_OPERATIONS = ("add", "modify", "delete")
+TRANSIENT_APPLY_SETTLE_SECONDS = 1.0
+TRANSIENT_APPLY_TERMINATE_TIMEOUT_SECONDS = 1.0
 
 
 @dataclass(frozen=True)
@@ -103,14 +109,64 @@ def apply_managed_section_action(config_path: Path, request: ManagedSectionActio
     except ValueError as exc:
         return TestConfigActionResult(False, action, config_path, message=str(exc))
 
+    runtime_warning = _apply_saved_rules_transiently()
+
     return TestConfigActionResult(
         ok=True,
         action=action,
         path=result.config_path,
         backup_path=result.backup_path,
         backup_member=result.backup_member,
-        message=_success_message(request),
+        message=_success_message(request) + runtime_warning,
     )
+
+
+def _apply_saved_rules_transiently(command: str = "devilspie2") -> str:
+    # Start a short-lived Devilspie2 process so saved rules apply now.
+    devilspie2 = shutil.which(command)
+    if devilspie2 is None:
+        return ""
+
+    try:
+        process = subprocess.Popen(
+            [devilspie2],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+            close_fds=True,
+        )
+    except OSError as exc:
+        return f"\nRuntime apply warning: could not start {command}: {exc}"
+
+    try:
+        process.wait(timeout=TRANSIENT_APPLY_SETTLE_SECONDS)
+        return ""
+    except subprocess.TimeoutExpired:
+        pass
+
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return ""
+
+    try:
+        process.wait(timeout=TRANSIENT_APPLY_TERMINATE_TIMEOUT_SECONDS)
+        return ""
+    except subprocess.TimeoutExpired:
+        pass
+
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return ""
+
+    try:
+        process.wait(timeout=TRANSIENT_APPLY_TERMINATE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        return "\nRuntime apply warning: transient devilspie2 did not exit cleanly"
+
+    return ""
 
 
 def _apply_to_source(source: str, request: ManagedSectionActionRequest):

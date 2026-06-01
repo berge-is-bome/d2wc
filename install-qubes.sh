@@ -12,6 +12,11 @@ MANAGED_DIR="$HOME/.config/d2wc/lua"
 DEVILSPIE2_DIR="$HOME/.config/devilspie2"
 DEVILSPIE2_ENTRY="$DEVILSPIE2_DIR/d2wc.lua"
 DEFAULT_MANAGED_FILENAME="d2wc.lua"
+DEFAULT_TEMPLATE_TARGET="2160"
+TEMPLATE_TARGET_2160="2160"
+TEMPLATE_TARGET_1080="1080"
+TEMPLATE_FILE_2160="src/d2wc.lua"
+TEMPLATE_FILE_1080="src/d2wc-1080.lua"
 PATH_BLOCK_START="# >>> d2wc local bin >>>"
 PATH_BLOCK_END="# <<< d2wc local bin <<<"
 
@@ -162,6 +167,92 @@ choose_source_vm() {
   printf '%s\n' "$vm"
 }
 
+choose_template_target_zenity() {
+  command -v zenity >/dev/null 2>&1 || return 1
+  [ -n "${DISPLAY-}" ] || return 1
+
+  zenity --list --radiolist --height=240 --width=360 \
+    --title 'd2wc installer' \
+    --text 'Choose the display/template target for the managed config.' \
+    --column '' \
+    --column 'Display/template target' \
+    FALSE "$TEMPLATE_TARGET_1080" \
+    TRUE "$TEMPLATE_TARGET_2160" 2>/dev/null || return 3
+}
+
+choose_template_target_cli() {
+  local target
+
+  while true; do
+    read -rp "Display/template target [1080/2160] (default: $DEFAULT_TEMPLATE_TARGET): " target
+    target="${target:-$DEFAULT_TEMPLATE_TARGET}"
+
+    case "$target" in
+      "$TEMPLATE_TARGET_1080"|"$TEMPLATE_TARGET_2160")
+        printf '%s\n' "$target"
+        return 0
+        ;;
+      *)
+        echo "ERROR: choose either 1080 or 2160" >&2
+        ;;
+    esac
+  done
+}
+
+choose_template_target() {
+  local selection
+  local rc
+
+  if selection="$(choose_template_target_zenity)"; then
+    printf '%s\n' "$selection"
+    return 0
+  fi
+
+  rc=$?
+  if [ "$rc" -eq 3 ]; then
+    echo "Cancelled." >&2
+    exit 1
+  fi
+
+  echo "zenity GUI not available for display/template selection; falling back to interactive prompt." >&2
+  choose_template_target_cli
+}
+
+template_file_for_target() {
+  local target="$1"
+
+  case "$target" in
+    "$TEMPLATE_TARGET_1080")
+      printf '%s\n' "$TEMPLATE_FILE_1080"
+      ;;
+    "$TEMPLATE_TARGET_2160")
+      printf '%s\n' "$TEMPLATE_FILE_2160"
+      ;;
+    *)
+      echo "ERROR: unsupported display/template target: $target" >&2
+      return 1
+      ;;
+  esac
+}
+
+choose_managed_template_path() {
+  local target
+  local template_file
+  local template_path
+
+  target="$(choose_template_target)"
+  template_file="$(template_file_for_target "$target")"
+  template_path="$SOURCE_ROOT/$template_file"
+
+  if [ ! -f "$template_path" ]; then
+    echo "ERROR: selected template does not exist: $template_path" >&2
+    exit 1
+  fi
+
+  echo "Using $target display template: $template_file" >&2
+  printf '%s\n' "$template_path"
+}
+
 validate_archive_file() {
   local archive="$1"
   local listing
@@ -182,6 +273,12 @@ validate_archive_file() {
   if ! grep -qx 'd2wc/src/d2wc.lua' "$listing"; then
     rm -f -- "$listing"
     echo "ERROR: archive does not contain d2wc/src/d2wc.lua" >&2
+    return 1
+  fi
+
+  if ! grep -qx 'd2wc/src/d2wc-1080.lua' "$listing"; then
+    rm -f -- "$listing"
+    echo "ERROR: archive does not contain d2wc/src/d2wc-1080.lua" >&2
     return 1
   fi
 
@@ -507,6 +604,11 @@ if [ ! -f "$EXTRACTED/src/d2wc.lua" ]; then
   exit 1
 fi
 
+if [ ! -f "$EXTRACTED/src/d2wc-1080.lua" ]; then
+  echo "ERROR: expected $EXTRACTED/src/d2wc-1080.lua after extracting archive" >&2
+  exit 1
+fi
+
 if python3 -m pip show d2wc >/dev/null 2>&1 || [ -x "$D2WC_BIN" ]; then
   FIRST_INSTALL=0
 else
@@ -538,12 +640,14 @@ elif [ "$FIRST_INSTALL" -eq 0 ] && MANAGED_PATH="$(current_safe_devilspie2_manag
 else
   MANAGED_PATH="$MANAGED_DIR/$DEFAULT_MANAGED_FILENAME"
   if [ ! -e "$MANAGED_PATH" ]; then
-    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    managed_template_path="$(choose_managed_template_path)"
+    cp -- "$managed_template_path" "$MANAGED_PATH"
     echo "Created managed config: $MANAGED_PATH"
   elif [ "$FIRST_INSTALL" -eq 1 ] && ! is_d2wc_managed_lua_file "$MANAGED_PATH" "$SOURCE_ROOT"; then
     alt_name="$(choose_available_managed_filename "$DEFAULT_MANAGED_FILENAME")"
     MANAGED_PATH="$MANAGED_DIR/$alt_name"
-    cp -- "$SOURCE_ROOT/src/d2wc.lua" "$MANAGED_PATH"
+    managed_template_path="$(choose_managed_template_path)"
+    cp -- "$managed_template_path" "$MANAGED_PATH"
     echo "Created managed config: $MANAGED_PATH"
   fi
 fi
