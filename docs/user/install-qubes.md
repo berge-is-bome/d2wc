@@ -60,4 +60,4 @@ When the install completes, launch `d2wc`:
 d2wc
 ```
 
-You can also bind a keyboard shortcut to `d2wc`, or set how `d2wc` [behaves](docs/user/configurator-options.md) on new window events.
+You can also bind a keyboard shortcut to `d2wc`, or set how `d2wc` [behaves](configurator-options.md) on new window events.
