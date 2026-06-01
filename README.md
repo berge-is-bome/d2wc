@@ -2,7 +2,7 @@
 
 Devilspie2 Workspace Configurator.
 
-Created by André, with code developed in collaboration with ChatGPT and Codex.
+Created by André, code developed in collaboration with ChatGPT and Codex.
 
 `d2wc` is a desktop workspace and window placement configurator for Linux systems that use Devilspie2.
 
@@ -20,13 +20,21 @@ A route can be broad, such as every window from a Qubes domain, or narrow, such 
 
 ![Workspace routes workflow](docs/user/images/d2wc-configurator-workspace-routes.png)
 
+### Create reusable geometry profiles
+
+Save reusable window size and position profiles.
+
+Geometry profiles store values such as x position, y position, width, and height. They become active when a placement rule links them to matching windows.
+
+![Window geometry workflow](docs/user/images/d2wc-configurator-window-geometry.png)
+
 ### Place windows with saved geometry profiles
 
-Save reusable window size and position profiles, then apply those profiles to matching windows.
+Apply a saved geometry profile to matching windows.
 
 This is useful for layouts such as a file manager on the left, a browser on the right, a document viewer on a second workspace, or any other repeated desktop arrangement.
 
-![Window geometry workflow](docs/user/images/d2wc-configurator-window-geometry.png)
+![Workspace placement workflow](docs/user/images/d2wc-configurator-workspace-placement.png)
 
 ### Pin selected windows
 

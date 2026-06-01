@@ -250,6 +250,8 @@ def build_managed_section_editor(
                 timeout_seconds=timeout_seconds,
                 opacity=opacity,
             )
+            if "Runtime apply warning:" in result_text:
+                _show_message(Gtk, main_box, result_text)
         else:
             _show_message(Gtk, main_box, result_text)
         refreshed_snapshot = load_managed_config_snapshot(snapshot_value.path)

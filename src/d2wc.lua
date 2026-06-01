@@ -68,6 +68,7 @@ local GEOM = {
 
   dom0_qubes_app_menu   = { x = 0   , y = 0   , w = 1000, h = 1200 },
   dom0_settings_manager = { x = 830 , y = 517 , w = 1818, h = 1029 },
+  qvm_template_gui      = { x = 0   , y = 500 , w = 1920, h = 1300 },
   dom0_template_manager = { x = 1129, y = 0   , w = 1220, h = 2115 },
   dom0_new_qube         = { x = 0   , y = 387 , w = 1920, h = 1200 },
   dom0_global_config    = { x = 0   , y = 0   , w = 1920, h = 1800 },
@@ -101,6 +102,7 @@ local WORKSPACE_PLACEMENT = {
   "d:dom0 c:qubes-app-menu g:dom0_qubes_app_menu",    -- domain-specific override for qubes-app-menu in dom0
   "d:dom0 c:zenity g:dom0_zenity",
   "d:dom0 c:d2wc-configurator g:d2wc_configurator",
+  "c:qvm-template-gui g:qvm_template_gui",
 
   -- add more here
 }

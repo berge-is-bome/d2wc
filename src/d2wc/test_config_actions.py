@@ -33,6 +33,7 @@ from d2wc.core.route_operations import (
     modify_route_rule_in_source,
 )
 from d2wc.core.saving import SaveConfigError, SaveValidationError, save_source_config
+from d2wc.core.transient_apply import apply_transient_rule_after_save
 from d2wc.core.target_rule_operations import (
     TargetRuleOperationError,
     add_exclude_rule_to_source,
@@ -103,13 +104,16 @@ def apply_managed_section_action(config_path: Path, request: ManagedSectionActio
     except ValueError as exc:
         return TestConfigActionResult(False, action, config_path, message=str(exc))
 
+    transient_result = apply_transient_rule_after_save(config_path, request)
+    runtime_warning = f"\n{transient_result.warning}" if transient_result.warning else ""
+
     return TestConfigActionResult(
         ok=True,
         action=action,
         path=result.config_path,
         backup_path=result.backup_path,
         backup_member=result.backup_member,
-        message=_success_message(request),
+        message=_success_message(request) + runtime_warning,
     )
 
 

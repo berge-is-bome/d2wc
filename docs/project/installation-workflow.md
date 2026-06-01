@@ -40,6 +40,13 @@ Before replacing the extracted source tree, the installer copies `/tmp/d2wc.tgz`
 
 The copied archive is validated before use. If the archive cannot be read, the installer exits before replacing the local source tree.
 
+The archive must contain both bundled managed Lua templates:
+
+```text
+src/d2wc.lua
+src/d2wc-1080.lua
+```
+
 ## Local source installation
 
 After the archive is copied and validated, the installer extracts the source tree under a temporary directory and then installs it as the active local source tree:
@@ -74,11 +81,30 @@ The default managed Lua file is:
 ~/.config/d2wc/lua/d2wc.lua
 ```
 
-On first install, if no managed file exists, the installer creates the default managed file from the bundled template:
+On first install, if no managed file exists, the installer asks which bundled display template to use:
+
+1. `1080`
+2. `2160`
+
+The `2160` choice uses:
 
 ```text
 src/d2wc.lua
 ```
+
+The `1080` choice uses:
+
+```text
+src/d2wc-1080.lua
+```
+
+Both choices install the selected template as:
+
+```text
+~/.config/d2wc/lua/d2wc.lua
+```
+
+The display-template chooser is only part of new managed config creation. On update, or when an existing managed file is preserved, the installer does not replace the user's managed file with a bundled template.
 
 On update, the installer preserves the active managed file selection when the Devilspie2 integration symlink already points safely into:
 

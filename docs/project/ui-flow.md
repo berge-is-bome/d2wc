@@ -264,7 +264,32 @@ Typical user flow:
 5. User reviews row state.
 6. User applies the row.
 7. `d2wc` validates the managed Lua file, creates a backup, and replaces the active managed file safely.
-8. The UI refreshes with the updated configured rows.
+8. For successful `Add` and `Modify` actions on target rules, `d2wc` transiently applies only the saved rule to currently open windows.
+9. The UI refreshes with the updated configured rows.
+
+## Apply-after-save behavior
+
+After a successful row-level `Apply`, `d2wc` starts a short-lived Devilspie2 process only when the action has an immediate target rule to apply.
+
+The transient apply helper:
+
+1. builds a temporary `d2wc.lua` containing only the saved rule and the minimum supporting context it needs,
+2. writes that temporary file under a temporary folder,
+3. runs `devilspie2 --folder <temporary-folder>`,
+4. gives Devilspie2 a short time to apply the rule,
+5. terminates only that transient process,
+6. removes the temporary folder.
+
+The helper does not run the user's full managed Lua file. This avoids moving unrelated windows that the user may have placed manually during the current desktop session.
+
+Transient apply uses these rule-selection rules:
+
+1. `Add` and `Modify` target-rule actions are eligible.
+2. `Delete` actions are skipped.
+3. Pure `Window geometry` actions are skipped because a geometry profile does not target a window by itself.
+4. `Workspace placement` includes only the selected placement rule and its referenced geometry profile.
+5. `Left edge correction` includes the selected correction rule plus the matching placement rule and geometry profile needed for the correction branch to run.
+6. Runtime warnings do not turn a successful save into a failed save.
 
 ## Flow: route window to workspace
 
@@ -288,6 +313,8 @@ When this window opens, use this saved size and position.
 
 The workflow writes to `WORKSPACE_PLACEMENT` and references a profile from `GEOM`.
 
+Clicking `Apply` on an existing `Workspace placement` row also re-applies that one placement rule, even when the row values were not changed. This lets a user update a geometry profile, return to the linked placement rule, and apply the new geometry to matching open windows.
+
 ## Flow: create or modify a geometry profile
 
 User-facing intent:
@@ -297,3 +324,5 @@ Save this reusable window size and position.
 ```
 
 The workflow writes to `GEOM`.
+
+Geometry profile changes are saved but are not transiently applied by themselves. Apply a linked `Workspace placement` row to immediately use the updated profile on matching open windows.
