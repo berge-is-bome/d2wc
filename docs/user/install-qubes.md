@@ -2,7 +2,7 @@
 
 This guide is for Qubes users who want to install or update `d2wc` in dom0.
 
-The install flow uses a source VM to clone and archive the repository, then runs the installer in dom0. The source VM can be any running `AppVM` or `DispVM` that contains `/tmp/d2wc.tgz`.
+The install flow uses a source VM to clone and archive the repository, then runs the installer in dom0. The source VM can be any running `AppVM` or `DispVM` with internet access.
 
 ## In the source VM:
 
@@ -10,18 +10,6 @@ The install flow uses a source VM to clone and archive the repository, then runs
 2. Create archive.
 3. Copy install script to /tmp.
 4. Leave the source VM running until the dom0 installation is finished.
-
-```bash
-cd /tmp
-rm -rf -- d2wc
-
-git clone --depth 1 git@github.com:berge-is-bome/d2wc.git
-git -C d2wc fetch --depth 1 origin tag v0.1.0
-git -C d2wc archive --format=tar --prefix=d2wc/ v0.1.0 | gzip > /tmp/d2wc.tgz
-cp d2wc/install-qubes.sh .
-```
-
-If you want to stay on the main branch instead of the specific release tag, use:
 
 ```bash
 cd /tmp
@@ -46,7 +34,7 @@ chmod 700 /tmp/install-qubes.sh
 ./install-qubes.sh
 ```
 
-The script can also be called with a sourceVM paramete, `./install-qubes.sh <source-vm>`. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
+The script can also be called with a sourceVM parameter, `./install-qubes.sh <source-vm>`. If it is omitted, the installer shows a `zenity` chooser when available. The chooser lists running `AppVM` and `DispVM` entries only. If `zenity` is unavailable, the installer falls back to a command-line prompt.
 
 ## Installer update behavior
 
@@ -72,8 +60,4 @@ When the install completes, launch `d2wc`:
 d2wc
 ```
 
-The explicit configurator subcommand remains supported:
-
-```bash
-d2wc configure
-```
+You can also bind a keyboard shortcut to `d2wc`, or set how `d2wc` [behaves](docs/user/configurator-options.md) on new window events.
