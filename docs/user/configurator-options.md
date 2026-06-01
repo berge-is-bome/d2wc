@@ -42,7 +42,7 @@ This option controls what `d2wc` opens when automatic window-event behavior is e
 Available choices:
 
 1. `Open configurator directly`
-2. `Show Cancel/Configure button first`
+2. `Show Cancel/Configure overlay button`
 
 #### Open configurator directly
 
@@ -50,7 +50,7 @@ This opens the full configurator when an unconfigured normal window appears.
 
 Use this when you want the fastest setup workflow and you are comfortable with the configurator opening automatically.
 
-#### Show Cancel/Configure button first
+#### Show Cancel/Configure overlay button
 
 This shows a small prompt first.
 
