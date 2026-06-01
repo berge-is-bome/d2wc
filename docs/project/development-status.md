@@ -17,6 +17,8 @@ Current public target:
 5. GTK configurator as the normal user path for managing rules.
 6. Optional automatic configurator launch for unconfigured normal windows through Lua event handoff.
 7. Optional prompt button handoff for users who prefer a confirm-before-configure workflow.
+8. First-install bundled template choice for 1080 and 2160 display defaults.
+9. One-rule transient apply after successful configurator saves.
 
 Broader X11/Linux desktop use remains part of the project direction, but should be treated as experimental until tested deliberately.
 
@@ -26,19 +28,21 @@ Latest verification was reported as:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
+python3 -m d2wc validate --config src/d2wc-1080.lua
 python3 -m pytest
 ```
 
 Result:
 
 ```text
-302 passed
+312 passed
 ```
 
-After documentation restructuring and any local commits, run the normal verification path again:
+After documentation updates and any local commits, run the normal verification path again:
 
 ```bash
 python3 -m d2wc validate --config src/d2wc.lua
+python3 -m d2wc validate --config src/d2wc-1080.lua
 python3 -m pytest
 ```
 
@@ -49,13 +53,15 @@ Current implemented behavior is documented in the focused files below.
 User-facing documentation:
 
 1. [Install/Update for Qubes](../user/install-qubes.md) documents the Qubes dom0 install/update flow.
-2. [Lua Configurables](../user/lua-configurables.md) documents what users can configure.
-3. [Backups](../user/backups.md) documents where users can find backup archives.
+2. [Bundled Templates](../user/bundled-templates.md) explains the 1080 and 2160 first-install template choices.
+3. [Lua Configurables](../user/lua-configurables.md) documents what users can configure.
+4. [Configurator Options](../user/configurator-options.md) documents Behavior and Notifications settings.
+5. [Backups](../user/backups.md) documents where users can find backup archives.
 
 Project documentation:
 
 1. [UI Flow](ui-flow.md) documents the current user-facing configurator behavior.
-2. [Managed Config Workflow](managed-config-workflow.md) documents the installed path model, managed-file ownership, File Open, Save As, settings file, and symlink safety.
+2. [Managed Config Workflow](managed-config-workflow.md) documents the installed path model, managed-file ownership, File Open, Save As, settings file, symlink safety, and transient apply behavior.
 3. [Lua Configurables](lua-configurables.md) documents the internal managed Lua rule grammar and rule-section behavior.
 4. [Lua Event Handoff](lua-event-handoff.md) documents automatic window-event launching, prompt mode, recursion suppression, process locks, and managed Lua runtime migrations.
 5. [Backup Archives](backup-archives.md) documents backup archive creation and safe-save ordering.
@@ -100,6 +106,17 @@ Completed work:
 3. Added configurator recursion suppression through the stable GTK/X11 class `d2wc-configurator`.
 4. Added automatic launch suppression for windows that already match managed target rules.
 5. Added targeted managed Lua runtime migration during installer updates.
+
+### PR #39: `Add one-rule transient Devilspie2 apply after save`
+
+Completed work:
+
+1. Added transient one-rule apply after successful configurator saves.
+2. Used `devilspie2 --folder <temporary-folder>` with a temporary minimal `d2wc.lua`.
+3. Applied only the saved Add/Modify target rule instead of the user's full managed config.
+4. Included referenced geometry context for `Workspace placement` and `Left edge correction` transient apply.
+5. Skipped transient apply for Delete and pure `Window geometry` actions.
+6. Preserved successful saves when transient runtime apply reports a warning.
 
 ## Recent post-handoff GTK and runtime work
 
