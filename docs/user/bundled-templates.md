@@ -6,8 +6,8 @@ The templates are included because window placement uses real screen measurement
 
 The bundled choices are:
 
-1. `2160`: the original default template, intended as a starting point for 3840x2160 displays.
-2. `1080`: a smaller template, intended as a starting point for 1920x1080 displays.
+1. `2160`
+2. `1080`
 
 The `1080` template is based on the `2160` template, but scaled down by half. That gives 1080 users a practical first layout instead of starting with windows sized for a much larger display.
 
