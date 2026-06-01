@@ -125,7 +125,7 @@ choose_source_vm_zenity() {
   list="$(list_source_vms)" || return 1
   [ -n "$list" ] || return 2
 
-  printf '%s\n' "$list" | zenity --list --height=420 \
+  printf '%s\n' "$list" | zenity --list --height=600 \
     --title 'd2wc installer' \
     --hide-header \
     --column 'Running AppVM/DispVM' 2>/dev/null || return 3
@@ -172,7 +172,7 @@ choose_template_target_zenity() {
   [ -n "${DISPLAY-}" ] || return 1
 
   printf '%s\n%s\n' "$TEMPLATE_TARGET_1080" "$TEMPLATE_TARGET_2160" |
-    zenity --list --height=240 --width=360 \
+    zenity --list --width --height=400 \
       --title 'd2wc installer' \
       --text 'Choose the display/template target for the managed config.' \
       --hide-header \
