@@ -71,6 +71,7 @@ local EXCLUDE = {
 local PIN = {
 }
 local WORKSPACE_ROUTES = {
+  [2] = { "d:old c:pinned", },
 }
 local GEOM = {
 }
@@ -105,6 +106,7 @@ local PIN = {
   "d:work",
 }
 local WORKSPACE_ROUTES = {
+  [4] = { "d:work c:route-target", },
 }
 local GEOM = {
 }
@@ -287,7 +289,7 @@ def test_workspace_route_plan_excludes_unrelated_pin_context(tmp_path: Path) -> 
     assert '"d:old c:pinned",' not in plan.source
 
 
-def test_pin_delete_plan_unpins_matching_windows(tmp_path: Path) -> None:
+def test_pin_delete_plan_unpins_matching_windows_and_restores_route_workspace(tmp_path: Path) -> None:
     path = write_config(tmp_path, PIN_DELETE_CONFIG)
 
     plan = build_transient_apply_plan(
@@ -296,10 +298,14 @@ def test_pin_delete_plan_unpins_matching_windows(tmp_path: Path) -> None:
     )
 
     assert 'local PIN = {' in plan.source
+    assert '[2] = { "d:old c:pinned", },' in plan.source
     assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
     assert '"d:old c:pinned",' in plan.source
     assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
+    assert 'local d2wc_transient_workspace = compute_workspace(domain, cls)' in plan.source
     assert 'unpin_window()' in plan.source
+    assert 'set_window_workspace(d2wc_transient_workspace)' in plan.source
+    assert plan.source.index("unpin_window()") < plan.source.index("set_window_workspace(d2wc_transient_workspace)")
     assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
 
 
@@ -313,6 +319,7 @@ def test_pin_delete_plan_keeps_matching_remaining_pin_context(tmp_path: Path) ->
 
     assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
     assert '"d:work c:route-target",' in plan.source
+    assert '[4] = { "d:work c:route-target", },' in plan.source
     assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
     assert '"d:work",' in plan.source
     assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
