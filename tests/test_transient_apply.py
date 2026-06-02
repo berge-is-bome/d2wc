@@ -64,6 +64,73 @@ runtime_helper()
 '''
 
 
+PIN_DELETE_CONFIG = '''
+local D2WC_MANAGED = true
+local EXCLUDE = {
+}
+local PIN = {
+}
+local WORKSPACE_ROUTES = {
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+
+local function rule_matches_window(rule, d, c)
+  return rule ~= nil and d ~= nil and c ~= nil
+end
+
+local function list_rule_matches_window(list, d, c)
+  for _, rule in ipairs(list) do
+    if rule_matches_window(rule, d, c) then
+      return true
+    end
+  end
+  return false
+end
+
+local domain = "old"
+local cls = "pinned"
+'''
+
+
+PIN_DELETE_WITH_REMAINING_PIN_CONFIG = '''
+local D2WC_MANAGED = true
+local EXCLUDE = {
+}
+local PIN = {
+  "d:work",
+}
+local WORKSPACE_ROUTES = {
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+
+local function rule_matches_window(rule, d, c)
+  return rule ~= nil and d ~= nil and c ~= nil
+end
+
+local function list_rule_matches_window(list, d, c)
+  for _, rule in ipairs(list) do
+    if rule_matches_window(rule, d, c) then
+      return true
+    end
+  end
+  return false
+end
+
+local domain = "work"
+local cls = "route-target"
+'''
+
+
 class FakeTempDir:
     def __init__(self, path: Path):
         self.path = path
@@ -220,14 +287,45 @@ def test_workspace_route_plan_excludes_unrelated_pin_context(tmp_path: Path) -> 
     assert '"d:old c:pinned",' not in plan.source
 
 
+def test_pin_delete_plan_unpins_matching_windows(tmp_path: Path) -> None:
+    path = write_config(tmp_path, PIN_DELETE_CONFIG)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:old c:pinned"),
+    )
+
+    assert 'local PIN = {' in plan.source
+    assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
+    assert '"d:old c:pinned",' in plan.source
+    assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
+    assert 'unpin_window()' in plan.source
+    assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
+
+
+def test_pin_delete_plan_keeps_matching_remaining_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path, PIN_DELETE_WITH_REMAINING_PIN_CONFIG)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:work c:route-target"),
+    )
+
+    assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
+    assert '"d:work c:route-target",' in plan.source
+    assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
+    assert '"d:work",' in plan.source
+    assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
+
+
 @pytest.mark.parametrize(
     "action_request",
     [
         ManagedSectionActionRequest(section="GEOM", operation="add", profile_name="new", x=1, y=2, w=100, h=100),
-        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:old c:pinned"),
+        ManagedSectionActionRequest(section="EXCLUDE", operation="delete", existing_rule="d:old c:excluded"),
     ],
 )
-def test_geom_and_delete_actions_do_not_build_transient_plan(tmp_path: Path, action_request: ManagedSectionActionRequest) -> None:
+def test_geom_and_non_pin_delete_actions_do_not_build_transient_plan(tmp_path: Path, action_request: ManagedSectionActionRequest) -> None:
     path = write_config(tmp_path)
 
     with pytest.raises(NoTransientApplyNeeded):
