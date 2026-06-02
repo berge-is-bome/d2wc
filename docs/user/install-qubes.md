@@ -13,6 +13,7 @@ The install flow uses a source VM to clone and archive the repository, then runs
 
 ```bash
 cd /tmp
+rm -rf -- d2wc
 git clone git@github.com:berge-is-bome/d2wc.git
 git -C d2wc archive --format=tar --prefix=d2wc/ HEAD | gzip > /tmp/d2wc.tgz
 cp d2wc/install-qubes.sh .
