@@ -285,12 +285,13 @@ The helper does not run the user's full managed Lua file. This avoids moving unr
 Transient apply uses these rule-selection rules:
 
 1. `Add` and `Modify` target-rule actions are eligible.
-2. `Delete` actions are skipped.
+2. `Delete` actions are skipped except for `Pin` delete, which is eligible for transient cleanup.
 3. Pure `Window geometry` actions are skipped because a geometry profile does not target a window by itself.
 4. `Workspace routes` includes the selected route plus matching saved `Pin` context so a pinned window remains pinned after its workspace route is applied.
-5. `Workspace placement` includes only the selected placement rule and its referenced geometry profile.
-6. `Left edge correction` includes the selected correction rule plus the matching placement rule and geometry profile needed for the correction branch to run.
-7. Runtime warnings do not turn a successful save into a failed save.
+5. `Pin` delete removes the sticky flag and re-applies any matching saved `Workspace routes` context so the window remains anchored to its configured workspace.
+6. `Workspace placement` includes only the selected placement rule and its referenced geometry profile.
+7. `Left edge correction` includes the selected correction rule plus the matching placement rule and geometry profile needed for the correction branch to run.
+8. Runtime warnings do not turn a successful save into a failed save.
 
 ## Flow: route window to workspace
 
