@@ -23,6 +23,12 @@ local EXCLUDE = {
 }
 local PIN = {
   "d:old c:pinned",
+  "d:work c:route-target",
+  "d:work",
+  "c:route-target",
+  "d:other c:route-target",
+  "d:work c:other",
+  "c:elsewhere",
 }
 local WORKSPACE_ROUTES = {
   [1] = { "d:old c:routed", },
@@ -43,6 +49,15 @@ local LEFT_EDGE_CORRECTION = {
 local function runtime_helper()
   return true
 end
+
+local function apply_workspace()
+  set_window_workspace(4)
+end
+
+local function apply_pin()
+  pin_window()
+end
+
 runtime_helper()
 '''
 
@@ -136,6 +151,45 @@ def test_workspace_route_plan_contains_only_selected_route(tmp_path: Path) -> No
     assert '[4] = { "d:work c:route-target", },' in plan.source
     assert "d:old c:routed" not in plan.source
     assert "d:other c:route" not in plan.source
+
+
+def test_workspace_route_plan_includes_matching_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:route-target",
+        ),
+    )
+
+    assert '[4] = { "d:work c:route-target", },' in plan.source
+    assert '"d:work c:route-target",' in plan.source
+    assert '"d:work",' in plan.source
+    assert '"c:route-target",' in plan.source
+    assert plan.source.index("set_window_workspace") < plan.source.index("pin_window")
+
+
+def test_workspace_route_plan_excludes_unrelated_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:route-target",
+        ),
+    )
+
+    assert '"d:other c:route-target",' not in plan.source
+    assert '"d:work c:other",' not in plan.source
+    assert '"c:elsewhere",' not in plan.source
+    assert '"d:old c:pinned",' not in plan.source
 
 
 @pytest.mark.parametrize(
