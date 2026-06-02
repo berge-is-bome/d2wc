@@ -40,6 +40,7 @@ class _ActionRequest(Protocol):
     section: str
     operation: str
     rule: str
+    existing_rule: str
     workspace: int | None
 
 
@@ -156,14 +157,14 @@ def build_transient_apply_plan(config_path: Path, request: _ActionRequest) -> Tr
 
     section = request.section.upper()
     operation = request.operation.lower()
-    if operation == "delete" or section == "GEOM":
+    if section == "GEOM":
         raise NoTransientApplyNeeded()
-    if operation not in {"add", "modify"}:
+    if operation not in {"add", "modify", "delete"}:
+        raise NoTransientApplyNeeded()
+    if operation == "delete" and section != "PIN":
         raise NoTransientApplyNeeded()
 
-    rule = request.rule.strip()
-    if not rule:
-        raise ValueError("transient apply requires the saved rule text")
+    rule = _rule_for_transient_request(request, operation)
 
     source = config_path.read_text(encoding="utf-8")
     parsed = ManagedBlockParser().parse(source)
@@ -172,9 +173,11 @@ def build_transient_apply_plan(config_path: Path, request: _ActionRequest) -> Tr
         raise RenderValidationError(validation)
 
     saved_config = extract_managed_config(parsed.blocks)
-    minimal_config = _minimal_config_for_request(saved_config, section, rule, request)
+    minimal_config = _minimal_config_for_request(saved_config, section, operation, rule, request)
     rendered_blocks = render_managed_config(minimal_config)
     transient_source = _replace_managed_blocks(source, parsed.blocks, rendered_blocks)
+    if operation == "delete" and section == "PIN":
+        transient_source = _append_pin_delete_unpin(transient_source, saved_config, rule)
 
     transient_parsed = ManagedBlockParser().parse(transient_source)
     transient_validation = validate_managed_blocks(transient_parsed.blocks)
@@ -188,9 +191,20 @@ class NoTransientApplyNeeded(Exception):
     """Raised internally when an action should not be transient-applied."""
 
 
+def _rule_for_transient_request(request: _ActionRequest, operation: str) -> str:
+    if operation == "delete":
+        rule = request.existing_rule.strip() or request.rule.strip()
+    else:
+        rule = request.rule.strip()
+    if not rule:
+        raise ValueError("transient apply requires the saved rule text")
+    return rule
+
+
 def _minimal_config_for_request(
     saved_config: ManagedConfig,
     section: str,
+    operation: str,
     rule: str,
     request: _ActionRequest,
 ) -> ManagedConfig:
@@ -206,13 +220,15 @@ def _minimal_config_for_request(
     if section == "EXCLUDE":
         return ManagedConfig((rule,), empty.pin, empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "PIN":
-        return ManagedConfig(empty.exclude, (rule,), empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
+        pin = () if operation == "delete" else (rule,)
+        workspace_routes = _matching_workspace_routes_for_target(saved_config, rule) if operation == "delete" else empty.workspace_routes
+        return ManagedConfig(empty.exclude, pin, workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "WORKSPACE_ROUTES":
         if request.workspace is None:
             raise ValueError("transient WORKSPACE_ROUTES apply requires a workspace number")
         return ManagedConfig(
             empty.exclude,
-            empty.pin,
+            _matching_pin_rules_for_target(saved_config, rule),
             (WorkspaceRoute(request.workspace, (rule,)),),
             empty.geom,
             empty.workspace_placement,
@@ -226,6 +242,147 @@ def _minimal_config_for_request(
         return ManagedConfig(empty.exclude, empty.pin, empty.workspace_routes, (profile,), (placement_rule,), (rule,))
 
     raise NoTransientApplyNeeded()
+
+
+def _append_pin_delete_unpin(source: str, saved_config: ManagedConfig, deleted_rule: str) -> str:
+    keep_pin_rules = _matching_pin_rules_for_target(saved_config, deleted_rule)
+    cleanup = "\n".join(
+        (
+            "",
+            "-- D2WC transient PIN delete cleanup",
+            _render_lua_rule_list("D2WC_TRANSIENT_UNPIN", (deleted_rule,)),
+            _render_lua_rule_list("D2WC_TRANSIENT_KEEP_PIN", keep_pin_rules),
+            "if domain and list_rule_matches_window(D2WC_TRANSIENT_UNPIN, domain, cls)",
+            "  and not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls) then",
+            "  local d2wc_transient_workspace = compute_workspace(domain, cls)",
+            "  unpin_window()",
+            "  if d2wc_transient_workspace and d2wc_transient_workspace > 0",
+            "    and d2wc_transient_workspace <= get_workspace_count() then",
+            "    set_window_workspace(d2wc_transient_workspace)",
+            "  end",
+            "end",
+        )
+    )
+    return source.rstrip() + "\n" + cleanup + "\n"
+
+
+def _matching_pin_rules_for_target(saved_config: ManagedConfig, target_rule: str) -> tuple[str, ...]:
+    target = parse_prefixed_rule(target_rule)
+    if not target.has_target:
+        return ()
+
+    matches: list[str] = []
+    for pin_rule in saved_config.pin:
+        pin_target = parse_prefixed_rule(pin_rule)
+        if _rule_targets_can_match_same_window(target, pin_target):
+            matches.append(pin_rule)
+
+    return tuple(matches)
+
+
+def _matching_workspace_routes_for_target(saved_config: ManagedConfig, target_rule: str) -> tuple[WorkspaceRoute, ...]:
+    target = parse_prefixed_rule(target_rule)
+    if not target.has_target:
+        return ()
+
+    matches: list[WorkspaceRoute] = []
+    for route in saved_config.workspace_routes:
+        rules = tuple(
+            route_rule
+            for route_rule in route.rules
+            if _rule_targets_can_match_same_window(target, parse_prefixed_rule(route_rule))
+        )
+        if rules:
+            matches.append(WorkspaceRoute(route.workspace, rules))
+
+    return tuple(matches)
+
+
+def _rule_targets_can_match_same_window(left: PrefixedRule, right: PrefixedRule) -> bool:
+    if not left.has_target or not right.has_target:
+        return False
+    if left.domain is not None and right.domain is not None and left.domain != right.domain:
+        return False
+    if left.class_name is not None and right.class_name is not None:
+        return _class_patterns_can_match_same_window(left.class_name, right.class_name)
+    return True
+
+
+def _class_patterns_can_match_same_window(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    if _class_match_rank(left, right) > 0 or _class_match_rank(right, left) > 0:
+        return True
+    if left.endswith("*") and _wildcard_class_pattern_can_overlap(left[:-1], right):
+        return True
+    if right.endswith("*") and _wildcard_class_pattern_can_overlap(right[:-1], left):
+        return True
+    return False
+
+
+def _class_match_rank(rule_class: str, actual_class: str) -> int:
+    if rule_class == actual_class:
+        return 4
+
+    tokens = _split_dotted(actual_class)
+    if rule_class in tokens:
+        return 3
+
+    if rule_class.endswith("*"):
+        prefix = rule_class[:-1]
+        if actual_class.startswith(prefix):
+            return 2
+        for token in tokens:
+            if token.startswith(prefix):
+                return 1
+
+    return 0
+
+
+def _wildcard_class_pattern_can_overlap(wildcard_prefix: str, other_pattern: str) -> bool:
+    if not wildcard_prefix:
+        return True
+    if other_pattern.endswith("*"):
+        other_prefix = other_pattern[:-1]
+        if not other_prefix:
+            return True
+        if wildcard_prefix.startswith(other_prefix) or other_prefix.startswith(wildcard_prefix):
+            return True
+        return _wildcard_prefix_tail_can_overlap(wildcard_prefix, other_prefix) or _wildcard_prefix_tail_can_overlap(
+            other_prefix,
+            wildcard_prefix,
+        )
+
+    if other_pattern.startswith(wildcard_prefix):
+        return True
+    if any(token.startswith(wildcard_prefix) for token in _split_dotted(other_pattern)):
+        return True
+    return _wildcard_prefix_tail_can_overlap(wildcard_prefix, other_pattern)
+
+
+def _wildcard_prefix_tail_can_overlap(wildcard_prefix: str, other_pattern: str) -> bool:
+    if "." not in wildcard_prefix:
+        return False
+    tail_prefix = wildcard_prefix.rsplit(".", 1)[-1]
+    if not tail_prefix:
+        return "." not in other_pattern
+    return other_pattern.startswith(tail_prefix)
+
+
+def _split_dotted(value: str) -> list[str]:
+    return [part for part in value.split(".") if part]
+
+
+def _render_lua_rule_list(name: str, rules: tuple[str, ...]) -> str:
+    lines = [f"local {name} = {{"]
+    for rule in rules:
+        lines.append(f'  "{_escape_lua_string(rule)}",')
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _escape_lua_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _referenced_geometry_profile(saved_config: ManagedConfig, rule: str) -> tuple[GeometryProfile, ...]:

@@ -23,6 +23,14 @@ local EXCLUDE = {
 }
 local PIN = {
   "d:old c:pinned",
+  "d:work c:route-target",
+  "d:work",
+  "c:route-target",
+  "d:other c:route-target",
+  "d:work c:other",
+  "c:elsewhere",
+  "c:meld",
+  "c:soffice*",
 }
 local WORKSPACE_ROUTES = {
   [1] = { "d:old c:routed", },
@@ -43,7 +51,85 @@ local LEFT_EDGE_CORRECTION = {
 local function runtime_helper()
   return true
 end
+
+local function apply_workspace()
+  set_window_workspace(4)
+end
+
+local function apply_pin()
+  pin_window()
+end
+
 runtime_helper()
+'''
+
+
+PIN_DELETE_CONFIG = '''
+local D2WC_MANAGED = true
+local EXCLUDE = {
+}
+local PIN = {
+}
+local WORKSPACE_ROUTES = {
+  [2] = { "d:old c:pinned", },
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+
+local function rule_matches_window(rule, d, c)
+  return rule ~= nil and d ~= nil and c ~= nil
+end
+
+local function list_rule_matches_window(list, d, c)
+  for _, rule in ipairs(list) do
+    if rule_matches_window(rule, d, c) then
+      return true
+    end
+  end
+  return false
+end
+
+local domain = "old"
+local cls = "pinned"
+'''
+
+
+PIN_DELETE_WITH_REMAINING_PIN_CONFIG = '''
+local D2WC_MANAGED = true
+local EXCLUDE = {
+}
+local PIN = {
+  "d:work",
+}
+local WORKSPACE_ROUTES = {
+  [4] = { "d:work c:route-target", },
+}
+local GEOM = {
+}
+local WORKSPACE_PLACEMENT = {
+}
+local LEFT_EDGE_CORRECTION = {
+}
+
+local function rule_matches_window(rule, d, c)
+  return rule ~= nil and d ~= nil and c ~= nil
+end
+
+local function list_rule_matches_window(list, d, c)
+  for _, rule in ipairs(list) do
+    if rule_matches_window(rule, d, c) then
+      return true
+    end
+  end
+  return false
+end
+
+local domain = "work"
+local cls = "route-target"
 '''
 
 
@@ -138,14 +224,115 @@ def test_workspace_route_plan_contains_only_selected_route(tmp_path: Path) -> No
     assert "d:other c:route" not in plan.source
 
 
+def test_workspace_route_plan_includes_matching_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:route-target",
+        ),
+    )
+
+    assert '[4] = { "d:work c:route-target", },' in plan.source
+    assert '"d:work c:route-target",' in plan.source
+    assert '"d:work",' in plan.source
+    assert '"c:route-target",' in plan.source
+    assert plan.source.index("set_window_workspace") < plan.source.index("pin_window")
+
+
+def test_workspace_route_plan_includes_pin_context_using_runtime_class_semantics(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    dotted_plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:org.gnome.meld",
+        ),
+    )
+    wildcard_plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:soffice.bin",
+        ),
+    )
+
+    assert '"c:meld",' in dotted_plan.source
+    assert '"c:soffice*",' in wildcard_plan.source
+
+
+def test_workspace_route_plan_excludes_unrelated_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:route-target",
+        ),
+    )
+
+    assert '"d:other c:route-target",' not in plan.source
+    assert '"d:work c:other",' not in plan.source
+    assert '"c:elsewhere",' not in plan.source
+    assert '"d:old c:pinned",' not in plan.source
+
+
+def test_pin_delete_plan_unpins_matching_windows_and_restores_route_workspace(tmp_path: Path) -> None:
+    path = write_config(tmp_path, PIN_DELETE_CONFIG)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:old c:pinned"),
+    )
+
+    assert 'local PIN = {' in plan.source
+    assert '[2] = { "d:old c:pinned", },' in plan.source
+    assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
+    assert '"d:old c:pinned",' in plan.source
+    assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
+    assert 'local d2wc_transient_workspace = compute_workspace(domain, cls)' in plan.source
+    assert 'unpin_window()' in plan.source
+    assert 'set_window_workspace(d2wc_transient_workspace)' in plan.source
+    assert plan.source.index("unpin_window()") < plan.source.index("set_window_workspace(d2wc_transient_workspace)")
+    assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
+
+
+def test_pin_delete_plan_keeps_matching_remaining_pin_context(tmp_path: Path) -> None:
+    path = write_config(tmp_path, PIN_DELETE_WITH_REMAINING_PIN_CONFIG)
+
+    plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:work c:route-target"),
+    )
+
+    assert 'local D2WC_TRANSIENT_UNPIN = {' in plan.source
+    assert '"d:work c:route-target",' in plan.source
+    assert '[4] = { "d:work c:route-target", },' in plan.source
+    assert 'local D2WC_TRANSIENT_KEEP_PIN = {' in plan.source
+    assert '"d:work",' in plan.source
+    assert 'not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls)' in plan.source
+
+
 @pytest.mark.parametrize(
     "action_request",
     [
         ManagedSectionActionRequest(section="GEOM", operation="add", profile_name="new", x=1, y=2, w=100, h=100),
-        ManagedSectionActionRequest(section="PIN", operation="delete", existing_rule="d:old c:pinned"),
+        ManagedSectionActionRequest(section="EXCLUDE", operation="delete", existing_rule="d:old c:excluded"),
     ],
 )
-def test_geom_and_delete_actions_do_not_build_transient_plan(tmp_path: Path, action_request: ManagedSectionActionRequest) -> None:
+def test_geom_and_non_pin_delete_actions_do_not_build_transient_plan(tmp_path: Path, action_request: ManagedSectionActionRequest) -> None:
     path = write_config(tmp_path)
 
     with pytest.raises(NoTransientApplyNeeded):
