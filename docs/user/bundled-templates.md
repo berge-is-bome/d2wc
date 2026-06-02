@@ -11,7 +11,7 @@ The `1080` template is based on the `2160` template, but scaled down by a factor
 
 >The `2160` template was created while using the `Default-hdpi` theme in `appMenu -> gear icon -> System Settings -> Window Manager`.
 
-The `1080` template is still only a starting point. Different desktops, themes, window borders, font sizes, and display layouts can make the same values feel slightly different from one system to another. The goal is not to make every window perfect immediately. The goal is to make the first install usable, then let you fine-tune from there.
+Both templates are intended only as starting points. Different desktops, themes, window borders, font sizes, and display layouts can make the same values feel slightly different from one system to another. The goal is not to make every window perfect immediately. The goal is to make the first install usable, then let you fine-tune from there.
 
 After installation, geometry profiles can be adjusted in the Window geometry workflow:
 
