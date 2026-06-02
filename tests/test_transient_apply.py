@@ -29,6 +29,8 @@ local PIN = {
   "d:other c:route-target",
   "d:work c:other",
   "c:elsewhere",
+  "c:meld",
+  "c:soffice*",
 }
 local WORKSPACE_ROUTES = {
   [1] = { "d:old c:routed", },
@@ -171,6 +173,32 @@ def test_workspace_route_plan_includes_matching_pin_context(tmp_path: Path) -> N
     assert '"d:work",' in plan.source
     assert '"c:route-target",' in plan.source
     assert plan.source.index("set_window_workspace") < plan.source.index("pin_window")
+
+
+def test_workspace_route_plan_includes_pin_context_using_runtime_class_semantics(tmp_path: Path) -> None:
+    path = write_config(tmp_path)
+
+    dotted_plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:org.gnome.meld",
+        ),
+    )
+    wildcard_plan = build_transient_apply_plan(
+        path,
+        ManagedSectionActionRequest(
+            section="WORKSPACE_ROUTES",
+            operation="modify",
+            workspace=4,
+            rule="d:work c:soffice.bin",
+        ),
+    )
+
+    assert '"c:meld",' in dotted_plan.source
+    assert '"c:soffice*",' in wildcard_plan.source
 
 
 def test_workspace_route_plan_excludes_unrelated_pin_context(tmp_path: Path) -> None:
