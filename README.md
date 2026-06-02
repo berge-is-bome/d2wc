@@ -83,7 +83,7 @@ This makes new rules easier to create because common values can be selected from
 
 ## Automatic window-event launching
 
-The active managed Lua file can open the configurator automatically when Devilspie2 sees a new normal application window that is not already covered by a managed rule.
+The active managed Lua file can open the configurator automatically when Devilspie2 sees a new application window that is not already covered by a managed rule.
 
 This behavior is controlled in the configurator:
 
