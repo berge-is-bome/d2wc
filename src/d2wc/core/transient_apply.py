@@ -247,9 +247,74 @@ def _rule_targets_can_match_same_window(left: PrefixedRule, right: PrefixedRule)
         return False
     if left.domain is not None and right.domain is not None and left.domain != right.domain:
         return False
-    if left.class_name is not None and right.class_name is not None and left.class_name != right.class_name:
-        return False
+    if left.class_name is not None and right.class_name is not None:
+        return _class_patterns_can_match_same_window(left.class_name, right.class_name)
     return True
+
+
+def _class_patterns_can_match_same_window(left: str, right: str) -> bool:
+    if left == right:
+        return True
+    if _class_match_rank(left, right) > 0 or _class_match_rank(right, left) > 0:
+        return True
+    if left.endswith("*") and _wildcard_class_pattern_can_overlap(left[:-1], right):
+        return True
+    if right.endswith("*") and _wildcard_class_pattern_can_overlap(right[:-1], left):
+        return True
+    return False
+
+
+def _class_match_rank(rule_class: str, actual_class: str) -> int:
+    if rule_class == actual_class:
+        return 4
+
+    tokens = _split_dotted(actual_class)
+    if rule_class in tokens:
+        return 3
+
+    if rule_class.endswith("*"):
+        prefix = rule_class[:-1]
+        if actual_class.startswith(prefix):
+            return 2
+        for token in tokens:
+            if token.startswith(prefix):
+                return 1
+
+    return 0
+
+
+def _wildcard_class_pattern_can_overlap(wildcard_prefix: str, other_pattern: str) -> bool:
+    if not wildcard_prefix:
+        return True
+    if other_pattern.endswith("*"):
+        other_prefix = other_pattern[:-1]
+        if not other_prefix:
+            return True
+        if wildcard_prefix.startswith(other_prefix) or other_prefix.startswith(wildcard_prefix):
+            return True
+        return _wildcard_prefix_tail_can_overlap(wildcard_prefix, other_prefix) or _wildcard_prefix_tail_can_overlap(
+            other_prefix,
+            wildcard_prefix,
+        )
+
+    if other_pattern.startswith(wildcard_prefix):
+        return True
+    if any(token.startswith(wildcard_prefix) for token in _split_dotted(other_pattern)):
+        return True
+    return _wildcard_prefix_tail_can_overlap(wildcard_prefix, other_pattern)
+
+
+def _wildcard_prefix_tail_can_overlap(wildcard_prefix: str, other_pattern: str) -> bool:
+    if "." not in wildcard_prefix:
+        return False
+    tail_prefix = wildcard_prefix.rsplit(".", 1)[-1]
+    if not tail_prefix:
+        return "." not in other_pattern
+    return other_pattern.startswith(tail_prefix)
+
+
+def _split_dotted(value: str) -> list[str]:
+    return [part for part in value.split(".") if part]
 
 
 def _referenced_geometry_profile(saved_config: ManagedConfig, rule: str) -> tuple[GeometryProfile, ...]:
