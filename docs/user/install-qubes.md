@@ -21,14 +21,16 @@ cp d2wc/install-qubes.sh .
 
 ## In dom0:
 
-4. Copy `install-qubes.sh` from the source VM.
-5. Make the script executable.
-6. Run the script.
-7. Shutdown the source VM when installation is complete.
+5. Install `devilspie2`, `python3`, and `python3-pip`.
+6. Copy `install-qubes.sh` from the source VM.
+7. Make the script executable.
+8. Run the script.
+9. Shutdown the source VM when installation is complete.
 
 Replace `<source-vm>` with the running VM that contains `/tmp/d2wc.tgz`.
 
 ```bash
+sudo qubes-dom0-update devilspie2 python3 python3-pip
 cd /tmp
 qvm-run --pass-io <source-vm> 'cat /tmp/d2wc/install-qubes.sh' > /tmp/install-qubes.sh
 chmod 700 /tmp/install-qubes.sh
