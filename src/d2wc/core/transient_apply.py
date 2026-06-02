@@ -212,7 +212,7 @@ def _minimal_config_for_request(
             raise ValueError("transient WORKSPACE_ROUTES apply requires a workspace number")
         return ManagedConfig(
             empty.exclude,
-            empty.pin,
+            _matching_pin_rules_for_route(saved_config, rule),
             (WorkspaceRoute(request.workspace, (rule,)),),
             empty.geom,
             empty.workspace_placement,
@@ -226,6 +226,30 @@ def _minimal_config_for_request(
         return ManagedConfig(empty.exclude, empty.pin, empty.workspace_routes, (profile,), (placement_rule,), (rule,))
 
     raise NoTransientApplyNeeded()
+
+
+def _matching_pin_rules_for_route(saved_config: ManagedConfig, route_rule: str) -> tuple[str, ...]:
+    route_target = parse_prefixed_rule(route_rule)
+    if not route_target.has_target:
+        return ()
+
+    matches: list[str] = []
+    for pin_rule in saved_config.pin:
+        pin_target = parse_prefixed_rule(pin_rule)
+        if _rule_targets_can_match_same_window(route_target, pin_target):
+            matches.append(pin_rule)
+
+    return tuple(matches)
+
+
+def _rule_targets_can_match_same_window(left: PrefixedRule, right: PrefixedRule) -> bool:
+    if not left.has_target or not right.has_target:
+        return False
+    if left.domain is not None and right.domain is not None and left.domain != right.domain:
+        return False
+    if left.class_name is not None and right.class_name is not None and left.class_name != right.class_name:
+        return False
+    return True
 
 
 def _referenced_geometry_profile(saved_config: ManagedConfig, rule: str) -> tuple[GeometryProfile, ...]:
