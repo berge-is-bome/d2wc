@@ -40,6 +40,7 @@ class _ActionRequest(Protocol):
     section: str
     operation: str
     rule: str
+    existing_rule: str
     workspace: int | None
 
 
@@ -156,14 +157,14 @@ def build_transient_apply_plan(config_path: Path, request: _ActionRequest) -> Tr
 
     section = request.section.upper()
     operation = request.operation.lower()
-    if operation == "delete" or section == "GEOM":
+    if section == "GEOM":
         raise NoTransientApplyNeeded()
-    if operation not in {"add", "modify"}:
+    if operation not in {"add", "modify", "delete"}:
+        raise NoTransientApplyNeeded()
+    if operation == "delete" and section != "PIN":
         raise NoTransientApplyNeeded()
 
-    rule = request.rule.strip()
-    if not rule:
-        raise ValueError("transient apply requires the saved rule text")
+    rule = _rule_for_transient_request(request, operation)
 
     source = config_path.read_text(encoding="utf-8")
     parsed = ManagedBlockParser().parse(source)
@@ -172,9 +173,11 @@ def build_transient_apply_plan(config_path: Path, request: _ActionRequest) -> Tr
         raise RenderValidationError(validation)
 
     saved_config = extract_managed_config(parsed.blocks)
-    minimal_config = _minimal_config_for_request(saved_config, section, rule, request)
+    minimal_config = _minimal_config_for_request(saved_config, section, operation, rule, request)
     rendered_blocks = render_managed_config(minimal_config)
     transient_source = _replace_managed_blocks(source, parsed.blocks, rendered_blocks)
+    if operation == "delete" and section == "PIN":
+        transient_source = _append_pin_delete_unpin(transient_source, saved_config, rule)
 
     transient_parsed = ManagedBlockParser().parse(transient_source)
     transient_validation = validate_managed_blocks(transient_parsed.blocks)
@@ -188,9 +191,20 @@ class NoTransientApplyNeeded(Exception):
     """Raised internally when an action should not be transient-applied."""
 
 
+def _rule_for_transient_request(request: _ActionRequest, operation: str) -> str:
+    if operation == "delete":
+        rule = request.existing_rule.strip() or request.rule.strip()
+    else:
+        rule = request.rule.strip()
+    if not rule:
+        raise ValueError("transient apply requires the saved rule text")
+    return rule
+
+
 def _minimal_config_for_request(
     saved_config: ManagedConfig,
     section: str,
+    operation: str,
     rule: str,
     request: _ActionRequest,
 ) -> ManagedConfig:
@@ -206,13 +220,14 @@ def _minimal_config_for_request(
     if section == "EXCLUDE":
         return ManagedConfig((rule,), empty.pin, empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "PIN":
-        return ManagedConfig(empty.exclude, (rule,), empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
+        pin = () if operation == "delete" else (rule,)
+        return ManagedConfig(empty.exclude, pin, empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "WORKSPACE_ROUTES":
         if request.workspace is None:
             raise ValueError("transient WORKSPACE_ROUTES apply requires a workspace number")
         return ManagedConfig(
             empty.exclude,
-            _matching_pin_rules_for_route(saved_config, rule),
+            _matching_pin_rules_for_target(saved_config, rule),
             (WorkspaceRoute(request.workspace, (rule,)),),
             empty.geom,
             empty.workspace_placement,
@@ -228,15 +243,32 @@ def _minimal_config_for_request(
     raise NoTransientApplyNeeded()
 
 
-def _matching_pin_rules_for_route(saved_config: ManagedConfig, route_rule: str) -> tuple[str, ...]:
-    route_target = parse_prefixed_rule(route_rule)
-    if not route_target.has_target:
+def _append_pin_delete_unpin(source: str, saved_config: ManagedConfig, deleted_rule: str) -> str:
+    keep_pin_rules = _matching_pin_rules_for_target(saved_config, deleted_rule)
+    cleanup = "\n".join(
+        (
+            "",
+            "-- D2WC transient PIN delete cleanup",
+            _render_lua_rule_list("D2WC_TRANSIENT_UNPIN", (deleted_rule,)),
+            _render_lua_rule_list("D2WC_TRANSIENT_KEEP_PIN", keep_pin_rules),
+            "if domain and list_rule_matches_window(D2WC_TRANSIENT_UNPIN, domain, cls)",
+            "  and not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls) then",
+            "  unpin_window()",
+            "end",
+        )
+    )
+    return source.rstrip() + "\n" + cleanup + "\n"
+
+
+def _matching_pin_rules_for_target(saved_config: ManagedConfig, target_rule: str) -> tuple[str, ...]:
+    target = parse_prefixed_rule(target_rule)
+    if not target.has_target:
         return ()
 
     matches: list[str] = []
     for pin_rule in saved_config.pin:
         pin_target = parse_prefixed_rule(pin_rule)
-        if _rule_targets_can_match_same_window(route_target, pin_target):
+        if _rule_targets_can_match_same_window(target, pin_target):
             matches.append(pin_rule)
 
     return tuple(matches)
@@ -315,6 +347,18 @@ def _wildcard_prefix_tail_can_overlap(wildcard_prefix: str, other_pattern: str) 
 
 def _split_dotted(value: str) -> list[str]:
     return [part for part in value.split(".") if part]
+
+
+def _render_lua_rule_list(name: str, rules: tuple[str, ...]) -> str:
+    lines = [f"local {name} = {{"]
+    for rule in rules:
+        lines.append(f'  "{_escape_lua_string(rule)}",')
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _escape_lua_string(value: str) -> str:
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _referenced_geometry_profile(saved_config: ManagedConfig, rule: str) -> tuple[GeometryProfile, ...]:
