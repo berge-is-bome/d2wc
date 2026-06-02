@@ -221,7 +221,8 @@ def _minimal_config_for_request(
         return ManagedConfig((rule,), empty.pin, empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "PIN":
         pin = () if operation == "delete" else (rule,)
-        return ManagedConfig(empty.exclude, pin, empty.workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
+        workspace_routes = _matching_workspace_routes_for_target(saved_config, rule) if operation == "delete" else empty.workspace_routes
+        return ManagedConfig(empty.exclude, pin, workspace_routes, empty.geom, empty.workspace_placement, empty.left_edge_correction)
     if section == "WORKSPACE_ROUTES":
         if request.workspace is None:
             raise ValueError("transient WORKSPACE_ROUTES apply requires a workspace number")
@@ -253,7 +254,12 @@ def _append_pin_delete_unpin(source: str, saved_config: ManagedConfig, deleted_r
             _render_lua_rule_list("D2WC_TRANSIENT_KEEP_PIN", keep_pin_rules),
             "if domain and list_rule_matches_window(D2WC_TRANSIENT_UNPIN, domain, cls)",
             "  and not list_rule_matches_window(D2WC_TRANSIENT_KEEP_PIN, domain, cls) then",
+            "  local d2wc_transient_workspace = compute_workspace(domain, cls)",
             "  unpin_window()",
+            "  if d2wc_transient_workspace and d2wc_transient_workspace > 0",
+            "    and d2wc_transient_workspace <= get_workspace_count() then",
+            "    set_window_workspace(d2wc_transient_workspace)",
+            "  end",
             "end",
         )
     )
@@ -270,6 +276,24 @@ def _matching_pin_rules_for_target(saved_config: ManagedConfig, target_rule: str
         pin_target = parse_prefixed_rule(pin_rule)
         if _rule_targets_can_match_same_window(target, pin_target):
             matches.append(pin_rule)
+
+    return tuple(matches)
+
+
+def _matching_workspace_routes_for_target(saved_config: ManagedConfig, target_rule: str) -> tuple[WorkspaceRoute, ...]:
+    target = parse_prefixed_rule(target_rule)
+    if not target.has_target:
+        return ()
+
+    matches: list[WorkspaceRoute] = []
+    for route in saved_config.workspace_routes:
+        rules = tuple(
+            route_rule
+            for route_rule in route.rules
+            if _rule_targets_can_match_same_window(target, parse_prefixed_rule(route_rule))
+        )
+        if rules:
+            matches.append(WorkspaceRoute(route.workspace, rules))
 
     return tuple(matches)
 
