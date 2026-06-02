@@ -287,9 +287,10 @@ Transient apply uses these rule-selection rules:
 1. `Add` and `Modify` target-rule actions are eligible.
 2. `Delete` actions are skipped.
 3. Pure `Window geometry` actions are skipped because a geometry profile does not target a window by itself.
-4. `Workspace placement` includes only the selected placement rule and its referenced geometry profile.
-5. `Left edge correction` includes the selected correction rule plus the matching placement rule and geometry profile needed for the correction branch to run.
-6. Runtime warnings do not turn a successful save into a failed save.
+4. `Workspace routes` includes the selected route plus matching saved `Pin` context so a pinned window remains pinned after its workspace route is applied.
+5. `Workspace placement` includes only the selected placement rule and its referenced geometry profile.
+6. `Left edge correction` includes the selected correction rule plus the matching placement rule and geometry profile needed for the correction branch to run.
+7. Runtime warnings do not turn a successful save into a failed save.
 
 ## Flow: route window to workspace
 
