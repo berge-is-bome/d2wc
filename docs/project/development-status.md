@@ -35,7 +35,7 @@ python3 -m pytest
 Result:
 
 ```text
-312 passed
+317 passed
 ```
 
 After documentation updates and any local commits, run the normal verification path again:
